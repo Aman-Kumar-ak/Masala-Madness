@@ -1,8 +1,4 @@
-/* frontend/src/style.css */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f4;
-  }
-  
+/* src/style.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

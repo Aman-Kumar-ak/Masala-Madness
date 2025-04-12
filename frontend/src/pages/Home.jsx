@@ -1,15 +1,15 @@
-// src/pages/Home.jsx
-import React from 'react';
+import React from "react";
+import Menu from "../components/Menu";
 
-const Home = () => {
+export default function Home() {
   return (
-    <div className="h-screen bg-gradient-to-br from-yellow-200 to-red-100 flex flex-col items-center justify-center p-6">
-      <h1 className="text-3xl font-bold text-red-700 mb-4">🍛 Masala Madness</h1>
-      <p className="text-gray-800 text-center">
-        If you're seeing this, your mobile-first setup is working!
-      </p>
+    <div className="min-h-screen bg-orange-100">
+      <div className="bg-white shadow-md">
+        <div className="container mx-auto">
+          <h1 className="text-2xl text-center font-bold py-4">Masala Madness</h1>
+        </div>
+      </div>
+      <Menu />
     </div>
   );
-};
-
-export default Home;
+}
