@@ -14,12 +14,17 @@ const MenuManager = ({ categories, onUpdate }) => {
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
+    const isDuplicate = categories.some(
+      (cat) => cat.categoryName.toLowerCase() === newCategory.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      alert('Category already exists!');
+      return;
+    }
     try {
       const response = await fetch(`${BASE_URL}/dishes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ categoryName: newCategory }),
       });
       if (response.ok) {
@@ -33,12 +38,19 @@ const MenuManager = ({ categories, onUpdate }) => {
 
   const handleAddDish = async (e) => {
     e.preventDefault();
+    const category = categories.find((cat) => cat._id === newDish.categoryId);
+    if (!category) return;
+    const isDuplicate = category.dishes.some(
+      (dish) => dish.name.toLowerCase() === newDish.name.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      alert('Dish with this name already exists in this category!');
+      return;
+    }
     try {
       const response = await fetch(`${BASE_URL}/dishes/${newDish.categoryId}/dish`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newDish.name,
           priceHalf: Number(newDish.priceHalf),
@@ -46,12 +58,7 @@ const MenuManager = ({ categories, onUpdate }) => {
         }),
       });
       if (response.ok) {
-        setNewDish({
-          categoryId: '',
-          name: '',
-          priceHalf: '',
-          priceFull: ''
-        });
+        setNewDish({ categoryId: '', name: '', priceHalf: '', priceFull: '' });
         setShowAddDish(false);
         onUpdate();
       }
@@ -62,12 +69,25 @@ const MenuManager = ({ categories, onUpdate }) => {
 
   const handleUpdateDish = async (e) => {
     e.preventDefault();
+
+    const category = categories.find(cat => cat._id === editingDish.categoryId);
+    if (!category) return;
+
+    const isDuplicate = category.dishes.some(
+      (dish) =>
+        dish._id !== editingDish.dishId &&
+        dish.name.toLowerCase() === editingDish.name.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      alert('Another dish with this name already exists in this category!');
+      return;
+    }
+
     try {
       const response = await fetch(`${BASE_URL}/dishes/${editingDish.categoryId}/dish/${editingDish.dishId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editingDish.name,
           priceHalf: Number(editingDish.priceHalf),
@@ -85,14 +105,11 @@ const MenuManager = ({ categories, onUpdate }) => {
 
   const handleDeleteCategory = async (categoryId) => {
     if (!window.confirm('Are you sure you want to delete this category?')) return;
-    
     try {
       const response = await fetch(`${BASE_URL}/dishes/${categoryId}`, {
         method: 'DELETE',
       });
-      if (response.ok) {
-        onUpdate();
-      }
+      if (response.ok) onUpdate();
     } catch (error) {
       console.error('Error deleting category:', error);
     }
@@ -100,14 +117,11 @@ const MenuManager = ({ categories, onUpdate }) => {
 
   const handleDeleteDish = async (categoryId, dishId) => {
     if (!window.confirm('Are you sure you want to delete this dish?')) return;
-    
     try {
       const response = await fetch(`${BASE_URL}/dishes/${categoryId}/dish/${dishId}`, {
         method: 'DELETE',
       });
-      if (response.ok) {
-        onUpdate();
-      }
+      if (response.ok) onUpdate();
     } catch (error) {
       console.error('Error deleting dish:', error);
     }
@@ -127,8 +141,7 @@ const MenuManager = ({ categories, onUpdate }) => {
     <div className="p-4 bg-white rounded-lg shadow-md mb-4">
       <div className="mb-4">
         <h2 className="text-xl font-bold mb-2">Menu Management</h2>
-        
-        {/* Add Category Form */}
+
         <form onSubmit={handleAddCategory} className="mb-4">
           <div className="flex gap-2">
             <input
@@ -139,16 +152,12 @@ const MenuManager = ({ categories, onUpdate }) => {
               className="flex-1 p-2 border rounded"
               required
             />
-            <button
-              type="submit"
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-            >
+            <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
               Add Category
             </button>
           </div>
         </form>
 
-        {/* Add Dish Button */}
         <button
           onClick={() => setShowAddDish(!showAddDish)}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-4"
@@ -156,7 +165,6 @@ const MenuManager = ({ categories, onUpdate }) => {
           {showAddDish ? 'Cancel' : 'Add New Dish'}
         </button>
 
-        {/* Add Dish Form */}
         {showAddDish && (
           <form onSubmit={handleAddDish} className="mb-4 p-4 bg-gray-50 rounded">
             <div className="grid grid-cols-1 gap-4">
@@ -168,9 +176,7 @@ const MenuManager = ({ categories, onUpdate }) => {
               >
                 <option value="">Select Category</option>
                 {categories.map((category) => (
-                  <option key={category._id} value={category._id}>
-                    {category.categoryName}
-                  </option>
+                  <option key={category._id} value={category._id}>{category.categoryName}</option>
                 ))}
               </select>
               <input
@@ -207,7 +213,6 @@ const MenuManager = ({ categories, onUpdate }) => {
           </form>
         )}
 
-        {/* Categories and Dishes List */}
         <div className="mt-4">
           {categories.map((category) => (
             <div key={category._id} className="mb-4 p-4 bg-gray-50 rounded">
@@ -251,10 +256,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                           />
                         </div>
                         <div className="flex gap-2">
-                          <button
-                            type="submit"
-                            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                          >
+                          <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
                             Save
                           </button>
                           <button
