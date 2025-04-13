@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const OrderSchema = new mongoose.Schema({
   orderId: {
@@ -17,8 +17,14 @@ const OrderSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   paymentMethod: { type: String, required: true },
   isPaid: { type: Boolean, required: true },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: {
+    type: Date,
+    default: () => {
+      const istOffset = 5.5 * 60 * 60000;
+      return new Date(Date.now() + istOffset);
+    },
+  },
 });
 
-const Order = mongoose.model('Order', OrderSchema);
-module.exports = Order;
+const Order = mongoose.model("Order", OrderSchema); // ✅ Mongoose model
+module.exports = Order; // ✅ Export the model only

@@ -63,13 +63,10 @@ router.get("/today", async (req, res) => {
 router.get("/date/:date", async (req, res) => {
   try {
     const dateStr = req.params.date; // Expected format: 'YYYY-MM-DD'
-    const date = new Date(dateStr);
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Start of the selected date in UTC
+    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
 
     const orders = await Order.find({
       createdAt: { $gte: startOfDay, $lte: endOfDay },
@@ -77,10 +74,14 @@ router.get("/date/:date", async (req, res) => {
 
     res.status(200).json(orders);
   } catch (error) {
-    console.error('Fetch orders by date error:', error);
-    res.status(500).json({ message: "Failed to fetch orders for the given date", error: error.message });
+    console.error("Fetch orders by date error:", error);
+    res.status(500).json({
+      message: "Failed to fetch orders for the given date",
+      error: error.message,
+    });
   }
 });
+
 
 // @route   DELETE /api/orders/cleanup
 //Delete orders older than a specific date (e.g., 30 days)
