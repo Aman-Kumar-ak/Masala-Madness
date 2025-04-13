@@ -170,11 +170,13 @@ node scripts/addTestData.js
    - Backend: The server auto-restarts with nodemon
    - Frontend: Changes hot-reload automatically
 
-## Things to do now - 
+## Issue
 
-1. We have to make the Payment section which will be inside the @cart.jsx only.
-2. There will be two option - Cash/Online(QR).
-3. Admin has to verify the payment manually and confirm it on with the popup which comes and ask for the payment is successful or not.
-4. If the Payment is successful, the Order will be updated in the Database with the details - OrderId, Order Number(Starting from 0 everyday), Choosen dish(H/F) with their Original Price and Total amount of each dish, Total amount of the Order, Choosen Mode of Payment (Cash/Online(QR)), Date and Time(+5:30)in IST.
-5. After the Payment is Successful it will updated in database and the page will be redirected to the Home Page wtih 0 items in the Cart(Cart will be empty) and ready for the next Order.
-5. If the payment is Failed(Choosen Failed in Popup for confirmation) then it will return to the Homepage with 0 items in the Cart(Cart will be empty) for new Orders.
+When the date changes, the Order Number has to be reset to 0 but at present for the new Order it storing with (Previous Order Number + 1) which is need to be fixed.
+
+## Things to do now
+
+1. We have to work on showing Previous Orders in Frontend. In that we can see the Orders of Specific date.
+2. We also have to work on Providing Excel Sheets. When admin download the Excel sheets of Specific date, data has to be fetch from the database and convert into Excel Sheet.
+3. In Excel Sheets, there will be columns of OrderNumber, Date, Time, Dishes, Type(H/F) Dishes Price, Total Dish(each Price), Total Order Amount, Mode of Payment, Sucessfull/Failed.
+

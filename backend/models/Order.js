@@ -6,16 +6,21 @@ const OrderSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  orderNumber: {
+    type: Number,
+    required: true,
+  },
   items: [
     {
-      dishId: { type: String, required: true },
       name: { type: String, required: true },
+      type: { type: String, required: true }, // H or F
+      price: { type: Number, required: true }, // Original price per unit
       quantity: { type: Number, required: true },
-      price: { type: Number, required: true },
+      totalPrice: { type: Number, required: true }, // price * quantity
     },
   ],
   totalAmount: { type: Number, required: true },
-  paymentMethod: { type: String, required: true },
+  paymentMethod: { type: String, required: true }, // Cash or Online
   isPaid: { type: Boolean, required: true },
   createdAt: {
     type: Date,
@@ -26,5 +31,5 @@ const OrderSchema = new mongoose.Schema({
   },
 });
 
-const Order = mongoose.model("Order", OrderSchema); // ✅ Mongoose model
-module.exports = Order; // ✅ Export the model only
+const Order = mongoose.model("Order", OrderSchema);
+module.exports = Order;

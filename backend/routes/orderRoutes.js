@@ -10,9 +10,21 @@ router.post("/confirm", async (req, res) => {
   try {
     const { items, totalAmount, paymentMethod, isPaid } = req.body;
 
+    // Get the latest order to generate a new order number
+    const latestOrder = await Order.findOne().sort({ orderNumber: -1 });
+    const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
+
+    // Ensure each item has the required fields
+    const processedItems = items.map(item => ({
+      ...item,
+      type: item.type || 'H', // Default to 'H' if not provided
+      totalPrice: item.totalPrice || (item.price * item.quantity) // Calculate if not provided
+    }));
+
     const newOrder = new Order({
       orderId: uuidv4(),
-      items,
+      orderNumber,
+      items: processedItems,
       totalAmount,
       paymentMethod,
       isPaid,

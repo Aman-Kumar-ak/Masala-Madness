@@ -8,21 +8,29 @@ export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load cart data from sessionStorage when the component mounts
   useEffect(() => {
-    const savedCart = JSON.parse(sessionStorage.getItem("cartItems"));
-    if (savedCart) {
-      setCartItems(savedCart);
+    try {
+      const savedCart = JSON.parse(sessionStorage.getItem("cartItems"));
+      if (savedCart && savedCart.length > 0) {
+        setCartItems(savedCart);
+      }
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("Error loading cart from sessionStorage:", error);
+      setIsInitialized(true);
     }
   }, []);
 
   // Save cart data to sessionStorage whenever cartItems change
   useEffect(() => {
-    if (cartItems.length > 0) {
+    // Only save to sessionStorage if the initial load has happened
+    if (isInitialized) {
       sessionStorage.setItem("cartItems", JSON.stringify(cartItems));
     }
-  }, [cartItems]);
+  }, [cartItems, isInitialized]);
 
   const addToCart = (dish) => {
     setCartItems((prev) => {
