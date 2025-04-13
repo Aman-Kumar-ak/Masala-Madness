@@ -1,17 +1,14 @@
-// src/App.jsx
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/Home';
+// App.jsx
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
+import Cart from "./pages/Cart";
 
-const App = () => {
+export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        {/* Add more routes here as needed */}
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/cart" element={<Cart />} />
+    </Routes>
   );
-};
-
-export default App;
+}
