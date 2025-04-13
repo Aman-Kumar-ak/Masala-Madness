@@ -175,6 +175,6 @@ node scripts/addTestData.js
 1. We have to make the Payment section which will be inside the @cart.jsx only.
 2. There will be two option - Cash/Online(QR).
 3. Admin has to verify the payment manually and confirm it on with the popup which comes and ask for the payment is successful or not.
-4. If the Payment is successul, the Order will be updated in the Database with the details - OrderId, Order Number(Starting from 0 everyday), Choosen dish(H/F) with their Original Price and Total amount of each dish, Total amount of the Order, Choosen Mode of Payment(Cash/Online(QR)), Date and Time(+5:30)in IST.
+4. If the Payment is successful, the Order will be updated in the Database with the details - OrderId, Order Number(Starting from 0 everyday), Choosen dish(H/F) with their Original Price and Total amount of each dish, Total amount of the Order, Choosen Mode of Payment(Cash/Online(QR)), Date and Time(+5:30)in IST.
 5. After the Payment is Successful it will updated in database and the page will be redirected to the Home Page wtih 0 items in the Cart(Cart will be empty) and ready for the next Order.
 5. If the payment is Failed(Choosen Failed in Popup for confirmation) then it will return to the Homepage with 0 items in the Cart(Cart will be empty) for new Orders.
