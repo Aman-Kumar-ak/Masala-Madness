@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { useCart } from "../components/CartContext";
 
 const MenuCard = ({ name, priceHalf, priceFull, category }) => {
   const [quantity, setQuantity] = useState(1);
+  const [selectedType, setSelectedType] = useState(""); // "H" or "F"
+  
+  const { addToCart } = useCart();
 
   const decreaseQuantity = () => {
     if (quantity > 1) {
@@ -11,6 +15,15 @@ const MenuCard = ({ name, priceHalf, priceFull, category }) => {
 
   const increaseQuantity = () => {
     setQuantity(quantity + 1);
+  };
+
+  const handleAddToCart = () => {
+    if (selectedType) {
+      const price = selectedType === "H" ? priceHalf : priceFull;
+      addToCart({ name, quantity, selectedType, price });
+    } else {
+      alert("Please select Half (H) or Full (F) size.");
+    }
   };
 
   return (
@@ -36,7 +49,24 @@ const MenuCard = ({ name, priceHalf, priceFull, category }) => {
         >
           +
         </button>
-        <button className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
+        <div className="space-x-2">
+          <button 
+            onClick={() => setSelectedType("H")}
+            className={`w-16 py-2 rounded ${selectedType === "H" ? "bg-orange-500 text-white" : "bg-gray-200"}`}
+          >
+            Half
+          </button>
+          <button 
+            onClick={() => setSelectedType("F")}
+            className={`w-16 py-2 rounded ${selectedType === "F" ? "bg-orange-500 text-white" : "bg-gray-200"}`}
+          >
+            Full
+          </button>
+        </div>
+        <button
+          onClick={handleAddToCart}
+          className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600"
+        >
           Add to Cart
         </button>
       </div>
