@@ -178,5 +178,5 @@ When the date changes, the Order Number has to be reset to 0 but at present for 
 
 1. We have to work on showing Previous Orders in Frontend. In that we can see the Orders of Specific date.
 2. We also have to work on Providing Excel Sheets. When admin download the Excel sheets of Specific date, data has to be fetch from the database and convert into Excel Sheet.
-3. In Excel Sheets, there will be columns of OrderNumber, Date, Time, Dishes, Type(H/F) Dishes Price, Total Dish(each Price), Total Order Amount, Mode of Payment, Sucessfull/Failed.
+3. In Excel Sheets, there will be columns of OrderNumber, Date, Time, Dishes, Type(H/F) Dishes Price, Total Dish(each Price), Total Order Amount, Mode of Payment, successful/Failed.
 
