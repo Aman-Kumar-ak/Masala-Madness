@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchCategories } from '../utils/fetchCategories';
 import MenuCard from './MenuCard';
-import MenuManager from './MenuManager';
 
 const Menu = () => {
   const [categories, setCategories] = useState([]);
@@ -33,8 +32,6 @@ const Menu = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <MenuManager categories={categories} onUpdate={loadCategories} />
-      
       <div className="flex gap-4 mb-8 overflow-x-auto py-2">
         <button
           onClick={() => setSelectedCategory('All')}

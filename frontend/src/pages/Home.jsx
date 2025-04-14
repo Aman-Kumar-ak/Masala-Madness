@@ -26,12 +26,20 @@ export default function Home() {
 
           {/* Cart Controls */}
           <div className="text-center py-4 space-y-2">
-            <Link
-              to="/cart"
-              className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
-            >
-              Go to Cart ({cartItems.length} items)
-            </Link>
+            <div className="flex justify-center gap-4">
+              <Link
+                to="/cart"
+                className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+              >
+                Go to Cart ({cartItems.length} items)
+              </Link> <br />
+              <Link
+                to="/admin"
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              >
+                Admin Panel
+              </Link>
+            </div>
             {cartItems.length > 0 && (
               <div>
                 <button

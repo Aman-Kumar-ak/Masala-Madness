@@ -10,8 +10,17 @@ router.post("/confirm", async (req, res) => {
   try {
     const { items, totalAmount, paymentMethod, isPaid } = req.body;
 
-    // Get the latest order to generate a new order number
-    const latestOrder = await Order.findOne().sort({ orderNumber: -1 });
+    // Get today's date in IST
+    const today = new Date();
+    const istOffset = 5.5 * 60 * 60000;
+    const todayIST = new Date(today.getTime() + istOffset);
+    todayIST.setHours(0, 0, 0, 0);
+
+    // Get the latest order for today to generate a new order number
+    const latestOrder = await Order.findOne({
+      createdAt: { $gte: todayIST }
+    }).sort({ orderNumber: -1 });
+
     const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
 
     // Ensure each item has the required fields
