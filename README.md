@@ -172,7 +172,7 @@ node scripts/addTestData.js
 
 ## Issue
 
-Issue Resolved - Nothing New
+Order Number is still concern. It is not reseting when the new date comes.
 
 ## Things to do now
 

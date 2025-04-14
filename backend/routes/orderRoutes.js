@@ -21,7 +21,16 @@ router.post("/confirm", async (req, res) => {
       createdAt: { $gte: todayIST }
     }).sort({ orderNumber: -1 });
 
-    const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
+    // Get the latest order from yesterday to check if we need to reset
+    const yesterdayIST = new Date(todayIST);
+    yesterdayIST.setDate(yesterdayIST.getDate() - 1);
+    const lastOrderOfYesterday = await Order.findOne({
+      createdAt: { $lt: todayIST, $gte: yesterdayIST }
+    }).sort({ orderNumber: -1 });
+
+    // If there are no orders today but there were orders yesterday, reset to 1
+    const orderNumber = !latestOrder && lastOrderOfYesterday ? 1 : 
+                       latestOrder ? latestOrder.orderNumber + 1 : 1;
 
     // Ensure each item has the required fields
     const processedItems = items.map(item => ({

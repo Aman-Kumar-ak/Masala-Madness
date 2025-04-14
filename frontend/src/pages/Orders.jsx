@@ -3,10 +3,17 @@ import React, { useState, useEffect } from "react";
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    // Get current date in IST
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60000;
+    const istDate = new Date(now.getTime() + istOffset);
+    return istDate.toISOString().split('T')[0];
+  });
 
   const loadOrders = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`http://localhost:5000/api/orders/date/${selectedDate}`);
       const data = await response.json();
       setOrders(data);
@@ -25,9 +32,16 @@ const Orders = () => {
     setSelectedDate(e.target.value);
   };
 
+  const getCurrentDate = () => {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60000;
+    const istDate = new Date(now.getTime() + istOffset);
+    return istDate.toISOString().split('T')[0];
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    const istOffset = 5.5 * 60 * 60000;
+    const istOffset = 5.5 * 60 * 60000; // IST offset in milliseconds
     const istDate = new Date(date.getTime() - istOffset);
     return istDate.toLocaleString('en-IN', {
       day: '2-digit',
@@ -38,6 +52,10 @@ const Orders = () => {
       second: '2-digit',
       hour12: true
     });
+  };
+
+  const calculateTotalAmount = () => {
+    return orders.reduce((total, order) => total + order.totalAmount, 0);
   };
 
   if (loading) {
@@ -53,13 +71,37 @@ const Orders = () => {
           <label className="block text-gray-700 text-sm font-bold mb-2">
             Select Date:
           </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={handleDateChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={handleDateChange}
+              max={getCurrentDate()}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            />
+            <button
+              onClick={() => setSelectedDate(getCurrentDate())}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            >
+              Today
+            </button>
+          </div>
         </div>
+
+        {orders.length > 0 && (
+          <div className="bg-orange-50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Total Orders</h3>
+                <p className="text-2xl font-bold text-orange-600">{orders.length}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Total Revenue</h3>
+                <p className="text-2xl font-bold text-orange-600">₹{calculateTotalAmount()}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           {orders.length === 0 ? (
@@ -74,22 +116,22 @@ const Orders = () => {
                       {formatDate(order.createdAt)}
                     </p>
                   </div>
-                  <div className="mt-2">
+                  <div className="text-right">
+                    <p className="font-semibold">Total: ₹{order.totalAmount}</p>
+                    <p className={`text-sm ${order.isPaid ? 'text-green-600' : 'text-red-600'}`}>
+                      {order.isPaid ? 'Paid' : 'Unpaid'} - {order.paymentMethod}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2">
                   <h4 className="font-medium mb-1">Items:</h4>
                   <ul className="space-y-1">
                     {order.items.map((item, index) => (
                       <li key={index} className="text-sm">
-                        {item.name} ({item.type}) - {item.quantity} x ₹{item.price} = <b>₹{item.totalPrice}</b>
+                        {item.name} ({item.type}) - {item.quantity} x ₹{item.price} = ₹{item.totalPrice}
                       </li>
                     ))}
                   </ul>
-                </div>
-                  <div className="text-right">
-                    <h3 className="font-semibold">Total: ₹{order.totalAmount}</h3>
-                    <p className={`text-sm ${order.isPaid ? 'text-green-600' : 'text-red-600'}`}>
-                      <b>{order.isPaid ? 'Payment Successful' : 'Payment Failed'}</b> - {order.paymentMethod}
-                    </p>
-                  </div>
                 </div>
               </div>
             ))
