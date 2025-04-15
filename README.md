@@ -163,7 +163,7 @@ node scripts/addTestData.js
 
 2. If MongoDB fails to connect:
    - Check if MongoDB service is running
-   - Verify the MONGO_URI in .env file
+   - Verify the MONGO_URL in .env file
    - Ensure network connectivity
 
 3. If changes don't reflect:
@@ -172,10 +172,9 @@ node scripts/addTestData.js
 
 ## Issue
 
-Order Number is still concern. It is not reseting when the new date comes.
+Issues Resolved
 
 ## Things to do now
-
 
 1. We also have to work on Providing Excel Sheets. When admin download the Excel sheets of Specific date, data has to be fetch from the database and convert into Excel Sheet.
 2. In Excel Sheets, there will be columns of OrderNumber, Date, Time, Dishes, Type(H/F) Dishes Price, Total Dish(each Price), Total Order Amount, Mode of Payment, successful/Failed.

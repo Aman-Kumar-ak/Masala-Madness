@@ -1,10 +1,51 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from 'react-router-dom';
 import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
 
 export default function Home() {
   const { cartItems, clearCart } = useCart();
+  const [totalRevenue, setTotalRevenue] = useState(0);
+
+  // Get current date in Indian format
+  const getCurrentDate = () => {
+    const options = { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    };
+    return new Date().toLocaleString('en-IN', options);
+  };
+
+  // Fetch today's revenue
+  useEffect(() => {
+    const fetchTodayRevenue = async () => {
+      try {
+        const now = new Date();
+        const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const tomorrowUTC = new Date(todayUTC);
+        tomorrowUTC.setDate(todayUTC.getDate() + 1);
+
+        const response = await fetch('http://localhost:5000/api/orders');
+        const allOrders = await response.json();
+        
+        // Filter orders for today in UTC
+        const todayOrders = allOrders.filter(order => {
+          const orderDate = new Date(order.createdAt);
+          return orderDate >= todayUTC && orderDate < tomorrowUTC;
+        });
+
+        const revenue = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+        setTotalRevenue(revenue);
+      } catch (error) {
+        console.error('Error fetching today\'s revenue:', error);
+      }
+    };
+
+    fetchTodayRevenue();
+  }, []);
 
   // Prompt to ask user if they want to keep or discard the cart
   useEffect(() => {
@@ -24,10 +65,20 @@ export default function Home() {
         <div className="container mx-auto">
           <h1 className="text-2xl text-center font-bold py-4">Masala Madness</h1>
 
+          {/* Date and Revenue Display */}
+          <div className="text-center py-2 bg-orange-50">
+            <p className="text-lg font-semibold text-gray-700">
+              {getCurrentDate()}
+            </p>
+            <p className="text-lg font-semibold text-green-600">
+              Today's Revenue: ₹{totalRevenue.toFixed(2)}
+            </p>
+          </div>
+
           {/* Cart Controls */}
           <div className="text-center py-4 space-y-2">
             <div className="flex justify-center gap-4">
-            <Link
+              <Link
                 to="/admin"
                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
               >

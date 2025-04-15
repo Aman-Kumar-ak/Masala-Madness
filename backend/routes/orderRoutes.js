@@ -10,27 +10,40 @@ router.post("/confirm", async (req, res) => {
   try {
     const { items, totalAmount, paymentMethod, isPaid } = req.body;
 
-    // Get today's date in IST
-    const today = new Date();
-    const istOffset = 5.5 * 60 * 60000;
-    const todayIST = new Date(today.getTime() + istOffset);
+    // Get current time in IST
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60000; // IST is UTC+5:30
+    const todayIST = new Date(now.getTime() + istOffset);
     todayIST.setHours(0, 0, 0, 0);
+    todayIST.setHours(todayIST.getHours() - 5.5); // Adjust back to UTC for MongoDB
 
-    // Get the latest order for today to generate a new order number
+    // Get the latest order for today in UTC
     const latestOrder = await Order.findOne({
-      createdAt: { $gte: todayIST }
+      createdAt: { $gte: new Date() } // This will be in UTC
     }).sort({ orderNumber: -1 });
 
-    // Get the latest order from yesterday to check if we need to reset
+    // Get the latest order from yesterday
     const yesterdayIST = new Date(todayIST);
     yesterdayIST.setDate(yesterdayIST.getDate() - 1);
     const lastOrderOfYesterday = await Order.findOne({
       createdAt: { $lt: todayIST, $gte: yesterdayIST }
     }).sort({ orderNumber: -1 });
 
-    // If there are no orders today but there were orders yesterday, reset to 1
-    const orderNumber = !latestOrder && lastOrderOfYesterday ? 1 : 
-                       latestOrder ? latestOrder.orderNumber + 1 : 1;
+    // Generate new order number
+    let orderNumber;
+    if (!latestOrder) {
+      // If no orders today, check if there were orders yesterday
+      if (lastOrderOfYesterday) {
+        // If there were orders yesterday, reset to 1
+        orderNumber = 1;
+      } else {
+        // If no orders at all, start with 1
+        orderNumber = 1;
+      }
+    } else {
+      // If there are orders today, increment from the latest
+      orderNumber = latestOrder.orderNumber + 1;
+    }
 
     // Ensure each item has the required fields
     const processedItems = items.map(item => ({
@@ -112,7 +125,6 @@ router.get("/date/:date", async (req, res) => {
   }
 });
 
-
 // @route   DELETE /api/orders/cleanup
 //Delete orders older than a specific date (e.g., 30 days)
 router.delete("/cleanup", async (req, res) => {
@@ -128,6 +140,32 @@ router.delete("/cleanup", async (req, res) => {
   } catch (error) {
     console.error('Cleanup orders error:', error);
     res.status(500).json({ message: "Failed to clean up orders", error: error.message });
+  }
+});
+
+// Get today's total revenue
+router.get('/today-revenue', async (req, res) => {
+  try {
+    // Get current time in IST
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60000; // IST is UTC+5:30
+    const todayIST = new Date(now.getTime() + istOffset);
+    todayIST.setHours(0, 0, 0, 0);
+    todayIST.setHours(todayIST.getHours() - 5.5); // Adjust back to UTC for MongoDB
+
+    const tomorrowIST = new Date(todayIST);
+    tomorrowIST.setDate(tomorrowIST.getDate() + 1);
+
+    const todayOrders = await Order.find({
+      createdAt: { $gte: todayIST, $lt: tomorrowIST }
+    });
+
+    const totalRevenue = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+
+    res.json({ totalRevenue });
+  } catch (error) {
+    console.error('Error fetching today\'s revenue:', error);
+    res.status(500).json({ message: 'Error fetching today\'s revenue' });
   }
 });
 
