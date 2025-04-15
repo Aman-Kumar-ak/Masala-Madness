@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useCart } from "../components/CartContext";
 
-const MenuCard = ({ name, priceHalf, priceFull, category }) => {
+const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedType, setSelectedType] = useState(""); // "H" or "F"
   
@@ -18,7 +18,11 @@ const MenuCard = ({ name, priceHalf, priceFull, category }) => {
   };
 
   const handleAddToCart = () => {
-    if (selectedType) {
+    if (price) {
+      // Single price dish
+      addToCart({ name, quantity, type: "N/A", price });
+    } else if (selectedType) {
+      // Half/Full dish
       const price = selectedType === "H" ? priceHalf : priceFull;
       addToCart({ name, quantity, type: selectedType, price });
     } else {
@@ -26,13 +30,21 @@ const MenuCard = ({ name, priceHalf, priceFull, category }) => {
     }
   };
 
+  const hasHalfFull = !price && (priceHalf || priceFull);
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 mb-4 flex justify-between items-center">
+    <div className="bg-white p-4 rounded-lg shadow-md flex justify-between items-center mb-4">
       <div className="flex-1">
         <h3 className="text-lg font-semibold">{name}</h3>
         <div className="text-gray-600">
-          {priceHalf && <span>Half: ₹{priceHalf} </span>}
-          {priceFull && <span>Full: ₹{priceFull}</span>}
+          {price ? (
+            <span>Price: ₹{price}</span>
+          ) : hasHalfFull ? (
+            <>
+              {priceHalf && <span>Half: ₹{priceHalf} </span>}
+              {priceFull && <span>Full: ₹{priceFull}</span>}
+            </>
+          ) : null}
         </div>
       </div>
       <div className="flex items-center space-x-2">
@@ -49,20 +61,26 @@ const MenuCard = ({ name, priceHalf, priceFull, category }) => {
         >
           +
         </button>
-        <div className="space-x-2">
-          <button 
-            onClick={() => setSelectedType("H")}
-            className={`w-16 py-2 rounded ${selectedType === "H" ? "bg-orange-500 text-white" : "bg-gray-200"}`}
-          >
-            Half
-          </button>
-          <button 
-            onClick={() => setSelectedType("F")}
-            className={`w-16 py-2 rounded ${selectedType === "F" ? "bg-orange-500 text-white" : "bg-gray-200"}`}
-          >
-            Full
-          </button>
-        </div>
+        {hasHalfFull && (
+          <div className="space-x-2">
+            {priceHalf && (
+              <button 
+                onClick={() => setSelectedType("H")}
+                className={`w-16 py-2 rounded ${selectedType === "H" ? "bg-orange-500 text-white" : "bg-gray-200"}`}
+              >
+                Half
+              </button>
+            )}
+            {priceFull && (
+              <button 
+                onClick={() => setSelectedType("F")}
+                className={`w-16 py-2 rounded ${selectedType === "F" ? "bg-orange-500 text-white" : "bg-gray-200"}`}
+              >
+                Full
+              </button>
+            )}
+          </div>
+        )}
         <button
           onClick={handleAddToCart}
           className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600"

@@ -31,13 +31,30 @@ router.post('/', async (req, res) => {
 // URL: PUT http://localhost:5000/api/dishes/:categoryId/dish
 router.put('/:categoryId/dish', async (req, res) => {
   const { categoryId } = req.params;
-  const { name, priceHalf, priceFull } = req.body;
+  const { name, priceHalf, priceFull, price } = req.body;
   try {
     const category = await DishCategory.findById(categoryId);
     if (!category) {
       return res.status(404).json({ error: 'Category not found' });
     }
-    category.dishes.push({ name, priceHalf, priceFull });
+
+    // Validate price fields
+    if (price && (priceHalf || priceFull)) {
+      return res.status(400).json({ error: 'Cannot have both single price and half/full prices' });
+    }
+
+    if (!price && !priceHalf && !priceFull) {
+      return res.status(400).json({ error: 'At least one price must be provided' });
+    }
+
+    const newDish = {
+      name,
+      priceHalf: price ? null : priceHalf,
+      priceFull: price ? null : priceFull,
+      price: price || null
+    };
+
+    category.dishes.push(newDish);
     await category.save();
     res.status(201).json({ 
       message: 'Dish added successfully', 
@@ -52,15 +69,28 @@ router.put('/:categoryId/dish', async (req, res) => {
 // URL: PUT http://localhost:5000/api/dishes/:categoryId/dish/:dishId
 router.put('/:categoryId/dish/:dishId', async (req, res) => {
   const { categoryId, dishId } = req.params;
-  const { name, priceHalf, priceFull } = req.body;
+  const { name, priceHalf, priceFull, price } = req.body;
   try {
     const category = await DishCategory.findById(categoryId);
     if (!category) return res.status(404).json({ message: 'Category not found' });
+    
     const dish = category.dishes.id(dishId);
     if (!dish) return res.status(404).json({ message: 'Dish not found' });
+
+    // Validate price fields
+    if (price && (priceHalf || priceFull)) {
+      return res.status(400).json({ error: 'Cannot have both single price and half/full prices' });
+    }
+
+    if (!price && !priceHalf && !priceFull) {
+      return res.status(400).json({ error: 'At least one price must be provided' });
+    }
+
     if (name !== undefined) dish.name = name;
-    if (priceHalf !== undefined) dish.priceHalf = priceHalf;
-    if (priceFull !== undefined) dish.priceFull = priceFull;
+    dish.priceHalf = price ? null : priceHalf;
+    dish.priceFull = price ? null : priceFull;
+    dish.price = price || null;
+
     await category.save();
     res.json({ message: 'Dish updated successfully', category });
   } catch (err) {

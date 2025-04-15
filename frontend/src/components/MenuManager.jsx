@@ -7,7 +7,9 @@ const MenuManager = ({ categories, onUpdate }) => {
     categoryId: '',
     name: '',
     priceHalf: '',
-    priceFull: ''
+    priceFull: '',
+    price: '',
+    hasHalfFull: true
   });
   const [editingDish, setEditingDish] = useState(null);
   const [showAddDish, setShowAddDish] = useState(false);
@@ -53,12 +55,13 @@ const MenuManager = ({ categories, onUpdate }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newDish.name,
-          priceHalf: Number(newDish.priceHalf),
-          priceFull: Number(newDish.priceFull),
+          priceHalf: newDish.hasHalfFull ? Number(newDish.priceHalf) : null,
+          priceFull: newDish.hasHalfFull ? Number(newDish.priceFull) : null,
+          price: newDish.hasHalfFull ? null : Number(newDish.price)
         }),
       });
       if (response.ok) {
-        setNewDish({ categoryId: '', name: '', priceHalf: '', priceFull: '' });
+        setNewDish({ categoryId: '', name: '', priceHalf: '', priceFull: '', price: '', hasHalfFull: true });
         setShowAddDish(false);
         onUpdate();
       }
@@ -90,8 +93,9 @@ const MenuManager = ({ categories, onUpdate }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editingDish.name,
-          priceHalf: Number(editingDish.priceHalf),
-          priceFull: Number(editingDish.priceFull),
+          priceHalf: editingDish.hasHalfFull ? Number(editingDish.priceHalf) : null,
+          priceFull: editingDish.hasHalfFull ? Number(editingDish.priceFull) : null,
+          price: editingDish.hasHalfFull ? null : Number(editingDish.price)
         }),
       });
       if (response.ok) {
@@ -132,8 +136,10 @@ const MenuManager = ({ categories, onUpdate }) => {
       categoryId,
       dishId: dish._id,
       name: dish.name,
-      priceHalf: dish.priceHalf,
-      priceFull: dish.priceFull
+      priceHalf: dish.priceHalf || '',
+      priceFull: dish.priceFull || '',
+      price: dish.price || '',
+      hasHalfFull: !dish.price
     });
   };
 
@@ -187,22 +193,45 @@ const MenuManager = ({ categories, onUpdate }) => {
                 className="p-2 border rounded"
                 required
               />
-              <input
-                type="number"
-                value={newDish.priceHalf}
-                onChange={(e) => setNewDish({...newDish, priceHalf: e.target.value})}
-                placeholder="Half Price"
-                className="p-2 border rounded"
-                required
-              />
-              <input
-                type="number"
-                value={newDish.priceFull}
-                onChange={(e) => setNewDish({...newDish, priceFull: e.target.value})}
-                placeholder="Full Price"
-                className="p-2 border rounded"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="hasHalfFull"
+                  checked={newDish.hasHalfFull}
+                  onChange={(e) => setNewDish({...newDish, hasHalfFull: e.target.checked})}
+                  className="h-4 w-4"
+                />
+                <label htmlFor="hasHalfFull">Has Half/Full options</label>
+              </div>
+              {newDish.hasHalfFull ? (
+                <>
+                  <input
+                    type="number"
+                    value={newDish.priceHalf}
+                    onChange={(e) => setNewDish({...newDish, priceHalf: e.target.value})}
+                    placeholder="Half Price"
+                    className="p-2 border rounded"
+                    required
+                  />
+                  <input
+                    type="number"
+                    value={newDish.priceFull}
+                    onChange={(e) => setNewDish({...newDish, priceFull: e.target.value})}
+                    placeholder="Full Price"
+                    className="p-2 border rounded"
+                    required
+                  />
+                </>
+              ) : (
+                <input
+                  type="number"
+                  value={newDish.price}
+                  onChange={(e) => setNewDish({...newDish, price: e.target.value})}
+                  placeholder="Price"
+                  className="p-2 border rounded"
+                  required
+                />
+              )}
               <button
                 type="submit"
                 className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
@@ -237,24 +266,45 @@ const MenuManager = ({ categories, onUpdate }) => {
                           className="p-2 border rounded w-full"
                           required
                         />
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2">
                           <input
-                            type="number"
-                            value={editingDish.priceHalf}
-                            onChange={(e) => setEditingDish({...editingDish, priceHalf: e.target.value})}
-                            className="p-2 border rounded w-1/2"
-                            placeholder="Half Price"
-                            required
+                            type="checkbox"
+                            id="editHasHalfFull"
+                            checked={editingDish.hasHalfFull}
+                            onChange={(e) => setEditingDish({...editingDish, hasHalfFull: e.target.checked})}
+                            className="h-4 w-4"
                           />
-                          <input
-                            type="number"
-                            value={editingDish.priceFull}
-                            onChange={(e) => setEditingDish({...editingDish, priceFull: e.target.value})}
-                            className="p-2 border rounded w-1/2"
-                            placeholder="Full Price"
-                            required
-                          />
+                          <label htmlFor="editHasHalfFull">Has Half/Full options</label>
                         </div>
+                        {editingDish.hasHalfFull ? (
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={editingDish.priceHalf}
+                              onChange={(e) => setEditingDish({...editingDish, priceHalf: e.target.value})}
+                              className="p-2 border rounded w-1/2"
+                              placeholder="Half Price"
+                              required
+                            />
+                            <input
+                              type="number"
+                              value={editingDish.priceFull}
+                              onChange={(e) => setEditingDish({...editingDish, priceFull: e.target.value})}
+                              className="p-2 border rounded w-1/2"
+                              placeholder="Full Price"
+                              required
+                            />
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            value={editingDish.price}
+                            onChange={(e) => setEditingDish({...editingDish, price: e.target.value})}
+                            className="p-2 border rounded w-full"
+                            placeholder="Price"
+                            required
+                          />
+                        )}
                         <div className="flex gap-2">
                           <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
                             Save
@@ -273,7 +323,11 @@ const MenuManager = ({ categories, onUpdate }) => {
                         <div>
                           <span className="font-medium">{dish.name}</span>
                           <span className="text-gray-600 ml-2">
-                            (Half: ₹{dish.priceHalf}, Full: ₹{dish.priceFull})
+                            {dish.price ? (
+                              `(Price: ₹${dish.price})`
+                            ) : dish.priceHalf || dish.priceFull ? (
+                              `(Half: ₹${dish.priceHalf || 'N/A'}, Full: ₹${dish.priceFull || 'N/A'})`
+                            ) : null}
                           </span>
                         </div>
                         <div className="flex gap-2">

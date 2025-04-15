@@ -63,8 +63,9 @@ const Menu = () => {
           <MenuCard
             key={dish._id}
             name={dish.name}
-            priceHalf={dish.priceHalf}
-            priceFull={dish.priceFull}
+            priceHalf={dish.priceHalf || null}
+            priceFull={dish.priceFull || null}
+            price={dish.price || null}
             category={dish.category}
           />
         ))}
