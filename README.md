@@ -172,10 +172,10 @@ node scripts/addTestData.js
 
 ## Issue
 
-Issues Resolved
+Order Number is reset on the basis of UTC timinig.
 
 ## Things to do now
 
 1. We also have to work on Providing Excel Sheets. When admin download the Excel sheets of Specific date, data has to be fetch from the database and convert into Excel Sheet.
-2. In Excel Sheets, there will be columns of OrderNumber, Date, Time, Dishes, Type(H/F) Dishes Price, Total Dish(each Price), Total Order Amount, Mode of Payment, successful/Failed.
+2. In Excel Sheets, there will be columns of OrderNumber, Date, Time, Dishes, Type(H/F), Dishes Price, Total Dish(each Price), Total Order Amount, Mode of Payment, successful/Failed and in last give me the total amount of that day till the Excel sheet generated.
 

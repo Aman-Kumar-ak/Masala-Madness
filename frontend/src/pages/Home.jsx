@@ -23,6 +23,7 @@ export default function Home() {
   useEffect(() => {
     const fetchTodayRevenue = async () => {
       try {
+        // Get current time in UTC
         const now = new Date();
         const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
         const tomorrowUTC = new Date(todayUTC);

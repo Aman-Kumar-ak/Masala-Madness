@@ -10,23 +10,22 @@ router.post("/confirm", async (req, res) => {
   try {
     const { items, totalAmount, paymentMethod, isPaid } = req.body;
 
-    // Get current time in IST
+    // Get current time in UTC
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60000; // IST is UTC+5:30
-    const todayIST = new Date(now.getTime() + istOffset);
-    todayIST.setHours(0, 0, 0, 0);
-    todayIST.setHours(todayIST.getHours() - 5.5); // Adjust back to UTC for MongoDB
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const tomorrowUTC = new Date(todayUTC);
+    tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
     // Get the latest order for today in UTC
     const latestOrder = await Order.findOne({
-      createdAt: { $gte: new Date() } // This will be in UTC
+      createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
     }).sort({ orderNumber: -1 });
 
-    // Get the latest order from yesterday
-    const yesterdayIST = new Date(todayIST);
-    yesterdayIST.setDate(yesterdayIST.getDate() - 1);
+    // Get the latest order from yesterday in UTC
+    const yesterdayUTC = new Date(todayUTC);
+    yesterdayUTC.setDate(todayUTC.getDate() - 1);
     const lastOrderOfYesterday = await Order.findOne({
-      createdAt: { $lt: todayIST, $gte: yesterdayIST }
+      createdAt: { $lt: todayUTC, $gte: yesterdayUTC }
     }).sort({ orderNumber: -1 });
 
     // Generate new order number
