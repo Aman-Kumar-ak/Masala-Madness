@@ -1,4 +1,5 @@
 const express = require("express");
+const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
 
@@ -12,11 +13,12 @@ router.post("/confirm", async (req, res) => {
 
     // Get current time in UTC
     const now = new Date();
+
+    // Get the latest order for today in UTC
     const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
-    // Get the latest order for today in UTC
     const latestOrder = await Order.findOne({
       createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
     }).sort({ orderNumber: -1 });
@@ -31,24 +33,15 @@ router.post("/confirm", async (req, res) => {
     // Generate new order number
     let orderNumber;
     if (!latestOrder) {
-      // If no orders today, check if there were orders yesterday
-      if (lastOrderOfYesterday) {
-        // If there were orders yesterday, reset to 1
-        orderNumber = 1;
-      } else {
-        // If no orders at all, start with 1
-        orderNumber = 1;
-      }
+      orderNumber = lastOrderOfYesterday ? 1 : 1;
     } else {
-      // If there are orders today, increment from the latest
       orderNumber = latestOrder.orderNumber + 1;
     }
 
-    // Ensure each item has the required fields
     const processedItems = items.map(item => ({
       ...item,
-      type: item.type || 'H', // Default to 'H' if not provided
-      totalPrice: item.totalPrice || (item.price * item.quantity) // Calculate if not provided
+      type: item.type || 'H',
+      totalPrice: item.totalPrice || (item.price * item.quantity)
     }));
 
     const newOrder = new Order({
@@ -58,6 +51,7 @@ router.post("/confirm", async (req, res) => {
       totalAmount,
       paymentMethod,
       isPaid,
+      createdAt: now // Store the current time in UTC
     });
 
     await newOrder.save();
@@ -143,20 +137,18 @@ router.delete("/cleanup", async (req, res) => {
 });
 
 // Get today's total revenue
+// routes/orderRoutes.js
+// @route   GET /api/orders/today-revenue
+// Get today's revenue based on UTC
 router.get('/today-revenue', async (req, res) => {
   try {
-    // Get current time in IST
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60000; // IST is UTC+5:30
-    const todayIST = new Date(now.getTime() + istOffset);
-    todayIST.setHours(0, 0, 0, 0);
-    todayIST.setHours(todayIST.getHours() - 5.5); // Adjust back to UTC for MongoDB
-
-    const tomorrowIST = new Date(todayIST);
-    tomorrowIST.setDate(tomorrowIST.getDate() + 1);
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const tomorrowUTC = new Date(todayUTC);
+    tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
     const todayOrders = await Order.find({
-      createdAt: { $gte: todayIST, $lt: tomorrowIST }
+      createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
     });
 
     const totalRevenue = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
@@ -165,6 +157,95 @@ router.get('/today-revenue', async (req, res) => {
   } catch (error) {
     console.error('Error fetching today\'s revenue:', error);
     res.status(500).json({ message: 'Error fetching today\'s revenue' });
+  }
+});
+
+module.exports = router;
+
+// @route   GET /api/orders/excel/:date
+// Download Excel of orders for a specific date (YYYY-MM-DD)
+router.get("/excel/:date", async (req, res) => {
+  try {
+    const dateStr = req.params.date; // Expected format: 'YYYY-MM-DD'
+    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+
+    const orders = await Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    }).sort({ createdAt: 1 });
+
+    // Prepare Excel workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Orders");
+
+    // Define columns
+    worksheet.columns = [
+      { header: "OrderNumber", key: "orderNumber", width: 12 },
+      { header: "Date", key: "date", width: 12 },
+      { header: "Time", key: "time", width: 10 },
+      { header: "Dishes", key: "dishes", width: 30 },
+      { header: "Type(H/F)", key: "types", width: 10 },
+      { header: "Dishes Price", key: "dishPrice", width: 15 },
+      { header: "Total Dish(each Price)", key: "totalDish", width: 20 },
+      { header: "Total Order Amount", key: "totalAmount", width: 18 },
+      { header: "Mode of Payment", key: "paymentMethod", width: 15 },
+      { header: "Successful/Failed", key: "status", width: 15 },
+    ];
+
+    let totalOfDay = 0;
+    orders.forEach(order => {
+      const dateObj = new Date(order.createdAt);
+      const date = dateObj.toISOString().slice(0, 10);
+      const time = dateObj.toTimeString().slice(0, 8);
+      const dishes = order.items.map(i => i.name + ' x' + i.quantity).join(", ");
+      const types = order.items.map(i => i.type).join(", ");
+      const dishPrice = order.items.map(i => i.price).join(", ");
+      const totalDish = order.items.map(i => i.totalPrice).join(", ");
+      totalOfDay += order.totalAmount;
+      worksheet.addRow({
+        orderNumber: order.orderNumber,
+        date,
+        time,
+        dishes,
+        types,
+        dishPrice,
+        totalDish,
+        totalAmount: order.totalAmount,
+        paymentMethod: order.paymentMethod,
+        status: order.isPaid ? "Successful" : "Failed"
+      });
+    });
+
+    // Add summary row for total amount
+    worksheet.addRow({}); // Empty row
+    worksheet.addRow({
+      orderNumber: "",
+      date: "",
+      time: "",
+      dishes: "",
+      types: "",
+      dishPrice: "",
+      totalDish: "",
+      totalAmount: `Total: ${totalOfDay}`,
+      paymentMethod: "",
+      status: ""
+    });
+
+    // Set response headers
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=orders_${dateStr}.xlsx`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("Excel export error:", error);
+    res.status(500).json({ message: "Failed to generate Excel", error: error.message });
   }
 });
 

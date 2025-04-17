@@ -19,27 +19,13 @@ export default function Home() {
     return new Date().toLocaleString('en-IN', options);
   };
 
-  // Fetch today's revenue
+  // Fetch today's revenue from backend (calculated in IST)
   useEffect(() => {
     const fetchTodayRevenue = async () => {
       try {
-        // Get current time in UTC
-        const now = new Date();
-        const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const tomorrowUTC = new Date(todayUTC);
-        tomorrowUTC.setDate(todayUTC.getDate() + 1);
-
-        const response = await fetch('http://localhost:5000/api/orders');
-        const allOrders = await response.json();
-        
-        // Filter orders for today in UTC
-        const todayOrders = allOrders.filter(order => {
-          const orderDate = new Date(order.createdAt);
-          return orderDate >= todayUTC && orderDate < tomorrowUTC;
-        });
-
-        const revenue = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-        setTotalRevenue(revenue);
+        const response = await fetch('http://localhost:5000/api/orders/today-revenue');
+        const data = await response.json();
+        setTotalRevenue(data.totalRevenue || 0);
       } catch (error) {
         console.error('Error fetching today\'s revenue:', error);
       }
@@ -106,6 +92,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Menu Component */}
       <Menu />
     </div>
   );

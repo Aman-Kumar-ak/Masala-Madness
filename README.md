@@ -170,9 +170,12 @@ node scripts/addTestData.js
    - Backend: The server auto-restarts with nodemon
    - Frontend: Changes hot-reload automatically
 
-## Issue
+## Note
 
 Order Number is reset on the basis of UTC timinig.
+
+## Issue 
+Issues Resolved
 
 ## Things to do now
 

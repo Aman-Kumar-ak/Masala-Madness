@@ -4,7 +4,6 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(() => {
-    // Get current date in IST
     const now = new Date();
     const istOffset = 5.5 * 60 * 60000;
     const istDate = new Date(now.getTime() + istOffset);
@@ -39,23 +38,27 @@ const Orders = () => {
     return istDate.toISOString().split('T')[0];
   };
 
-  const formatDate = (dateString) => {
+  const formatDateIST = (dateString) => {
     const date = new Date(dateString);
-    const istOffset = 5.5 * 60 * 60000; // IST offset in milliseconds
-    const istDate = new Date(date.getTime() - istOffset);
-    return istDate.toLocaleString('en-IN', {
+    return date.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: true
+      hour12: false // 24-hour format
     });
   };
 
   const calculateTotalAmount = () => {
     return orders.reduce((total, order) => total + order.totalAmount, 0);
+  };
+
+  const handleDownloadExcel = () => {
+    const url = `http://localhost:5000/api/orders/excel/${selectedDate}`;
+    window.open(url, '_blank');
   };
 
   if (loading) {
@@ -67,6 +70,7 @@ const Orders = () => {
       <div className="bg-white shadow-md rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-6">Order Management</h1>
         
+        {/* Date Picker + Excel Download */}
         <div className="mb-6">
           <label className="block text-gray-700 text-sm font-bold mb-2">
             Select Date:
@@ -80,14 +84,15 @@ const Orders = () => {
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             />
             <button
-              onClick={() => setSelectedDate(getCurrentDate())}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              onClick={handleDownloadExcel}
+              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
-              Today
+              Download Excel
             </button>
           </div>
         </div>
 
+        {/* Totals */}
         {orders.length > 0 && (
           <div className="bg-orange-50 p-4 rounded-lg mb-6">
             <div className="grid grid-cols-2 gap-4">
@@ -103,6 +108,7 @@ const Orders = () => {
           </div>
         )}
 
+        {/* Orders List */}
         <div className="space-y-4">
           {orders.length === 0 ? (
             <p className="text-gray-600 text-center">No orders found for this date</p>
@@ -112,9 +118,7 @@ const Orders = () => {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="text-lg font-semibold">Order #{order.orderNumber}</h3>
-                    <p className="text-sm text-gray-600">
-                      {formatDate(order.createdAt)}
-                    </p>
+                    <p className="text-sm text-gray-600">{formatDateIST(order.createdAt)}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">Total: ₹{order.totalAmount}</p>

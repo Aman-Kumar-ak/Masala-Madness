@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function Cart() {
   const { cartItems, removeFromCart, clearCart } = useCart();
-  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const navigate = useNavigate();
 
   const totalAmount = cartItems.reduce(
@@ -13,6 +13,11 @@ export default function Cart() {
   );
 
   const handlePayment = async () => {
+    if (!paymentMethod) {
+      alert("Please select a payment method before confirming.");
+      return;
+    }
+
     const confirmed = window.confirm("Is the payment successful?");
     const isPaid = confirmed;
 
