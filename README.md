@@ -176,7 +176,7 @@ Order Number is reset on the basis of UTC timinig.
 
 ## Issue 
 
-Total Revenue showing all the payment which is being Sucessful/Failed
+Issue Resolved
 
 ## Things to do now
 
