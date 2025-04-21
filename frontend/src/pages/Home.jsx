@@ -19,7 +19,6 @@ export default function Home() {
     return new Date().toLocaleString('en-IN', options);
   };
 
-  // Fetch today's revenue from backend (calculated in IST)
   useEffect(() => {
     const fetchTodayRevenue = async () => {
       try {

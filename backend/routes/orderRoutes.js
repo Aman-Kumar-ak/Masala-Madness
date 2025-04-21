@@ -139,7 +139,7 @@ router.delete("/cleanup", async (req, res) => {
 // Get today's total revenue
 // routes/orderRoutes.js
 // @route   GET /api/orders/today-revenue
-// Get today's revenue based on UTC
+// Get today's revenue based on paid orders
 router.get('/today-revenue', async (req, res) => {
   try {
     const now = new Date();
@@ -147,10 +147,13 @@ router.get('/today-revenue', async (req, res) => {
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
+    // Fetch today's orders that are paid
     const todayOrders = await Order.find({
-      createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
+      createdAt: { $gte: todayUTC, $lt: tomorrowUTC },
+      isPaid: true // Only include paid orders
     });
 
+    // Calculate total revenue from paid orders
     const totalRevenue = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
     res.json({ totalRevenue });
@@ -170,8 +173,9 @@ router.get("/excel/:date", async (req, res) => {
     const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
     const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
 
+    // Fetch all orders for the specified date (both paid and unpaid)
     const orders = await Order.find({
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
     }).sort({ createdAt: 1 });
 
     // Prepare Excel workbook and worksheet
@@ -192,7 +196,7 @@ router.get("/excel/:date", async (req, res) => {
       { header: "Successful/Failed", key: "status", width: 15 },
     ];
 
-    let totalOfDay = 0;
+    let totalOfDay = 0; // Initialize total amount for paid orders
     orders.forEach(order => {
       const dateObj = new Date(order.createdAt);
       const date = dateObj.toISOString().slice(0, 10);
@@ -201,7 +205,12 @@ router.get("/excel/:date", async (req, res) => {
       const types = order.items.map(i => i.type).join(", ");
       const dishPrice = order.items.map(i => i.price).join(", ");
       const totalDish = order.items.map(i => i.totalPrice).join(", ");
-      totalOfDay += order.totalAmount;
+      
+      // Only sum amounts from paid orders for total calculation
+      if (order.isPaid) {
+        totalOfDay += order.totalAmount;
+      }
+
       worksheet.addRow({
         orderNumber: order.orderNumber,
         date,
@@ -226,7 +235,7 @@ router.get("/excel/:date", async (req, res) => {
       types: "",
       dishPrice: "",
       totalDish: "",
-      totalAmount: `Total: ${totalOfDay}`,
+      totalAmount: `Total: ${totalOfDay}`, // Total of paid orders
       paymentMethod: "",
       status: ""
     });

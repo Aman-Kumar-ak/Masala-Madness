@@ -53,7 +53,9 @@ const Orders = () => {
   };
 
   const calculateTotalAmount = () => {
-    return orders.reduce((total, order) => total + order.totalAmount, 0);
+    return orders.reduce((total, order) => {
+      return order.isPaid ? total + order.totalAmount : total;
+    }, 0);
   };
 
   const handleDownloadExcel = () => {
