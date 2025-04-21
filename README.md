@@ -175,10 +175,18 @@ node scripts/addTestData.js
 Order Number is reset on the basis of UTC timinig.
 
 ## Issue 
-Issues Resolved
+
+Total Revenue showing all the payment which is being Sucessful/Failed
 
 ## Things to do now
 
 1. We can work on adding Discount on the given order with the specific details like - discount of 20% over 300
 2. Work on Design part of the Project
+
+## Future Features
+
+1. `Adding the Zomato and Swiggy api`
+By adding this feature, admin can view the order which are coming from these platfrom.
+
+2. We can use the Din In feature where we will give the QR to the table Numbers, by which customer can scan the QR and order the dishes from sitting in the Restaurant only.
 

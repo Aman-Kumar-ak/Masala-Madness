@@ -31,5 +31,15 @@ const OrderSchema = new mongoose.Schema({
   },
 });
 
+// Method to calculate total revenue from successful payments
+OrderSchema.statics.calculateTotalRevenue = async function () {
+  const totalRevenue = await this.aggregate([
+    { $match: { isPaid: true } }, // Only include paid orders
+    { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+  ]);
+
+  return totalRevenue.length > 0 ? totalRevenue[0].total : 0; // Return total or 0 if no paid orders
+};
+
 const Order = mongoose.model("Order", OrderSchema);
 module.exports = Order;
