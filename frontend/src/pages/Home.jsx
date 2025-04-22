@@ -1,17 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from 'react-router-dom';
 import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function Home() {
   const { cartItems, clearCart } = useCart();
   const [stats, setStats] = useState({
-    totalRevenue: 0,
     totalOrders: 0,
     totalPaidOrders: 0,
+    totalRevenue: 0,
     avgOrderValue: 0
   });
-  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const getCurrentDate = () => {
     const options = { 
@@ -24,66 +26,41 @@ export default function Home() {
     return new Date().toLocaleString('en-IN', options);
   };
 
-  const fetchTodayData = async () => {
+  const fetchStats = async () => {
     try {
-      const revenueResponse = await fetch('http://localhost:5000/api/orders/today-revenue');
-      const statsData = await revenueResponse.json();
-      setStats(statsData);
+      setLoading(true);
+      const today = new Date().toISOString().split('T')[0];
+      const response = await fetch(`${API_URL}/api/orders/date/${today}`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      
+      const data = await response.json();
+      setStats({
+        totalOrders: data.stats.totalOrders || 0,
+        totalPaidOrders: data.stats.totalPaidOrders || 0,
+        totalRevenue: data.stats.totalRevenue || 0,
+        avgOrderValue: data.stats.avgOrderValue || 0
+      });
     } catch (error) {
-      console.error('Error fetching today\'s data:', error);
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Set up optimistic updates and event-based refresh
-  useEffect(() => {
-    fetchTodayData(); // Initial fetch
-
-    // Handle order updates with optimistic updates
-    const handleOrderUpdate = async (event) => {
-      if (event.type === 'orderUpdating') {
-        // Optimistic update for better UX
-        setStats(prev => ({
-          ...prev,
-          totalOrders: prev.totalOrders + 1
-        }));
-      } else if (event.type === 'orderUpdated') {
-        const detail = event.detail;
-        
-        if (detail?.success) {
-          // Optimistic update for success case
-          setStats(prev => ({
-            ...prev,
-            totalPaidOrders: prev.totalPaidOrders + 1,
-            totalRevenue: prev.totalRevenue + (detail.amount || 0),
-            avgOrderValue: (prev.totalRevenue + (detail.amount || 0)) / (prev.totalPaidOrders + 1)
-          }));
-        }
-        
-        // Fetch actual data after a short delay to ensure backend is updated
-        setTimeout(fetchTodayData, 500);
-      }
+  // Call fetchStats when order is placed/updated
+  React.useEffect(() => {
+    const handleOrderUpdate = () => {
+      fetchStats();
     };
 
-    // Listen for all order-related events
-    window.addEventListener('orderUpdating', handleOrderUpdate);
     window.addEventListener('orderUpdated', handleOrderUpdate);
+    // Initial fetch
+    fetchStats();
 
     return () => {
-      window.removeEventListener('orderUpdating', handleOrderUpdate);
       window.removeEventListener('orderUpdated', handleOrderUpdate);
     };
   }, []);
-
-  useEffect(() => {
-    if (cartItems.length > 0) {
-      window.onbeforeunload = () => {
-        return "You have items in your cart. Do you want to discard them?";
-      };
-    }
-    return () => {
-      window.onbeforeunload = null;
-    };
-  }, [cartItems]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
@@ -127,12 +104,34 @@ export default function Home() {
       <div className="bg-white shadow-md mt-4 py-4">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            {/* Date */}
-            <div className="flex items-center space-x-2">
-              <span className="text-2xl">📅</span>
-              <p className="text-lg font-medium text-gray-700">
-                {getCurrentDate()}
-              </p>
+            {/* Date and Refresh Button */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">📅</span>
+                <p className="text-lg font-medium text-gray-700">
+                  {getCurrentDate()}
+                </p>
+              </div>
+              <button 
+                onClick={fetchStats}
+                disabled={loading}
+                className={`p-2 rounded-full ${loading ? 'bg-gray-300' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-colors duration-200`}
+                title="Refresh Stats"
+              >
+                <svg 
+                  className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                  />
+                </svg>
+              </button>
             </div>
             
             {/* Stats */}
