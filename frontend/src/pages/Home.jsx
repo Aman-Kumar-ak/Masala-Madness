@@ -6,8 +6,8 @@ import { useCart } from "../components/CartContext";
 export default function Home() {
   const { cartItems, clearCart } = useCart();
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Get current date in Indian format
   const getCurrentDate = () => {
     const options = { 
       weekday: 'long', 
@@ -33,7 +33,6 @@ export default function Home() {
     fetchTodayRevenue();
   }, []);
 
-  // Prompt to ask user if they want to keep or discard the cart
   useEffect(() => {
     if (cartItems.length > 0) {
       window.onbeforeunload = () => {
@@ -46,53 +45,80 @@ export default function Home() {
   }, [cartItems]);
 
   return (
-    <div className="min-h-screen bg-orange-100">
-      <div className="bg-white shadow-md">
-        <div className="container mx-auto">
-          <h1 className="text-2xl text-center font-bold py-4">Masala Madness</h1>
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
+      {/* Header */}
+      <header className="bg-white shadow-lg sticky top-0 z-50">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center py-4">
+            {/* Logo and Title */}
+            <div className="flex items-center space-x-2">
+              <span className="text-orange-500 text-3xl">🍛</span>
+              <h1 className="text-2xl font-bold text-gray-800">Masala Madness</h1>
+            </div>
 
-          {/* Date and Revenue Display */}
-          <div className="text-center py-2 bg-orange-50">
-            <p className="text-lg font-semibold text-gray-700">
-              {getCurrentDate()}
-            </p>
-            <p className="text-lg font-semibold text-green-600">
-              Today's Revenue: ₹{totalRevenue.toFixed(2)}
-            </p>
-          </div>
-
-          {/* Cart Controls */}
-          <div className="text-center py-4 space-y-2">
-            <div className="flex justify-center gap-4">
+            {/* Navigation */}
+            <nav className="flex items-center space-x-4">
               <Link
                 to="/admin"
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full transition-colors duration-200 flex items-center space-x-2"
               >
-                Admin Panel
-              </Link> <br />
+                <span className="hidden md:inline">Admin Panel</span>
+                <span className="md:hidden">👨‍💼</span>
+              </Link>
               <Link
                 to="/cart"
-                className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full transition-colors duration-200 flex items-center space-x-2"
               >
-                Go to Cart ({cartItems.length} items)
+                <span>🛒</span>
+                <span className="hidden md:inline">Cart</span>
+                {cartItems.length > 0 && (
+                  <span className="bg-white text-orange-500 px-2 py-1 rounded-full text-sm font-bold">
+                    {cartItems.length}
+                  </span>
+                )}
               </Link>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Date and Revenue Banner */}
+      <div className="bg-white shadow-md mt-4 py-4">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left space-y-2 md:space-y-0">
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">📅</span>
+              <p className="text-lg font-medium text-gray-700">
+                {getCurrentDate()}
+              </p>
             </div>
-            {cartItems.length > 0 && (
-              <div>
-                <button
-                  onClick={clearCart}
-                  className="mt-2 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                >
-                  Clear Cart
-                </button>
-              </div>
-            )}
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">💰</span>
+              <p className="text-lg font-bold text-green-600">
+                Today's Revenue: ₹{totalRevenue.toLocaleString('en-IN')}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Clear Cart Button (only shown when cart has items) */}
+      {cartItems.length > 0 && (
+        <div className="container mx-auto px-4 mt-4">
+          <button
+            onClick={clearCart}
+            className="w-full md:w-auto bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full transition-colors duration-200 flex items-center justify-center space-x-2 mx-auto"
+          >
+            <span>🗑️</span>
+            <span>Clear Cart</span>
+          </button>
+        </div>
+      )}
+
       {/* Menu Component */}
-      <Menu />
+      <div className="container mx-auto px-4 py-8">
+        <Menu />
+      </div>
     </div>
   );
 }
