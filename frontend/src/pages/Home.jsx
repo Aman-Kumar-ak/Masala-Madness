@@ -5,8 +5,12 @@ import { useCart } from "../components/CartContext";
 
 export default function Home() {
   const { cartItems, clearCart } = useCart();
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [todayOrders, setTodayOrders] = useState([]);
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalPaidOrders: 0,
+    avgOrderValue: 0
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const getCurrentDate = () => {
@@ -20,24 +24,54 @@ export default function Home() {
     return new Date().toLocaleString('en-IN', options);
   };
 
-  useEffect(() => {
-    const fetchTodayData = async () => {
-      try {
-        // Fetch revenue
-        const revenueResponse = await fetch('http://localhost:5000/api/orders/today-revenue');
-        const revenueData = await revenueResponse.json();
-        setTotalRevenue(revenueData.totalRevenue || 0);
+  const fetchTodayData = async () => {
+    try {
+      const revenueResponse = await fetch('http://localhost:5000/api/orders/today-revenue');
+      const statsData = await revenueResponse.json();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error fetching today\'s data:', error);
+    }
+  };
 
-        // Fetch today's orders
-        const ordersResponse = await fetch('http://localhost:5000/api/orders/today');
-        const ordersData = await ordersResponse.json();
-        setTodayOrders(ordersData || []);
-      } catch (error) {
-        console.error('Error fetching today\'s data:', error);
+  // Set up optimistic updates and event-based refresh
+  useEffect(() => {
+    fetchTodayData(); // Initial fetch
+
+    // Handle order updates with optimistic updates
+    const handleOrderUpdate = async (event) => {
+      if (event.type === 'orderUpdating') {
+        // Optimistic update for better UX
+        setStats(prev => ({
+          ...prev,
+          totalOrders: prev.totalOrders + 1
+        }));
+      } else if (event.type === 'orderUpdated') {
+        const detail = event.detail;
+        
+        if (detail?.success) {
+          // Optimistic update for success case
+          setStats(prev => ({
+            ...prev,
+            totalPaidOrders: prev.totalPaidOrders + 1,
+            totalRevenue: prev.totalRevenue + (detail.amount || 0),
+            avgOrderValue: (prev.totalRevenue + (detail.amount || 0)) / (prev.totalPaidOrders + 1)
+          }));
+        }
+        
+        // Fetch actual data after a short delay to ensure backend is updated
+        setTimeout(fetchTodayData, 500);
       }
     };
 
-    fetchTodayData();
+    // Listen for all order-related events
+    window.addEventListener('orderUpdating', handleOrderUpdate);
+    window.addEventListener('orderUpdated', handleOrderUpdate);
+
+    return () => {
+      window.removeEventListener('orderUpdating', handleOrderUpdate);
+      window.removeEventListener('orderUpdated', handleOrderUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -109,7 +143,7 @@ export default function Home() {
                 <div>
                   <p className="text-sm text-gray-600">Today's Orders</p>
                   <p className="text-lg font-bold text-blue-600">
-                    {todayOrders.length}
+                    {stats.totalPaidOrders}/{stats.totalOrders}
                   </p>
                 </div>
               </div>
@@ -120,7 +154,18 @@ export default function Home() {
                 <div>
                   <p className="text-sm text-gray-600">Today's Revenue</p>
                   <p className="text-lg font-bold text-green-600">
-                    ₹{totalRevenue.toLocaleString('en-IN')}
+                    ₹{stats.totalRevenue.toLocaleString('en-IN')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Average Order Value */}
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">📊</span>
+                <div>
+                  <p className="text-sm text-gray-600">Avg. Order</p>
+                  <p className="text-lg font-bold text-purple-600">
+                    ₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}
                   </p>
                 </div>
               </div>

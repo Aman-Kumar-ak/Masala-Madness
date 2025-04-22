@@ -9,27 +9,34 @@ const Menu = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadCategories = async () => {
+  const loadAllData = async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await fetchCategories();
-      // Ensure categories is always an array
-      setCategories(Array.isArray(data) ? data : []);
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid data format received');
+      }
+      if (data.length === 0) {
+        setError('No menu items found');
+      }
+      setCategories(data);
+
+      // Dispatch a custom event to notify parent components to refresh their data
+      window.dispatchEvent(new CustomEvent('refreshData'));
     } catch (error) {
       console.error('Error loading categories:', error);
-      setError('Failed to load menu items. Please try again later.');
+      setError('Failed to load menu items. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCategories();
+    loadAllData();
   }, []);
 
   const filteredDishes = React.useMemo(() => {
-    // Ensure categories is an array before using flatMap
     if (!Array.isArray(categories)) return [];
     
     return selectedCategory === 'All'
@@ -62,7 +69,7 @@ const Menu = () => {
       <div className="text-center py-12">
         <p className="text-red-500">{error}</p>
         <button 
-          onClick={loadCategories}
+          onClick={loadAllData}
           className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
         >
           Try Again
@@ -133,15 +140,27 @@ const Menu = () => {
       {/* No Results Message */}
       {searchFilteredDishes.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-gray-500 text-lg">No dishes found</p>
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="mt-2 text-orange-500 hover:text-orange-600"
-            >
-              Clear search
-            </button>
-          )}
+          <p className="text-gray-500 text-lg mb-4">
+            {error ? error : "No dishes found"}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            {error && (
+              <button 
+                onClick={loadAllData}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors duration-200"
+              >
+                Try Again
+              </button>
+            )}
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200"
+              >
+                Clear Search
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

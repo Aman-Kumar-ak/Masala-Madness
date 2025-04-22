@@ -5,6 +5,21 @@ const Order = require("../models/Order");
 
 const router = express.Router();
 
+// Cache orders for 30 seconds
+const ordersCache = new Map();
+const CACHE_DURATION = 30 * 1000; // 30 seconds
+
+const clearCacheEntry = (key) => {
+  setTimeout(() => ordersCache.delete(key), CACHE_DURATION);
+};
+
+// Helper function to get date range
+const getDateRange = (dateStr) => {
+  const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+  const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+  return { startOfDay, endOfDay };
+};
+
 // @route   POST /api/orders/confirm
 //Confirm and create a new order
 router.post("/confirm", async (req, res) => {
@@ -19,24 +34,15 @@ router.post("/confirm", async (req, res) => {
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
+    // Get latest order number efficiently using index
     const latestOrder = await Order.findOne({
       createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
-    }).sort({ orderNumber: -1 });
+    })
+    .select('orderNumber')
+    .sort({ orderNumber: -1 })
+    .lean();
 
-    // Get the latest order from yesterday in UTC
-    const yesterdayUTC = new Date(todayUTC);
-    yesterdayUTC.setDate(todayUTC.getDate() - 1);
-    const lastOrderOfYesterday = await Order.findOne({
-      createdAt: { $lt: todayUTC, $gte: yesterdayUTC }
-    }).sort({ orderNumber: -1 });
-
-    // Generate new order number
-    let orderNumber;
-    if (!latestOrder) {
-      orderNumber = lastOrderOfYesterday ? 1 : 1;
-    } else {
-      orderNumber = latestOrder.orderNumber + 1;
-    }
+    const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
 
     const processedItems = items.map(item => ({
       ...item,
@@ -55,7 +61,16 @@ router.post("/confirm", async (req, res) => {
     });
 
     await newOrder.save();
-    res.status(201).json({ message: "Order saved successfully", orderId: newOrder.orderId });
+
+    // Clear relevant cache entries
+    const todayKey = todayUTC.toISOString().split('T')[0];
+    ordersCache.delete(todayKey);
+
+    res.status(201).json({ 
+      message: "Order saved successfully", 
+      orderId: newOrder.orderId,
+      orderNumber
+    });
   } catch (error) {
     console.error('Order save error:', error);
     res.status(500).json({ message: "Failed to save order", error: error.message });
@@ -66,7 +81,7 @@ router.post("/confirm", async (req, res) => {
 //Get all orders sorted by createdAt in ascending order
 router.get("/", async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: 1 });
+    const orders = await Order.find().sort({ createdAt: 1 }).lean();
     res.status(200).json(orders);
   } catch (error) {
     console.error('Fetch orders error:', error);
@@ -75,19 +90,35 @@ router.get("/", async (req, res) => {
 });
 
 // @route   GET /api/orders/today
-//Get all orders for today
+//Get all orders for today with stats
 router.get("/today", async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const tomorrowUTC = new Date(todayUTC);
+    tomorrowUTC.setDate(todayUTC.getDate() + 1);
+    
+    const cacheKey = todayUTC.toISOString().split('T')[0];
+    
+    if (ordersCache.has(cacheKey)) {
+      return res.status(200).json(ordersCache.get(cacheKey));
+    }
 
-    const orders = await Order.find({
-      createdAt: { $gte: today, $lt: tomorrow },
-    }).sort({ createdAt: 1 });
+    const [stats, orders] = await Promise.all([
+      Order.calculateStats(todayUTC, tomorrowUTC),
+      Order.find({
+        createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
+      })
+      .select('-__v')
+      .sort({ createdAt: 1 })
+      .lean()
+    ]);
 
-    res.status(200).json(orders);
+    const result = { stats, orders };
+    ordersCache.set(cacheKey, result);
+    clearCacheEntry(cacheKey);
+
+    res.status(200).json(result);
   } catch (error) {
     console.error('Fetch today\'s orders error:', error);
     res.status(500).json({ message: "Failed to fetch today's orders", error: error.message });
@@ -95,20 +126,31 @@ router.get("/today", async (req, res) => {
 });
 
 // @route   GET /api/orders/date/:date
-//Get orders for a specific date (YYYY-MM-DD)
+//Get orders for a specific date (YYYY-MM-DD) with stats
 router.get("/date/:date", async (req, res) => {
   try {
-    const dateStr = req.params.date; // Expected format: 'YYYY-MM-DD'
+    const { startOfDay, endOfDay } = getDateRange(req.params.date);
+    const cacheKey = req.params.date;
 
-    // Start of the selected date in UTC
-    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
-    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+    if (ordersCache.has(cacheKey)) {
+      return res.status(200).json(ordersCache.get(cacheKey));
+    }
 
-    const orders = await Order.find({
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-    }).sort({ createdAt: 1 });
+    const [stats, orders] = await Promise.all([
+      Order.calculateStats(startOfDay, endOfDay),
+      Order.find({
+        createdAt: { $gte: startOfDay, $lte: endOfDay }
+      })
+      .select('-__v')
+      .sort({ createdAt: 1 })
+      .lean()
+    ]);
 
-    res.status(200).json(orders);
+    const result = { stats, orders };
+    ordersCache.set(cacheKey, result);
+    clearCacheEntry(cacheKey);
+
+    res.status(200).json(result);
   } catch (error) {
     console.error("Fetch orders by date error:", error);
     res.status(500).json({
@@ -129,7 +171,13 @@ router.delete("/cleanup", async (req, res) => {
       createdAt: { $lt: dateToDeleteBefore },
     });
 
-    res.status(200).json({ message: `${result.deletedCount} orders deleted.` });
+    // Clear all cache after cleanup
+    ordersCache.clear();
+
+    res.status(200).json({ 
+      message: `${result.deletedCount} orders deleted.`,
+      deletedBefore: dateToDeleteBefore
+    });
   } catch (error) {
     console.error('Cleanup orders error:', error);
     res.status(500).json({ message: "Failed to clean up orders", error: error.message });
@@ -147,36 +195,45 @@ router.get('/today-revenue', async (req, res) => {
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
-    // Fetch today's orders that are paid
-    const todayOrders = await Order.find({
-      createdAt: { $gte: todayUTC, $lt: tomorrowUTC },
-      isPaid: true // Only include paid orders
-    });
+    const cacheKey = `revenue_${todayUTC.toISOString().split('T')[0]}`;
+    
+    if (ordersCache.has(cacheKey)) {
+      return res.json(ordersCache.get(cacheKey));
+    }
 
-    // Calculate total revenue from paid orders
-    const totalRevenue = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const stats = await Order.calculateStats(todayUTC, tomorrowUTC);
+    ordersCache.set(cacheKey, stats);
+    clearCacheEntry(cacheKey);
 
-    res.json({ totalRevenue });
+    res.json(stats);
   } catch (error) {
-    console.error('Error fetching today\'s revenue:', error);
-    res.status(500).json({ message: 'Error fetching today\'s revenue' });
+    console.error('Error fetching today\'s stats:', error);
+    res.status(500).json({ message: 'Error fetching today\'s stats' });
   }
 });
-
-module.exports = router;
 
 // @route   GET /api/orders/excel/:date
 // Download Excel of orders for a specific date (YYYY-MM-DD)
 router.get("/excel/:date", async (req, res) => {
   try {
-    const dateStr = req.params.date; // Expected format: 'YYYY-MM-DD'
-    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
-    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+    const { startOfDay, endOfDay } = getDateRange(req.params.date);
 
-    // Fetch all orders for the specified date (both paid and unpaid)
-    const orders = await Order.find({
-      createdAt: { $gte: startOfDay, $lte: endOfDay }
-    }).sort({ createdAt: 1 });
+    const [ordersStats, orders] = await Promise.all([
+      Order.calculateStats(startOfDay, endOfDay),
+      Order.find({
+        createdAt: { $gte: startOfDay, $lte: endOfDay }
+      })
+      .sort({ createdAt: 1 })
+      .lean()
+    ]);
+
+    // Ensure stats have default values if undefined
+    const stats = {
+      totalOrders: ordersStats?.totalOrders || 0,
+      totalPaidOrders: ordersStats?.totalPaidOrders || 0,
+      totalRevenue: ordersStats?.totalRevenue || 0,
+      avgOrderValue: ordersStats?.avgOrderValue || 0
+    };
 
     // Prepare Excel workbook and worksheet
     const workbook = new ExcelJS.Workbook();
@@ -186,58 +243,64 @@ router.get("/excel/:date", async (req, res) => {
     worksheet.columns = [
       { header: "OrderNumber", key: "orderNumber", width: 12 },
       { header: "Date", key: "date", width: 12 },
-      { header: "Time", key: "time", width: 10 },
+      { header: "Time (IST)", key: "time", width: 15 },
       { header: "Dishes", key: "dishes", width: 30 },
       { header: "Type(H/F)", key: "types", width: 10 },
       { header: "Dishes Price", key: "dishPrice", width: 15 },
       { header: "Total Dish(each Price)", key: "totalDish", width: 20 },
       { header: "Total Order Amount", key: "totalAmount", width: 18 },
       { header: "Mode of Payment", key: "paymentMethod", width: 15 },
-      { header: "Successful/Failed", key: "status", width: 15 },
+      { header: "Status", key: "status", width: 15 },
     ];
 
-    let totalOfDay = 0; // Initialize total amount for paid orders
-    orders.forEach(order => {
-      const dateObj = new Date(order.createdAt);
-      const date = dateObj.toISOString().slice(0, 10);
-      const time = dateObj.toTimeString().slice(0, 8);
-      const dishes = order.items.map(i => i.name + ' x' + i.quantity).join(", ");
-      const types = order.items.map(i => i.type).join(", ");
-      const dishPrice = order.items.map(i => i.price).join(", ");
-      const totalDish = order.items.map(i => i.totalPrice).join(", ");
+    // Process orders in batches for better memory usage
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < orders.length; i += BATCH_SIZE) {
+      const batch = orders.slice(i, i + BATCH_SIZE);
       
-      // Only sum amounts from paid orders for total calculation
-      if (order.isPaid) {
-        totalOfDay += order.totalAmount;
-      }
-
-      worksheet.addRow({
-        orderNumber: order.orderNumber,
-        date,
-        time,
-        dishes,
-        types,
-        dishPrice,
-        totalDish,
-        totalAmount: order.totalAmount,
-        paymentMethod: order.paymentMethod,
-        status: order.isPaid ? "Successful" : "Failed"
+      batch.forEach(order => {
+        const dateObj = new Date(order.createdAt);
+        worksheet.addRow({
+          orderNumber: order.orderNumber,
+          date: dateObj.toLocaleDateString('en-IN'),
+          time: dateObj.toLocaleTimeString('en-IN', { 
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          }),
+          dishes: order.items.map(i => `${i.name} x${i.quantity}`).join(", "),
+          types: order.items.map(i => i.type).join(", "),
+          dishPrice: order.items.map(i => i.price).join(", "),
+          totalDish: order.items.map(i => i.totalPrice).join(", "),
+          totalAmount: order.totalAmount,
+          paymentMethod: order.paymentMethod,
+          status: order.isPaid ? "Successful" : "Failed"
+        });
       });
-    });
+    }
 
-    // Add summary row for total amount
-    worksheet.addRow({}); // Empty row
+    // Add summary section with proper null checks
+    worksheet.addRow({});
     worksheet.addRow({
-      orderNumber: "",
-      date: "",
-      time: "",
-      dishes: "",
-      types: "",
-      dishPrice: "",
-      totalDish: "",
-      totalAmount: `Total: ${totalOfDay}`, // Total of paid orders
-      paymentMethod: "",
-      status: ""
+      orderNumber: "Summary Statistics"
+    });
+    
+    worksheet.addRow({
+      orderNumber: "Total Orders",
+      totalAmount: stats.totalOrders
+    });
+    worksheet.addRow({
+      orderNumber: "Paid Orders",
+      totalAmount: stats.totalPaidOrders
+    });
+    worksheet.addRow({
+      orderNumber: "Total Revenue",
+      totalAmount: stats.totalRevenue
+    });
+    worksheet.addRow({
+      orderNumber: "Avg. Order Value",
+      totalAmount: Math.round(stats.avgOrderValue || 0)
     });
 
     // Set response headers
@@ -247,7 +310,7 @@ router.get("/excel/:date", async (req, res) => {
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=orders_${dateStr}.xlsx`
+      `attachment; filename=orders_${req.params.date}.xlsx`
     );
 
     await workbook.xlsx.write(res);

@@ -3,6 +3,7 @@ import BASE_URL from '../utils/api';
 
 const MenuManager = ({ categories, onUpdate }) => {
   const [newCategory, setNewCategory] = useState('');
+  const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [newDish, setNewDish] = useState({
     categoryId: '',
     name: '',
@@ -13,28 +14,38 @@ const MenuManager = ({ categories, onUpdate }) => {
   });
   const [editingDish, setEditingDish] = useState(null);
   const [showAddDish, setShowAddDish] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
+    const categoryName = newCategory.trim();
+    if (!categoryName) return;
+
     const isDuplicate = categories.some(
-      (cat) => cat.categoryName.toLowerCase() === newCategory.trim().toLowerCase()
+      (cat) => cat.categoryName.toLowerCase() === categoryName.toLowerCase()
     );
     if (isDuplicate) {
       alert('Category already exists!');
       return;
     }
+
+    setIsLoading(true);
     try {
       const response = await fetch(`${BASE_URL}/dishes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoryName: newCategory }),
+        body: JSON.stringify({ categoryName }),
       });
+      
       if (response.ok) {
         setNewCategory('');
-        onUpdate();
+        setShowCategoryInput(false); // Hide the input after successful addition
+        await onUpdate();
       }
     } catch (error) {
       console.error('Error adding category:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -144,36 +155,63 @@ const MenuManager = ({ categories, onUpdate }) => {
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md mb-4">
-      <div className="mb-4">
-        <h2 className="text-xl font-bold mb-2">Menu Management</h2>
+    <div className="p-6 bg-white rounded-lg shadow-md mb-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-4">Menu Management</h2>
 
-        <form onSubmit={handleAddCategory} className="mb-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="New Category Name"
-              className="flex-1 p-2 border rounded"
-              required
-            />
-            <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+        <div className="mb-3">  {/* Increased bottom margin for desktop */}
+          {showCategoryInput ? (
+            <form onSubmit={handleAddCategory} className="mb-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <input
+                  type="text"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="New Category Name"
+                  className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  required
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button 
+                    type="submit" 
+                    className="w-full sm:w-auto bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 whitespace-nowrap transition-all duration-200"
+                  >
+                    Add Category
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setShowCategoryInput(false);
+                      setNewCategory('');
+                    }}
+                    className="w-full sm:w-auto bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 whitespace-nowrap transition-all duration-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setShowCategoryInput(true)}
+              className="w-full sm:w-auto bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all duration-200"
+            >
               Add Category
             </button>
-          </div>
-        </form>
+          )}
+        </div>
 
         <button
           onClick={() => setShowAddDish(!showAddDish)}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-4"
+          className="w-full sm:w-auto bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mb-6 transition-all duration-200"
         >
           {showAddDish ? 'Cancel' : 'Add New Dish'}
         </button>
 
         {showAddDish && (
-          <form onSubmit={handleAddDish} className="mb-4 p-4 bg-gray-50 rounded">
-            <div className="grid grid-cols-1 gap-4">
+          <form onSubmit={handleAddDish} className="mb-6 p-6 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 gap-6">
               <select
                 value={newDish.categoryId}
                 onChange={(e) => setNewDish({...newDish, categoryId: e.target.value})}
@@ -234,7 +272,7 @@ const MenuManager = ({ categories, onUpdate }) => {
               )}
               <button
                 type="submit"
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                className="w-full sm:w-auto bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
               >
                 Add Dish
               </button>
@@ -242,23 +280,24 @@ const MenuManager = ({ categories, onUpdate }) => {
           </form>
         )}
 
-        <div className="mt-4">
+        <div className="mt-6 space-y-6">
           {categories.map((category) => (
-            <div key={category._id} className="mb-4 p-4 bg-gray-50 rounded">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-semibold">{category.categoryName}</h3>
+            <div key={category._id} className="mb-6 p-6 bg-gray-50 rounded-lg">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h3 className="text-2xl font-bold text-orange-700">{category.categoryName}</h3>
                 <button
                   onClick={() => handleDeleteCategory(category._id)}
-                  className="bg-rose-500 text-white px-3 py-1 rounded hover:bg-rose-600 transition-colors duration-200"
+                  className="text-sm px-4 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-all duration-200"
                 >
                   Delete Category
                 </button>
               </div>
-              <div className="pl-4">
+              <hr className="my-4 border-gray-300" />
+              <div className="pl-0 sm:pl-6 space-y-4">
                 {category.dishes.map((dish) => (
-                  <div key={dish._id} className="py-2">
+                  <div key={dish._id} className="py-4 border-b last:border-b-0">
                     {editingDish && editingDish.dishId === dish._id ? (
-                      <form onSubmit={handleUpdateDish} className="space-y-2">
+                      <form onSubmit={handleUpdateDish} className="space-y-4">
                         <input
                           type="text"
                           value={editingDish.name}
@@ -277,12 +316,12 @@ const MenuManager = ({ categories, onUpdate }) => {
                           <label htmlFor="editHasHalfFull">Has Half/Full options</label>
                         </div>
                         {editingDish.hasHalfFull ? (
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <input
                               type="number"
                               value={editingDish.priceHalf}
                               onChange={(e) => setEditingDish({...editingDish, priceHalf: e.target.value})}
-                              className="p-2 border rounded w-1/2"
+                              className="p-2 border rounded w-full sm:w-1/2"
                               placeholder="Half Price"
                               required
                             />
@@ -290,7 +329,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                               type="number"
                               value={editingDish.priceFull}
                               onChange={(e) => setEditingDish({...editingDish, priceFull: e.target.value})}
-                              className="p-2 border rounded w-1/2"
+                              className="p-2 border rounded w-full sm:w-1/2"
                               placeholder="Full Price"
                               required
                             />
@@ -305,46 +344,46 @@ const MenuManager = ({ categories, onUpdate }) => {
                             required
                           />
                         )}
-                        <div className="flex gap-2">
-                          <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <button type="submit" className="w-full sm:w-auto bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all duration-200">
                             Save
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditingDish(null)}
-                            className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
+                            className="w-full sm:w-auto bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
                           >
                             Cancel
                           </button>
                         </div>
                       </form>
                     ) : (
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{dish.name}</span>
-                          <span className="text-gray-600 ml-2">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="flex-1">
+                          <span className="text-lg font-medium">{dish.name}</span>
+                          <span className="text-gray-600 block sm:inline sm:ml-4">
                             {dish.price ? (
-                              `(Price: ₹${dish.price})`
+                              `₹${dish.price}`
                             ) : dish.priceHalf || dish.priceFull ? (
-                              `(Half: ₹${dish.priceHalf || 'N/A'}, Full: ₹${dish.priceFull || 'N/A'})`
+                              `Half: ₹${dish.priceHalf || 'N/A'} • Full: ₹${dish.priceFull || 'N/A'}`
                             ) : null}
                           </span>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                           <button
                             onClick={() => startEditingDish(category._id, dish)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1"
+                            className="w-full sm:w-auto px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 flex items-center justify-center gap-2"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             <span>Edit</span>
                           </button>
                           <button
                             onClick={() => handleDeleteDish(category._id, dish._id)}
-                            className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors duration-200 flex items-center gap-1"
+                            className="w-full sm:w-auto px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-200 flex items-center justify-center gap-2"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                             <span>Delete</span>

@@ -6,10 +6,18 @@ import BackButton from "../components/BackButton";
 
 const Admin = () => {
   const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const loadCategories = async () => {
-    const data = await fetchCategories();
-    setCategories(data);
+    try {
+      setLoading(true);
+      const data = await fetchCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -31,9 +39,13 @@ const Admin = () => {
                 View Orders
               </Link>
             </div>
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <MenuManager categories={categories} onUpdate={loadCategories} />
-            </div>
+            {loading ? (
+              <div className="text-center py-4">Loading categories...</div>
+            ) : (
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <MenuManager categories={categories} onUpdate={loadCategories} />
+              </div>
+            )}
           </div>
         </div>
       </div>

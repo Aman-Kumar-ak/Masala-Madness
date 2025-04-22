@@ -40,6 +40,9 @@ export default function Cart() {
     };
 
     try {
+      // Dispatch pre-update event
+      window.dispatchEvent(new CustomEvent('orderUpdating'));
+      
       const res = await fetch("http://localhost:5000/api/orders/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,15 +51,34 @@ export default function Cart() {
 
       const data = await res.json();
       if (res.ok) {
-        alert(`Order ${isPaid ? "confirmed" : "failed"}. Redirecting to Home.`);
+        // Clear cart first
         clearCart();
+        
+        // Dispatch success event
+        window.dispatchEvent(new CustomEvent('orderUpdated', { 
+          detail: { 
+            success: isPaid,
+            orderId: data.orderId,
+            amount: totalAmount
+          } 
+        }));
+
+        // Navigate after event dispatch
         navigate("/");
+        alert(`Order ${isPaid ? "confirmed" : "added to pending"}`);
       } else {
-        alert("Something went wrong. Try again.");
+        throw new Error(data.message || "Failed to process order");
       }
     } catch (error) {
       console.error("Payment error:", error);
-      alert("Failed to confirm order.");
+      // Dispatch failure event
+      window.dispatchEvent(new CustomEvent('orderUpdated', { 
+        detail: { 
+          success: false,
+          error: error.message
+        } 
+      }));
+      alert("Failed to confirm order: " + error.message);
     }
   };
 
