@@ -6,15 +6,20 @@ const Menu = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const loadCategories = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const data = await fetchCategories();
-      setCategories(data);
-      setLoading(false);
+      // Ensure categories is always an array
+      setCategories(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading categories:', error);
+      setError('Failed to load menu items. Please try again later.');
+    } finally {
       setLoading(false);
     }
   };
@@ -23,20 +28,45 @@ const Menu = () => {
     loadCategories();
   }, []);
 
-  const filteredDishes = selectedCategory === 'All'
-    ? categories.flatMap(category => category.dishes)
-    : categories.find(cat => cat.categoryName === selectedCategory)?.dishes || [];
+  const filteredDishes = React.useMemo(() => {
+    // Ensure categories is an array before using flatMap
+    if (!Array.isArray(categories)) return [];
+    
+    return selectedCategory === 'All'
+      ? categories.reduce((acc, category) => {
+          if (Array.isArray(category?.dishes)) {
+            return [...acc, ...category.dishes];
+          }
+          return acc;
+        }, [])
+      : categories.find(cat => cat?.categoryName === selectedCategory)?.dishes || [];
+  }, [categories, selectedCategory]);
 
-  const searchFilteredDishes = searchTerm
-    ? filteredDishes.filter(dish => 
-        dish.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : filteredDishes;
+  const searchFilteredDishes = React.useMemo(() => {
+    if (!searchTerm) return filteredDishes;
+    return filteredDishes.filter(dish => 
+      dish?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [filteredDishes, searchTerm]);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-500">{error}</p>
+        <button 
+          onClick={loadCategories}
+          className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+        >
+          Try Again
+        </button>
       </div>
     );
   }

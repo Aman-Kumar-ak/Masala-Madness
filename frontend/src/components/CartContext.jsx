@@ -4,9 +4,15 @@ import React from "react";
 
 const CartContext = createContext();
 
-export const useCart = () => useContext(CartContext);
+const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error("useCart must be used within a CartProvider");
+  }
+  return context;
+};
 
-export const CartProvider = ({ children }) => {
+function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -26,7 +32,6 @@ export const CartProvider = ({ children }) => {
 
   // Save cart data to sessionStorage whenever cartItems change
   useEffect(() => {
-    // Only save to sessionStorage if the initial load has happened
     if (isInitialized) {
       sessionStorage.setItem("cartItems", JSON.stringify(cartItems));
     }
@@ -47,26 +52,33 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const removeFromCart = (dish) => {
+  const updateQuantity = (dish, newQuantity) => {
+    if (newQuantity < 1) return;
     setCartItems((prev) =>
-      prev
-        .map((item) =>
-          item.name === dish.name
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
+      prev.map((item) =>
+        item.name === dish.name
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
     );
+  };
+
+  const removeFromCart = (dish) => {
+    if (window.confirm(`Are you sure you want to remove ${dish.name} from the cart?`)) {
+      setCartItems((prev) => prev.filter((item) => item.name !== dish.name));
+    }
   };
 
   const clearCart = () => {
     setCartItems([]);
-    sessionStorage.removeItem("cartItems"); // Clear cart data from sessionStorage
+    sessionStorage.removeItem("cartItems");
   };
 
   return (
-    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, clearCart }}>
+    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, clearCart, updateQuantity }}>
       {children}
     </CartContext.Provider>
   );
-};
+}
+
+export { CartProvider, useCart };

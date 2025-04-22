@@ -176,12 +176,16 @@ Order Number is reset on the basis of UTC timinig.
 
 ## Issue 
 
-Issue Resolved
+Number of order showing both paid/unpaid. We have to fix it.
 
 ## Things to do now
 
 1. We can work on adding Discount on the given order with the specific details like - discount of 20% over 300
 2. Work on Design part of the Project
+3. We have to add one feature in which customer give the order but not want to pay right now. After eating they pay the amount. So we have to add something like pending money/order payment.
+We can do like creating one page of Pending in which all the order will be shown which are un-paid, in that admin can modify the dishes like adding or removing. When the user ready to pay. We can use the same page of cart where that all dishes will be there with modified dishes. On that, admin can select b/w the Cash/QR for confirm payment or again put them in pending. Make sure until the customer not paying the money that will be considered as unpaid. When the customer will paid the money it will be change to the paid. In database same Order number when it was listed as the unpaid with time, it will change into the paid with the timing of paying the money. The database will be arrange on the basis of time.
+
+4. We can also give the option to admin that he/she want to recieve alert on various events like - removing element
 
 ## Future Features
 

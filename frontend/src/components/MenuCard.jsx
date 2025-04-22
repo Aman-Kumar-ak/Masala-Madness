@@ -17,6 +17,11 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
     setQuantity(quantity + 1);
   };
 
+  const handleTypeSelect = (type) => {
+    // If the same type is clicked again, deselect it
+    setSelectedType(selectedType === type ? "" : type);
+  };
+
   const handleAddToCart = () => {
     if (price) {
       addToCart({ name, quantity, type: "N/A", price });
@@ -82,14 +87,14 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
           <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
             <button 
               onClick={decreaseQuantity}
-              className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200"
+              className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg"
             >
               -
             </button>
             <span className="font-medium text-gray-700">{quantity}</span>
             <button 
               onClick={increaseQuantity}
-              className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200"
+              className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg"
             >
               +
             </button>
@@ -100,7 +105,7 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
             <div className="flex gap-2">
               {priceHalf && (
                 <button 
-                  onClick={() => setSelectedType("H")}
+                  onClick={() => handleTypeSelect("H")}
                   className={`flex-1 py-2 rounded-lg font-medium transition-all duration-200 ${
                     selectedType === "H"
                       ? "bg-orange-500 text-white shadow-md"
@@ -112,7 +117,7 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
               )}
               {priceFull && (
                 <button 
-                  onClick={() => setSelectedType("F")}
+                  onClick={() => handleTypeSelect("F")}
                   className={`flex-1 py-2 rounded-lg font-medium transition-all duration-200 ${
                     selectedType === "F"
                       ? "bg-orange-500 text-white shadow-md"

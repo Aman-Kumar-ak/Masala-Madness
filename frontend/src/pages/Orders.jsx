@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import BackButton from "../components/BackButton";
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -68,80 +69,81 @@ const Orders = () => {
   }
 
   return (
-    <div className="min-h-screen bg-orange-100 p-4">
-      <div className="bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-2xl font-bold mb-6">Order Management</h1>
-        
-        {/* Date Picker + Excel Download */}
-        <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Select Date:
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={handleDateChange}
-              max={getCurrentDate()}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            />
-            <button
-              onClick={handleDownloadExcel}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            >
-              Download Excel
-            </button>
-          </div>
-        </div>
-
-        {/* Totals */}
-        {orders.length > 0 && (
-          <div className="bg-orange-50 p-4 rounded-lg mb-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-lg font-semibold">Total Orders</h3>
-                <p className="text-2xl font-bold text-orange-600">{orders.length}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Total Revenue</h3>
-                <p className="text-2xl font-bold text-orange-600">₹{calculateTotalAmount()}</p>
-              </div>
+    <div className="min-h-screen bg-orange-100">
+      <BackButton />
+      <div className="p-4 pt-16">
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <h1 className="text-2xl font-bold mb-6">Order Management</h1>
+          
+          {/* Date Picker + Excel Download */}
+          <div className="mb-6">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Select Date:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={handleDateChange}
+                max={getCurrentDate()}
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              />
+              <button
+                onClick={handleDownloadExcel}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              >
+                Download Excel
+              </button>
             </div>
           </div>
-        )}
 
-        {/* Orders List */}
-        <div className="space-y-4">
-          {orders.length === 0 ? (
-            <p className="text-gray-600 text-center">No orders found for this date</p>
-          ) : (
-            orders.map((order) => (
-              <div key={order.orderId} className="bg-orange-50 p-4 rounded-lg">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="text-lg font-semibold">Order #{order.orderNumber}</h3>
-                    <p className="text-sm text-gray-600">{formatDateIST(order.createdAt)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">Total: ₹{order.totalAmount}</p>
-                    <p className={`text-sm ${order.isPaid ? 'text-green-600' : 'text-red-600'}`}>
-                      {order.isPaid ? 'Paid' : 'Unpaid'} - {order.paymentMethod}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <h4 className="font-medium mb-1">Items:</h4>
-                  <ul className="space-y-1">
-                    {order.items.map((item, index) => (
-                      <li key={index} className="text-sm">
-                        {item.name} ({item.type}) - {item.quantity} x ₹{item.price} = ₹{item.totalPrice}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+          {/* Totals */}
+          {orders.length > 0 && (
+            <div className="flex gap-6 mb-6">
+              <div className="flex-1 bg-orange-50 p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="text-lg font-semibold text-gray-700">Total Orders</h3>
+                <p className="text-3xl font-bold text-orange-600 mt-2">{orders.length}</p>
               </div>
-            ))
+              <div className="flex-1 bg-orange-50 p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="text-lg font-semibold text-gray-700">Total Revenue</h3>
+                <p className="text-3xl font-bold text-orange-600 mt-2">₹{calculateTotalAmount().toLocaleString('en-IN')}</p>
+              </div>
+            </div>
           )}
+
+          {/* Orders List */}
+          <div className="space-y-4">
+            {orders.length === 0 ? (
+              <p className="text-gray-600 text-center">No orders found for this date</p>
+            ) : (
+              orders.map((order) => (
+                <div key={order.orderId} className="bg-orange-50 p-4 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="text-lg font-semibold">Order #{order.orderNumber}</h3>
+                      <p className="text-sm text-gray-600">{formatDateIST(order.createdAt)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">Total: ₹{order.totalAmount}</p>
+                      <p className={`text-sm ${order.isPaid ? 'text-green-600' : 'text-red-600'}`}>
+                        {order.isPaid ? 'Paid' : 'Unpaid'} - {order.paymentMethod}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <h4 className="font-medium mb-1">Items:</h4>
+                    <ul className="space-y-1">
+                      {order.items.map((item, index) => (
+                        <li key={index} className="text-sm">
+                          {item.name} ({item.type}) - {item.quantity} x ₹{item.price} = ₹{item.totalPrice}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

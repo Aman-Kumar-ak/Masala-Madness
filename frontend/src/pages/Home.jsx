@@ -6,6 +6,7 @@ import { useCart } from "../components/CartContext";
 export default function Home() {
   const { cartItems, clearCart } = useCart();
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [todayOrders, setTodayOrders] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const getCurrentDate = () => {
@@ -20,17 +21,23 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const fetchTodayRevenue = async () => {
+    const fetchTodayData = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/orders/today-revenue');
-        const data = await response.json();
-        setTotalRevenue(data.totalRevenue || 0);
+        // Fetch revenue
+        const revenueResponse = await fetch('http://localhost:5000/api/orders/today-revenue');
+        const revenueData = await revenueResponse.json();
+        setTotalRevenue(revenueData.totalRevenue || 0);
+
+        // Fetch today's orders
+        const ordersResponse = await fetch('http://localhost:5000/api/orders/today');
+        const ordersData = await ordersResponse.json();
+        setTodayOrders(ordersData || []);
       } catch (error) {
-        console.error('Error fetching today\'s revenue:', error);
+        console.error('Error fetching today\'s data:', error);
       }
     };
 
-    fetchTodayRevenue();
+    fetchTodayData();
   }, []);
 
   useEffect(() => {
@@ -82,21 +89,41 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Date and Revenue Banner */}
+      {/* Date and Stats Banner */}
       <div className="bg-white shadow-md mt-4 py-4">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left space-y-2 md:space-y-0">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            {/* Date */}
             <div className="flex items-center space-x-2">
               <span className="text-2xl">📅</span>
               <p className="text-lg font-medium text-gray-700">
                 {getCurrentDate()}
               </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-2xl">💰</span>
-              <p className="text-lg font-bold text-green-600">
-                Today's Revenue: ₹{totalRevenue.toLocaleString('en-IN')}
-              </p>
+            
+            {/* Stats */}
+            <div className="flex items-center gap-6">
+              {/* Orders Count */}
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <p className="text-sm text-gray-600">Today's Orders</p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {todayOrders.length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Revenue */}
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">💰</span>
+                <div>
+                  <p className="text-sm text-gray-600">Today's Revenue</p>
+                  <p className="text-lg font-bold text-green-600">
+                    ₹{totalRevenue.toLocaleString('en-IN')}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
