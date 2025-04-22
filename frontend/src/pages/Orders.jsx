@@ -84,6 +84,9 @@ const Orders = () => {
   };
 
   const handleDownloadExcel = () => {
+    if (orders.length === 0) {
+      return;
+    }
     const url = `${API_URL}/api/orders/excel/${selectedDate}`;
     window.open(url, '_blank');
   };
@@ -141,9 +144,19 @@ const Orders = () => {
               />
               <button
                 onClick={handleDownloadExcel}
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                disabled={orders.length === 0}
+                className={`relative group ${
+                  orders.length === 0
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600'
+                } text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline`}
               >
                 Download Excel
+                {orders.length === 0 && (
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-40 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    No orders available to download
+                  </div>
+                )}
               </button>
             </div>
           </div>
