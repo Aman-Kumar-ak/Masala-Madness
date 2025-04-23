@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { useCart } from "../components/CartContext";
+import Notification from "./Notification";
 
 const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedType, setSelectedType] = useState("");
   const { addToCart } = useCart();
   const [isAdding, setIsAdding] = useState(false);
+  const [notification, setNotification] = useState(null);
 
   const decreaseQuantity = () => {
     if (quantity > 1) {
@@ -18,7 +20,6 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
   };
 
   const handleTypeSelect = (type) => {
-    // If the same type is clicked again, deselect it
     setSelectedType(selectedType === type ? "" : type);
   };
 
@@ -29,7 +30,10 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
       const selectedPrice = selectedType === "H" ? priceHalf : priceFull;
       addToCart({ name, quantity, type: selectedType, price: selectedPrice });
     } else {
-      alert("Please select Half (H) or Full (F) size.");
+      setNotification({
+        message: "Please select Half (H) or Full (F) size.",
+        type: "warning"
+      });
       return;
     }
     
@@ -143,6 +147,14 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
           </button>
         </div>
       </div>
+      
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
     </div>
   );
 };

@@ -19,7 +19,10 @@ const OrderSchema = new mongoose.Schema({
       totalPrice: { type: Number, required: true }, // price * quantity
     },
   ],
-  totalAmount: { type: Number, required: true },
+  subtotal: { type: Number, required: true }, // Original amount before discount
+  discountAmount: { type: Number, default: 0 },
+  discountPercentage: { type: Number, default: 0 },
+  totalAmount: { type: Number, required: true }, // Final amount after discount
   paymentMethod: { type: String, required: true }, // Cash or Online
   isPaid: { type: Boolean, required: true },
   createdAt: {

@@ -24,7 +24,7 @@ const getDateRange = (dateStr) => {
 //Confirm and create a new order
 router.post("/confirm", async (req, res) => {
   try {
-    const { items, totalAmount, paymentMethod, isPaid } = req.body;
+    const { items, totalAmount, subtotal, discountAmount, discountPercentage, paymentMethod, isPaid } = req.body;
 
     // Get current time in UTC
     const now = new Date();
@@ -54,10 +54,13 @@ router.post("/confirm", async (req, res) => {
       orderId: uuidv4(),
       orderNumber,
       items: processedItems,
+      subtotal: subtotal || totalAmount, // Use subtotal if provided, otherwise use totalAmount
       totalAmount,
+      discountAmount: discountAmount || 0,
+      discountPercentage: discountPercentage || 0,
       paymentMethod,
       isPaid,
-      createdAt: now // Store the current time in UTC
+      createdAt: now
     });
 
     await newOrder.save();
@@ -248,7 +251,10 @@ router.get("/excel/:date", async (req, res) => {
       { header: "Type(H/F)", key: "types", width: 10 },
       { header: "Dishes Price", key: "dishPrice", width: 15 },
       { header: "Total Dish(each Price)", key: "totalDish", width: 20 },
-      { header: "Total Order Amount", key: "totalAmount", width: 18 },
+      { header: "Subtotal", key: "subtotal", width: 15 },
+      { header: "Discount(%)", key: "discountPercentage", width: 12 },
+      { header: "Discount Amount", key: "discountAmount", width: 15 },
+      { header: "Final Amount", key: "totalAmount", width: 15 },
       { header: "Mode of Payment", key: "paymentMethod", width: 15 },
       { header: "Status", key: "status", width: 15 },
     ];
@@ -273,6 +279,9 @@ router.get("/excel/:date", async (req, res) => {
           types: order.items.map(i => i.type).join(", "),
           dishPrice: order.items.map(i => i.price).join(", "),
           totalDish: order.items.map(i => i.totalPrice).join(", "),
+          subtotal: order.subtotal || order.totalAmount,
+          discountPercentage: order.discountPercentage || 0,
+          discountAmount: order.discountAmount || 0,
           totalAmount: order.totalAmount,
           paymentMethod: order.paymentMethod,
           status: order.isPaid ? "Successful" : "Failed"

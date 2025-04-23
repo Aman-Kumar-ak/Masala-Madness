@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import BASE_URL from '../utils/api';
+import Notification from './Notification';
+import ConfirmationDialog from './ConfirmationDialog';
 
 const MenuManager = ({ categories, onUpdate }) => {
   const [newCategory, setNewCategory] = useState('');
@@ -15,17 +17,28 @@ const MenuManager = ({ categories, onUpdate }) => {
   const [editingDish, setEditingDish] = useState(null);
   const [showAddDish, setShowAddDish] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [notification, setNotification] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
     const categoryName = newCategory.trim();
-    if (!categoryName) return;
+    if (!categoryName) {
+      setNotification({
+        message: 'Category name cannot be empty',
+        type: 'error'
+      });
+      return;
+    }
 
     const isDuplicate = categories.some(
       (cat) => cat.categoryName.toLowerCase() === categoryName.toLowerCase()
     );
     if (isDuplicate) {
-      alert('Category already exists!');
+      setNotification({
+        message: 'Category already exists!',
+        type: 'warning'
+      });
       return;
     }
 
@@ -41,9 +54,19 @@ const MenuManager = ({ categories, onUpdate }) => {
         setNewCategory('');
         setShowCategoryInput(false); // Hide the input after successful addition
         await onUpdate();
+        setNotification({
+          message: 'Category added successfully!',
+          type: 'success'
+        });
+      } else {
+        throw new Error('Failed to add category');
       }
     } catch (error) {
       console.error('Error adding category:', error);
+      setNotification({
+        message: 'Failed to add category',
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -51,13 +74,31 @@ const MenuManager = ({ categories, onUpdate }) => {
 
   const handleAddDish = async (e) => {
     e.preventDefault();
+    if (!newDish.categoryId) {
+      setNotification({
+        message: 'Please select a category',
+        type: 'warning'
+      });
+      return;
+    }
+
     const category = categories.find((cat) => cat._id === newDish.categoryId);
-    if (!category) return;
+    if (!category) {
+      setNotification({
+        message: 'Selected category not found',
+        type: 'error'
+      });
+      return;
+    }
+
     const isDuplicate = category.dishes.some(
       (dish) => dish.name.toLowerCase() === newDish.name.trim().toLowerCase()
     );
     if (isDuplicate) {
-      alert('Dish with this name already exists in this category!');
+      setNotification({
+        message: 'Dish with this name already exists in this category!',
+        type: 'warning'
+      });
       return;
     }
     try {
@@ -74,10 +115,20 @@ const MenuManager = ({ categories, onUpdate }) => {
       if (response.ok) {
         setNewDish({ categoryId: '', name: '', priceHalf: '', priceFull: '', price: '', hasHalfFull: true });
         setShowAddDish(false);
-        onUpdate();
+        await onUpdate();
+        setNotification({
+          message: 'Dish added successfully!',
+          type: 'success'
+        });
+      } else {
+        throw new Error('Failed to add dish');
       }
     } catch (error) {
       console.error('Error adding dish:', error);
+      setNotification({
+        message: 'Failed to add dish: ' + error.message,
+        type: 'error'
+      });
     }
   };
 
@@ -94,7 +145,10 @@ const MenuManager = ({ categories, onUpdate }) => {
     );
 
     if (isDuplicate) {
-      alert('Another dish with this name already exists in this category!');
+      setNotification({
+        message: 'Another dish with this name already exists in this category!',
+        type: 'warning'
+      });
       return;
     }
 
@@ -111,35 +165,77 @@ const MenuManager = ({ categories, onUpdate }) => {
       });
       if (response.ok) {
         setEditingDish(null);
-        onUpdate();
+        await onUpdate();
+        setNotification({
+          message: 'Dish updated successfully!',
+          type: 'success'
+        });
       }
     } catch (error) {
       console.error('Error updating dish:', error);
+      setNotification({
+        message: 'Failed to update dish',
+        type: 'error'
+      });
     }
   };
 
   const handleDeleteCategory = async (categoryId) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
-    try {
-      const response = await fetch(`${BASE_URL}/dishes/${categoryId}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) onUpdate();
-    } catch (error) {
-      console.error('Error deleting category:', error);
-    }
+    setConfirmDialog({
+      title: 'Delete Category',
+      message: 'Are you sure you want to delete this category?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${BASE_URL}/dishes/${categoryId}`, {
+            method: 'DELETE',
+          });
+          if (response.ok) {
+            await onUpdate();
+            setNotification({
+              message: 'Category deleted successfully!',
+              type: 'success'
+            });
+          }
+          setConfirmDialog(null);
+        } catch (error) {
+          console.error('Error deleting category:', error);
+          setNotification({
+            message: 'Failed to delete category',
+            type: 'error'
+          });
+        }
+      }
+    });
   };
 
   const handleDeleteDish = async (categoryId, dishId) => {
-    if (!window.confirm('Are you sure you want to delete this dish?')) return;
-    try {
-      const response = await fetch(`${BASE_URL}/dishes/${categoryId}/dish/${dishId}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) onUpdate();
-    } catch (error) {
-      console.error('Error deleting dish:', error);
-    }
+    setConfirmDialog({
+      title: 'Delete Dish',
+      message: 'Are you sure you want to delete this dish?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${BASE_URL}/dishes/${categoryId}/dish/${dishId}`, {
+            method: 'DELETE',
+          });
+          if (response.ok) {
+            await onUpdate();
+            setNotification({
+              message: 'Dish deleted successfully!',
+              type: 'success'
+            });
+          }
+          setConfirmDialog(null);
+        } catch (error) {
+          console.error('Error deleting dish:', error);
+          setNotification({
+            message: 'Failed to delete dish',
+            type: 'error'
+          });
+        }
+      }
+    });
   };
 
   const startEditingDish = (categoryId, dish) => {
@@ -398,6 +494,27 @@ const MenuManager = ({ categories, onUpdate }) => {
           ))}
         </div>
       </div>
+
+      {/* Notifications */}
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
+      {/* Confirmation Dialog */}
+      {confirmDialog && (
+        <ConfirmationDialog
+          isOpen={true}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 // frontend/src/components/CartContext.jsx
 import { createContext, useState, useContext, useEffect } from "react";
 import React from "react";
+import ConfirmationDialog from "./ConfirmationDialog";
 
 const CartContext = createContext();
 
@@ -15,6 +16,7 @@ const useCart = () => {
 function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [itemToRemove, setItemToRemove] = useState(null);
 
   // Load cart data from sessionStorage when the component mounts
   useEffect(() => {
@@ -64,9 +66,12 @@ function CartProvider({ children }) {
   };
 
   const removeFromCart = (dish) => {
-    if (window.confirm(`Are you sure you want to remove ${dish.name} from the cart?`)) {
-      setCartItems((prev) => prev.filter((item) => item.name !== dish.name));
-    }
+    setItemToRemove(dish);
+  };
+
+  const handleConfirmRemove = () => {
+    setCartItems((prev) => prev.filter((item) => item.name !== itemToRemove.name));
+    setItemToRemove(null);
   };
 
   const clearCart = () => {
@@ -77,6 +82,15 @@ function CartProvider({ children }) {
   return (
     <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, clearCart, updateQuantity }}>
       {children}
+      <ConfirmationDialog
+        isOpen={itemToRemove !== null}
+        onClose={() => setItemToRemove(null)}
+        onConfirm={handleConfirmRemove}
+        title="Remove Item"
+        message={`Are you sure you want to remove ${itemToRemove?.name} from the cart?`}
+        confirmText="Remove"
+        type="danger"
+      />
     </CartContext.Provider>
   );
 }

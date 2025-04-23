@@ -213,7 +213,16 @@ const Orders = () => {
                       <p className="text-sm text-gray-600">{formatDateIST(order.createdAt)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">Total: ₹{order.totalAmount}</p>
+                      <p className="font-semibold">
+                        {order.discountAmount > 0 ? (
+                          <>
+                            <span className="text-gray-500 line-through mr-2">₹{order.subtotal}</span>
+                            <span>₹{order.totalAmount}</span>
+                          </>
+                        ) : (
+                          <span>₹{order.totalAmount}</span>
+                        )}
+                      </p>
                       <p className={`text-sm ${order.isPaid ? 'text-green-600' : 'text-red-600'}`}>
                         {order.isPaid ? 'Paid' : 'Unpaid'} - {order.paymentMethod}
                       </p>
@@ -228,6 +237,11 @@ const Orders = () => {
                         </li>
                       ))}
                     </ul>
+                    {order.discountAmount > 0 && (
+                      <div className="mt-2 text-sm text-green-600">
+                        Discount Applied: {order.discountPercentage}% (-₹{order.discountAmount})
+                      </div>
+                    )}
                   </div>
                 </div>
               ))

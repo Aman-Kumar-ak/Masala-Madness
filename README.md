@@ -176,7 +176,7 @@ Order Number is reset on the basis of UTC timinig.
 
 ## Issue 
 
-Number of order showing both paid/unpaid. We have to fix it.
+In orders.jsx, In order Management while choosing the date from calendar there is a option of clear button. While pressing that all the orders is disappearning. We have to fix that.
 
 ## Things to do now
 
@@ -194,3 +194,4 @@ By adding this feature, admin can view the order which are coming from these pla
 
 2. We can use the Din In feature where we will give the QR to the table Numbers, by which customer can scan the QR and order the dishes from sitting in the Restaurant only.
 
+Make the original price and discount amount with percent has to be in one line space because of less space in floating cart. give spaces and better. Change the floating cart to light color

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from 'react-router-dom';
 import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
@@ -14,6 +14,41 @@ export default function Home() {
     avgOrderValue: 0
   });
   const [loading, setLoading] = useState(false);
+  const [activeDiscount, setActiveDiscount] = useState(null);
+
+  // Calculate cart total
+  const subtotal = cartItems.reduce(
+    (sum, item) => sum + item.quantity * item.price,
+    0
+  );
+
+  // Calculate discount if applicable
+  const calculateDiscount = () => {
+    if (!activeDiscount || subtotal < activeDiscount.minOrderAmount) {
+      return 0;
+    }
+    return Math.round((subtotal * activeDiscount.percentage) / 100);
+  };
+
+  const discountAmount = calculateDiscount();
+  const totalAmount = subtotal - discountAmount;
+
+  // Fetch active discount
+  useEffect(() => {
+    const fetchActiveDiscount = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/discounts/active`);
+        if (response.ok) {
+          const data = await response.json();
+          setActiveDiscount(data);
+        }
+      } catch (error) {
+        console.error('Error fetching discount:', error);
+      }
+    };
+
+    fetchActiveDiscount();
+  }, []);
 
   const getCurrentDate = () => {
     const options = { 
@@ -48,7 +83,7 @@ export default function Home() {
   };
 
   // Call fetchStats when order is placed/updated
-  React.useEffect(() => {
+  useEffect(() => {
     const handleOrderUpdate = () => {
       fetchStats();
     };
@@ -173,7 +208,56 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Clear Cart Button (only shown when cart has items) */}
+      {/* New Compact Floating Cart with Light Theme */}
+      {cartItems.length > 0 && (
+        <div className="fixed bottom-4 right-4 left-4 z-50 flex justify-center">
+          <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-lg px-4 py-3 text-gray-800 border border-gray-200 flex items-center justify-between gap-3 max-w-md w-full">
+            {/* Cart Info */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xl flex-shrink-0">🛒</span>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center space-x-1 overflow-hidden">
+                  {discountAmount > 0 ? (
+                    <div className="flex items-baseline gap-2 text-base overflow-hidden">
+                      <div className="flex items-center gap-1">
+                        <span className="font-bold text-base flex-shrink-0">₹{totalAmount}</span>
+                        <span className="text-green-600 font-medium text-sm flex-shrink-0">(-{activeDiscount.percentage}%)</span>
+                      </div>
+                      <span className="text-gray-400 text-sm line-through flex-shrink-0">₹{subtotal}</span>
+                    </div>
+                  ) : (
+                    <span className="font-bold text-base flex-shrink-0">₹{totalAmount}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
+                  {activeDiscount && subtotal < activeDiscount.minOrderAmount && (
+                    <span className="text-xs text-orange-600 whitespace-nowrap">
+                      (₹{activeDiscount.minOrderAmount - subtotal} for {activeDiscount.percentage}% off)
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Link
+                to="/cart"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full transition-colors duration-200 text-sm font-medium flex items-center gap-2 whitespace-nowrap"
+              >
+                <span className="hidden sm:inline">View Cart</span>
+                <span className="sm:hidden">Cart</span>
+                <span className="bg-orange-600 text-white px-2 py-0.5 rounded-full text-xs">
+                  {cartItems.length}
+                </span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Cart Button - Moved before Menu Component */}
       {cartItems.length > 0 && (
         <div className="container mx-auto px-4 mt-4">
           <button
@@ -186,8 +270,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Menu Component */}
-      <div className="container mx-auto px-4 py-8">
+      {/* Menu Component with smaller bottom padding */}
+      <div className="container mx-auto px-4 py-8 pb-24">
         <Menu />
       </div>
     </div>
