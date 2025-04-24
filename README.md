@@ -22,6 +22,42 @@ masala-madness/
 
 ```
 
+```
+Masala-Madness/
+└── frontend/
+    ├── node_modules/                # Auto-generated dependencies
+    ├── public/                      # (Optional: Vite can use a public folder)
+    ├── src/
+    │   ├── components/              # Reusable UI components
+    │   │   ├── BackButton.jsx
+    │   │   ├── CartContext.jsx
+    │   │   ├── CategoryCard.jsx
+    │   │   ├── ConfirmationDialog.jsx
+    │   │   ├── Menu.jsx
+    │   │   ├── MenuCard.jsx
+    │   │   ├── MenuManager.jsx
+    │   │   └── Notification.jsx
+    │   ├── pages/                   # Main route-based pages
+    │   │   ├── Admin.jsx
+    │   │   ├── Cart.jsx
+    │   │   ├── Home.jsx
+    │   │   └── Orders.jsx
+    │   ├── utils/                   # Utility/helper functions
+    │   │   ├── api.js
+    │   │   └── fetchCategories.js
+    │   ├── App.jsx                  # Main app component with routes
+    │   ├── main.jsx                 # Entry point
+    │   └── style.css                # Tailwind CSS import and custom styles
+    ├── .gitignore
+    ├── index.html                   # HTML template
+    ├── package.json
+    ├── package-lock.json
+    ├── postcss.config.js           # PostCSS config (or .cjs depending on setup)
+    ├── tailwind.config.js          # Tailwind CSS config
+    └── vite.config.js              # Vite config
+
+```
+
 ## Technology Stack
 
 ### Backend

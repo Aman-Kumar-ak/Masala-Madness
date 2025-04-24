@@ -105,7 +105,11 @@ export default function Home() {
           <div className="flex justify-between items-center py-4">
             {/* Logo and Title */}
             <div className="flex items-center space-x-2">
-              <span className="text-orange-500 text-3xl">🍛</span>
+              <img 
+                src="/images/m_logo.png" 
+                alt="Masala Madness Logo" 
+                className="w-10 h-10 object-contain"
+              />
               <h1 className="text-2xl font-bold text-gray-800">Masala Madness</h1>
             </div>
 

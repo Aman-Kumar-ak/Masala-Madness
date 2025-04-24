@@ -1,11 +1,21 @@
-// App.jsx
-import React from "react";
-import { Outlet } from "react-router-dom";
-// import Home from "./pages/Home";
-// import Cart from "./pages/Cart";
-// import Admin from "./pages/Admin";
-// import Orders from "./pages/Orders";
+import React from 'react';
+import { Route, Routes } from 'react-router-dom';  // Import Route and Routes for routing
+import Home from './pages/Home';  // Import your Home component
+import Cart from './pages/Cart';  // Import Cart component (add other pages similarly)
+import Admin from './pages/Admin';  // Import Admin page
+import Orders from './pages/Orders';  // Import Admin page
 
-export default function App() {
-  return <Outlet />;
-}
+const App = () => {
+  return (
+    <div>
+      <Routes>  {/* Routes for handling different paths */}
+        <Route path="/" element={<Home />} />  {/* Home page */}
+        <Route path="/cart" element={<Cart />} />  {/* Cart page */}
+        <Route path="/admin" element={<Admin />} />  {/* Admin page */}
+        <Route path="/orders" element={<Orders />} />  {/* Admin page */}
+      </Routes>
+    </div>
+  );
+};
+
+export default App;
