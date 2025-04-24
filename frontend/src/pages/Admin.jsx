@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import MenuManager from "../components/MenuManager";
 import { fetchCategories } from "../utils/fetchCategories";
 import BackButton from "../components/BackButton";
+import Notification from "../components/Notification";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -16,6 +17,7 @@ const Admin = () => {
     minOrderAmount: '',
     isActive: true
   });
+  const [notification, setNotification] = useState(null);
 
   const loadCategories = async () => {
     try {
@@ -24,6 +26,7 @@ const Admin = () => {
       setCategories(data);
     } catch (error) {
       console.error('Error loading categories:', error);
+      setNotification({ message: 'Failed to load categories', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -38,6 +41,7 @@ const Admin = () => {
       }
     } catch (error) {
       console.error('Error loading active discount:', error);
+      setNotification({ message: 'Failed to load active discount', type: 'error' });
     }
   };
 
@@ -64,16 +68,21 @@ const Admin = () => {
       if (response.ok) {
         setShowDiscountForm(false);
         setNewDiscount({ percentage: '', minOrderAmount: '', isActive: true });
-        loadActiveDiscount();
+        await loadActiveDiscount();
+        setNotification({ message: "Discount saved successfully", type: "success" });
+      } else {
+        const errorData = await response.json();
+        setNotification({ message: errorData.message || "Failed to save discount", type: "error" });
       }
     } catch (error) {
       console.error('Error creating discount:', error);
+      setNotification({ message: "Error creating discount: " + error.message, type: 'error' });
     }
   };
 
   const handleRemoveDiscount = async () => {
     if (!activeDiscount?._id) return;
-    
+
     if (window.confirm('Are you sure you want to remove this discount?')) {
       try {
         const response = await fetch(`${API_URL}/api/discounts/${activeDiscount._id}`, {
@@ -86,23 +95,34 @@ const Admin = () => {
 
         // Clear the active discount from local state
         setActiveDiscount(null);
-        
-        // Notify user of successful deletion
-        alert('Discount removed successfully');
+        setNotification({ message: "Discount removed successfully", type: "success" });
 
         // Trigger a refresh of the active discount
         loadActiveDiscount();
       } catch (error) {
         console.error('Error removing discount:', error);
-        alert('Failed to remove discount. Please try again.');
+        setNotification({ message: "Failed to remove discount. Please try again.", type: "error" });
       }
     }
+  };
+
+  // Handler to notify after MenuManager updates (categories or dishes)
+  const handleMenuUpdate = async () => {
+    await loadCategories();
+    setNotification({ message: "Categories/Dishes updated successfully", type: "success" });
   };
 
   return (
     <div className="min-h-screen bg-orange-100">
       <BackButton />
       <div className="p-4 pt-16">
+        {notification && (
+          <Notification
+            message={notification.message}
+            type={notification.type}
+            onClose={() => setNotification(null)}
+          />
+        )}
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-6">Admin Panel</h1>
           <div className="space-y-4">
@@ -216,7 +236,7 @@ const Admin = () => {
               <div className="text-center py-4">Loading categories...</div>
             ) : (
               <div className="bg-orange-50 p-4 rounded-lg">
-                <MenuManager categories={categories} onUpdate={loadCategories} />
+                <MenuManager categories={categories} onUpdate={handleMenuUpdate} />
               </div>
             )}
           </div>

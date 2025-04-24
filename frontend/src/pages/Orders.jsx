@@ -152,13 +152,13 @@ const Orders = () => {
                 } text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline`}
               >
                 Download Excel
-                {orders.length === 0 && (
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-40 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    No orders available to download
-                  </div>
-                )}
               </button>
             </div>
+            {orders.length === 0 && (
+              <div className="mt-2 text-center text-red-600 font-semibold">
+                No orders available to download
+              </div>
+            )}
           </div>
 
           {/* Enhanced Stats Display */}
