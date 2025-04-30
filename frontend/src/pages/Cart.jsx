@@ -20,6 +20,8 @@ export default function Cart() {
     0
   );
 
+  
+
   // Calculate discount if applicable
   const calculateDiscount = () => {
     if (!activeDiscount || subtotal < activeDiscount.minOrderAmount) {
@@ -151,7 +153,7 @@ export default function Cart() {
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-bold text-md">#{index + 1} {item.name} ({item.type})</p>
+                    <p className="font-bold text-md">#{index + 1} {item.name} ({item.type === 'H' ? 'HALF' : item.type === 'F' ? 'FULL' : item.type})</p>
                     <p className="text-gray-600">Price: ₹{item.price}</p>
                   </div>
                   <button
@@ -188,9 +190,17 @@ export default function Cart() {
               <h3 className="font-bold text-lg mb-2">Order Summary</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
+                  
+                </div>
+                <div className="flex justify-between">
+                
+                 
+                </div>
+                <div className="flex justify-between font-semibold">
                   <span>Subtotal:</span>
                   <span>₹{subtotal}</span>
                 </div>
+              
                 
                 {activeDiscount && subtotal >= activeDiscount.minOrderAmount && (
                   <div className="flex justify-between text-green-600">

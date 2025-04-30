@@ -40,16 +40,18 @@ function CartProvider({ children }) {
   }, [cartItems, isInitialized]);
 
   const addToCart = (dish) => {
+    // Normalize type to uppercase for consistency
+    const dishWithNormalizedType = { ...dish, type: dish.type?.toUpperCase() };
     setCartItems((prev) => {
-      const existing = prev.find((item) => item.name === dish.name);
+      const existing = prev.find((item) => item.name === dishWithNormalizedType.name && item.type === dishWithNormalizedType.type);
       if (existing) {
         return prev.map((item) =>
-          item.name === dish.name
-            ? { ...item, quantity: item.quantity + dish.quantity }
+          item.name === dishWithNormalizedType.name && item.type === dishWithNormalizedType.type
+            ? { ...item, quantity: item.quantity + dishWithNormalizedType.quantity }
             : item
         );
       } else {
-        return [...prev, dish];
+        return [...prev, dishWithNormalizedType];
       }
     });
   };
@@ -58,7 +60,7 @@ function CartProvider({ children }) {
     if (newQuantity < 1) return;
     setCartItems((prev) =>
       prev.map((item) =>
-        item.name === dish.name
+        item.name === dish.name && item.type === dish.type
           ? { ...item, quantity: newQuantity }
           : item
       )
@@ -70,7 +72,7 @@ function CartProvider({ children }) {
   };
 
   const handleConfirmRemove = () => {
-    setCartItems((prev) => prev.filter((item) => item.name !== itemToRemove.name));
+    setCartItems((prev) => prev.filter((item) => !(item.name === itemToRemove.name && item.type === itemToRemove.type)));
     setItemToRemove(null);
   };
 

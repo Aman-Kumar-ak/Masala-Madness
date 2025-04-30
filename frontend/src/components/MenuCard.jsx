@@ -28,10 +28,10 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
       addToCart({ name, quantity, type: "N/A", price });
     } else if (selectedType) {
       const selectedPrice = selectedType === "H" ? priceHalf : priceFull;
-      addToCart({ name, quantity, type: selectedType, price: selectedPrice });
+      addToCart({ name, quantity, type: selectedType.toUpperCase(), price: selectedPrice });
     } else {
       setNotification({
-        message: "Please select Half (H) or Full (F) size.",
+        message: "Please select Half or Full size.",
         type: "warning"
       });
       return;
