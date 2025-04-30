@@ -93,53 +93,55 @@ export default function Cart() {
     };
 
     try {
-      // Dispatch pre-update event
-      window.dispatchEvent(new CustomEvent('orderUpdating'));
-      
-      const res = await fetch(`${API_URL}/api/orders/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        // Show notification with different types for paid vs pending
-        setNotification({
-          message: isPaid 
-            ? `Payment successful! Order confirmed for ₹${totalAmount}`
-            : `Order added to pending. Amount: ₹${totalAmount}`,
-          type: isPaid ? "success" : "error" // Use error type for pending orders to show red color
+      if (isPaid) {
+        // Confirm payment logic
+        const res = await fetch(`${API_URL}/api/orders/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
 
-        // Clear cart and dispatch events
-        clearCart();
-        window.dispatchEvent(new CustomEvent('orderUpdated', { 
-          detail: { 
-            success: true,
-            orderId: data.orderId,
-            amount: totalAmount,
-            isPaid: isPaid
-          } 
-        }));
-
-        // Redirect after a short delay to show notification
-        setTimeout(() => {
-          navigate("/");
-        }, 1500);
+        const data = await res.json();
+        if (res.ok) {
+          // Handle successful payment
+          setNotification({
+            message: `Payment successful! Order confirmed for ₹${totalAmount}`,
+            type: "success"
+          });
+          clearCart();
+          setTimeout(() => {
+            navigate("/");
+          }, 1500);
+        } else {
+          throw new Error(data.message || "Failed to process order");
+        }
       } else {
-        throw new Error(data.message || "Failed to process order");
+        // Add to pending logic
+        const res = await fetch(`${API_URL}/api/pending-orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          // Handle adding to pending
+          setNotification({
+            message: `Order added to pending. Amount: ₹${totalAmount}`,
+            type: "info"
+          });
+          clearCart();
+          setTimeout(() => {
+            navigate("/pending-orders");
+          }, 1500);
+        } else {
+          throw new Error(data.message || "Failed to add order to pending");
+        }
       }
     } catch (error) {
       console.error("Payment error:", error);
-      window.dispatchEvent(new CustomEvent('orderUpdated', { 
-        detail: { 
-          success: false,
-          error: error.message
-        } 
-      }));
       setNotification({
-        message: "Failed to confirm order: " + error.message,
+        message: "Failed to process order: " + error.message,
         type: "error"
       });
     }

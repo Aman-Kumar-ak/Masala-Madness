@@ -134,6 +134,13 @@ export default function Home() {
                   </span>
                 )}
               </Link>
+              <Link
+                to="/pending-orders"
+                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors duration-200 flex items-center space-x-2"
+              >
+                <span>🕒</span>
+                <span className="hidden md:inline">Pending Orders</span>
+              </Link>
             </nav>
           </div>
         </div>

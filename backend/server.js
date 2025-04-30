@@ -5,6 +5,7 @@ const cors = require('cors');
 const dishRoutes = require('./routes/dishRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const discountRoutes = require('./routes/discountRoutes');
+const pendingOrderRoutes = require('./routes/pendingOrderRoutes');
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use('/api/dishes', dishRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/discounts', discountRoutes);
+app.use('/api/pending-orders', pendingOrderRoutes);
 
 app.get('/', (req, res) => {
   res.send('Masala Madness API is running.');

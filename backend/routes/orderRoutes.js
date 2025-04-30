@@ -2,6 +2,7 @@ const express = require("express");
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
+const PendingOrder = require("../models/PendingOrder");
 
 const router = express.Router();
 
@@ -21,59 +22,71 @@ const getDateRange = (dateStr) => {
 };
 
 // @route   POST /api/orders/confirm
-//Confirm and create a new order
+// Confirm and create a new order or add to pending
 router.post("/confirm", async (req, res) => {
   try {
     const { items, totalAmount, subtotal, discountAmount, discountPercentage, paymentMethod, isPaid } = req.body;
 
-    // Get current time in UTC
-    const now = new Date();
+    if (isPaid) {
+      // Logic for confirming payment and creating an order
+      // Get current time in UTC
+      const now = new Date();
 
-    // Get the latest order for today in UTC
-    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const tomorrowUTC = new Date(todayUTC);
-    tomorrowUTC.setDate(todayUTC.getDate() + 1);
+      // Get the latest order for today in UTC
+      const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const tomorrowUTC = new Date(todayUTC);
+      tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
-    // Get latest order number efficiently using index
-    const latestOrder = await Order.findOne({
-      createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
-    })
-    .select('orderNumber')
-    .sort({ orderNumber: -1 })
-    .lean();
+      // Get latest order number efficiently using index
+      const latestOrder = await Order.findOne({
+        createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
+      })
+      .select('orderNumber')
+      .sort({ orderNumber: -1 })
+      .lean();
 
-    const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
+      const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
 
-    const processedItems = items.map(item => ({
-      ...item,
-      type: item.type || 'H',
-      totalPrice: item.totalPrice || (item.price * item.quantity)
-    }));
+      const processedItems = items.map(item => ({
+        ...item,
+        type: item.type || 'H',
+        totalPrice: item.totalPrice || (item.price * item.quantity)
+      }));
 
-    const newOrder = new Order({
-      orderId: uuidv4(),
-      orderNumber,
-      items: processedItems,
-      subtotal: subtotal || totalAmount, // Use subtotal if provided, otherwise use totalAmount
-      totalAmount,
-      discountAmount: discountAmount || 0,
-      discountPercentage: discountPercentage || 0,
-      paymentMethod,
-      isPaid,
-      createdAt: now
-    });
+      const newOrder = new Order({
+        orderId: uuidv4(),
+        orderNumber,
+        items: processedItems,
+        subtotal: subtotal || totalAmount, // Use subtotal if provided, otherwise use totalAmount
+        totalAmount,
+        discountAmount: discountAmount || 0,
+        discountPercentage: discountPercentage || 0,
+        paymentMethod,
+        isPaid,
+        createdAt: now
+      });
 
-    await newOrder.save();
+      await newOrder.save();
 
-    // Clear relevant cache entries
-    const todayKey = todayUTC.toISOString().split('T')[0];
-    ordersCache.delete(todayKey);
+      // Clear relevant cache entries
+      const todayKey = todayUTC.toISOString().split('T')[0];
+      ordersCache.delete(todayKey);
 
-    res.status(201).json({ 
-      message: "Order saved successfully", 
-      orderId: newOrder.orderId,
-      orderNumber
-    });
+      return res.status(201).json({ 
+        message: "Order saved successfully", 
+        orderId: newOrder.orderId,
+        orderNumber
+      });
+    } else {
+      // Logic for adding to pending orders
+      const newPendingOrder = new PendingOrder({
+        orderId: uuidv4(), // Generate a unique ID
+        items,
+        subtotal,
+      });
+      await newPendingOrder.save();
+      return res.status(201).json({ message: "Order added to pending successfully", orderId: newPendingOrder.orderId });
+    }
   } catch (error) {
     console.error('Order save error:', error);
     res.status(500).json({ message: "Failed to save order", error: error.message });
