@@ -20,7 +20,15 @@ export default function Cart() {
     0
   );
 
-  
+  const groupedItems = cartItems.reduce((acc, item) => {
+    const existing = acc.find(i => i.name === item.name);
+    if (existing) {
+      existing.types.push({ type: item.type, quantity: item.quantity, price: item.price });
+    } else {
+      acc.push({ name: item.name, types: [{ type: item.type, quantity: item.quantity, price: item.price }] });
+    }
+    return acc;
+  }, []);
 
   // Calculate discount if applicable
   const calculateDiscount = () => {
@@ -146,42 +154,43 @@ export default function Cart() {
           <p className="text-gray-600">Cart is empty.</p>
         ) : (
           <div className="space-y-4">
-            {cartItems.map((item, index) => (
-              <div
-                key={index}
-                className="bg-white p-4 rounded shadow space-y-3"
-              >
+            {groupedItems.map((group, index) => (
+              <div key={index} className="bg-white p-4 rounded shadow space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-bold text-md">#{index + 1} {item.name} ({item.type === 'H' ? 'HALF' : item.type === 'F' ? 'FULL' : item.type})</p>
-                    <p className="text-gray-600">Price: ₹{item.price}</p>
+                    <p className="font-bold text-md">#{index + 1} {group.name}</p>
+                    {group.types.map((type, idx) => (
+                      <p key={idx} className="text-gray-600">{type.type === 'H' ? 'Half' : 'Full'}: ₹{type.price} x {type.quantity}</p>
+                    ))}
                   </div>
                   <button
-                    onClick={() => removeFromCart(item)}
+                    onClick={() => group.types.forEach(type => removeFromCart({ name: group.name, type: type.type }))}
                     className="text-red-500 hover:text-red-700 font-bold p-1"
                   >
                     ✕
                   </button>
                 </div>
 
-                {/* Quantity Controls */}
-                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
-                  <button 
-                    onClick={() => updateQuantity(item, item.quantity - 1)}
-                    className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg"
-                  >
-                    -
-                  </button>
-                  <span className="font-medium text-gray-700">{item.quantity}</span>
-                  <button 
-                    onClick={() => updateQuantity(item, item.quantity + 1)}
-                    className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg"
-                  >
-                    +
-                  </button>
-                </div>
+                {/* Quantity Controls for each type */}
+                {group.types.map((type, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                    <button 
+                      onClick={() => updateQuantity({ name: group.name, type: type.type }, type.quantity - 1)}
+                      className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg"
+                    >
+                      -
+                    </button>
+                    <span className="font-medium text-gray-700">{type.quantity}</span>
+                    <button 
+                      onClick={() => updateQuantity({ name: group.name, type: type.type }, type.quantity + 1)}
+                      className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg"
+                    >
+                      +
+                    </button>
+                  </div>
+                ))}
 
-                <p className="text-right font-semibold">Total: ₹{item.quantity * item.price}</p>
+                <p className="text-right font-semibold">Total: ₹{group.types.reduce((sum, type) => sum + type.quantity * type.price, 0)}</p>
               </div>
             ))}
 
