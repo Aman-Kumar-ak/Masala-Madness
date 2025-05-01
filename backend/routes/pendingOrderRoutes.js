@@ -27,7 +27,7 @@ router.post("/", async (req, res) => {
 // Get all pending orders
 router.get("/", async (req, res) => {
   try {
-    const pendingOrders = await PendingOrder.find().sort({ createdAt: 1 }).lean();
+    const pendingOrders = await PendingOrder.find().sort({ createdAt: -1 }).lean();
     res.status(200).json(pendingOrders);
   } catch (error) {
     console.error("Fetch pending orders error:", error);
