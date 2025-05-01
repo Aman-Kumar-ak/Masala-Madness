@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
-const MenuModal = ({ onClose, onSave, items }) => {
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+const MenuModal = ({ onClose, onSave, items, orderId }) => {
   const [selectedItems, setSelectedItems] = useState([]);
 
   const handleSelectItem = (item, portion, price, index) => {
@@ -21,28 +23,65 @@ const MenuModal = ({ onClose, onSave, items }) => {
     );
   };
 
+  const handleSave = async () => {
+    if (selectedItems.length === 0) return;
+
+    const requestBody = {
+      items: selectedItems.map(item => ({
+        ...item,
+        quantity: item.quantity || 1, // Default to 1 if not specified
+        totalPrice: item.price * (item.quantity || 1), // Calculate totalPrice
+        type: item.portion // Assuming portion is equivalent to type
+      })),
+      subtotal: selectedItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0),
+      isPaid: false, // Assuming the order is not paid yet
+    };
+
+    console.log('Request URL:', `${API_URL}/api/pending-orders/${orderId}`);
+    console.log('Request Body:', requestBody);
+
+    try {
+      const response = await fetch(`${API_URL}/api/pending-orders/${orderId}`, {
+        method: 'PUT', // Use PUT to update the existing order
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) throw new Error('Failed to update order');
+
+      const data = await response.json();
+      alert(data.message);
+      onSave(selectedItems);
+    } catch (error) {
+      console.error('Error updating order:', error);
+      alert('Failed to update order');
+    }
+  };
+
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-md flex justify-center items-center z-50"
       aria-modal="true"
       role="dialog"
       aria-labelledby="menu-modal-title"
       aria-describedby="menu-modal-description"
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 mx-4">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+      <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-xl w-full p-8 mx-4 ring-1 ring-gray-200 dark:ring-gray-700">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <h2
             id="menu-modal-title"
-            className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-0"
+            className="text-3xl font-semibold text-gray-900 dark:text-gray-100 mb-4 sm:mb-0"
           >
             Select Items
           </h2>
           {selectedItems.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {selectedItems.map((item) => (
                 <span
                   key={`${item.id}-${item.portion}-${item.index}`}
-                  className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full flex items-center space-x-2"
+                  className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-semibold px-4 py-1.5 rounded-full flex items-center space-x-3 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <span>
                     {item.name} ({item.portion})
@@ -50,9 +89,18 @@ const MenuModal = ({ onClose, onSave, items }) => {
                   <button
                     onClick={() => handleRemoveItem(item)}
                     aria-label={`Remove ${item.name}`}
-                    className="text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-700 rounded"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 rounded-full transition"
                   >
-                    &times;
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </span>
               ))}
@@ -62,7 +110,7 @@ const MenuModal = ({ onClose, onSave, items }) => {
 
         <ul
           id="menu-modal-description"
-          className="max-h-64 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700"
+          className="max-h-72 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 rounded-lg scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-50 dark:scrollbar-thumb-blue-700 dark:scrollbar-track-blue-900"
         >
           {items.map((item, index) => {
             const isSelectedHalf = selectedItems.some(
@@ -77,38 +125,38 @@ const MenuModal = ({ onClose, onSave, items }) => {
             return (
               <li
                 key={`${item.id}-${index}`}
-                className="py-3 px-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                className="py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex flex-col sm:flex-row sm:items-center justify-between"
               >
-                <p className="text-gray-900 dark:text-gray-100 font-medium mb-1">{item.name}</p>
+                <p className="text-gray-900 dark:text-gray-100 font-semibold mb-2 sm:mb-0">{item.name}</p>
                 {typeof item.priceHalf === 'number' && typeof item.priceFull === 'number' ? (
-                  <div className="flex justify-between items-center space-x-3">
-                    <div className="flex-1 flex flex-col">
-                      <span className="text-gray-600 dark:text-gray-400 text-sm">
+                  <div className="flex space-x-4">
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
                         Half - ₹{item.priceHalf.toFixed(2)}
                       </span>
                       <button
                         onClick={() => handleSelectItem(item, 'half', item.priceHalf, index)}
                         disabled={isSelectedHalf}
-                        className={`mt-1 px-3 py-1 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600 transition ${
+                        className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600 transition-shadow ${
                           isSelectedHalf
-                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-inner'
+                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                         }`}
                       >
                         {isSelectedHalf ? 'Added' : 'Add Half'}
                       </button>
                     </div>
-                    <div className="flex-1 flex flex-col">
-                      <span className="text-gray-600 dark:text-gray-400 text-sm">
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
                         Full - ₹{item.priceFull.toFixed(2)}
                       </span>
                       <button
                         onClick={() => handleSelectItem(item, 'full', item.priceFull, index)}
                         disabled={isSelectedFull}
-                        className={`mt-1 px-3 py-1 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600 transition ${
+                        className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600 transition-shadow ${
                           isSelectedFull
-                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-inner'
+                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                         }`}
                       >
                         {isSelectedFull ? 'Added' : 'Add Full'}
@@ -116,17 +164,17 @@ const MenuModal = ({ onClose, onSave, items }) => {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400 text-sm">
+                  <div className="flex flex-col items-center">
+                    <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
                       ₹{typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'}
                     </span>
                     <button
                       onClick={() => handleSelectItem(item, 'fixed', item.price, index)}
                       disabled={isSelectedFixed}
-                      className={`px-3 py-1 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600 transition ${
+                      className={`px-6 py-1.5 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600 transition-shadow ${
                         isSelectedFixed
-                          ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                          ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-inner'
+                          : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                       }`}
                     >
                       {isSelectedFixed ? 'Added' : 'Add'}
@@ -138,21 +186,21 @@ const MenuModal = ({ onClose, onSave, items }) => {
           })}
         </ul>
 
-        <div className="flex justify-end space-x-3 mt-6">
+        <div className="flex justify-end space-x-4 mt-8">
           <button
-            onClick={() => onSave(selectedItems)}
+            onClick={handleSave}
             disabled={selectedItems.length === 0}
-            className={`px-5 py-2 rounded font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-600 transition ${
+            className={`px-8 py-3 rounded-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 transition-shadow ${
               selectedItems.length === 0
-                ? 'bg-green-300 text-green-700 cursor-not-allowed'
-                : 'bg-green-600 text-white hover:bg-green-700'
+                ? 'bg-green-300 text-green-700 cursor-not-allowed shadow-inner'
+                : 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
             }`}
           >
             Save
           </button>
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded bg-red-600 text-white hover:bg-red-700 font-semibold focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-600 transition"
+            className="px-8 py-3 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600 transition-shadow shadow-lg"
           >
             Close
           </button>

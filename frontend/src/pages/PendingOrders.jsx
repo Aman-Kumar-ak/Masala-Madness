@@ -75,7 +75,8 @@ export default function PendingOrders() {
   const handleSaveItems = (selectedItems) => {
     setPendingOrders(prevOrders => prevOrders.map(order => {
       if (order.orderId === currentOrderId) {
-        return { ...order, items: [...order.items, ...selectedItems] };
+        const updatedItems = [...order.items, ...selectedItems];
+        return { ...order, items: updatedItems };
       }
       return order;
     }));
@@ -127,7 +128,7 @@ export default function PendingOrders() {
           )}
         </div>
       )}
-      {showMenu && <MenuModal onClose={() => setShowMenu(false)} onSave={handleSaveItems} items={availableItems} />}
+      {showMenu && <MenuModal onClose={() => setShowMenu(false)} onSave={handleSaveItems} items={availableItems} orderId={currentOrderId} />}
     </div>
   );
 }

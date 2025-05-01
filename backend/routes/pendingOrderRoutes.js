@@ -35,12 +35,19 @@ router.get("/", async (req, res) => {
   }
 });
 
-// @route   PUT /api/pending-orders/:id
+// @route   PUT /api/pending-orders/:orderId
 // Update a pending order
-router.put("/:id", async (req, res) => {
+router.put("/:orderId", async (req, res) => {
   try {
     const { items, subtotal } = req.body;
-    const updatedOrder = await PendingOrder.findByIdAndUpdate(req.params.id, { items, subtotal, updatedAt: new Date() }, { new: true });
+    const updatedOrder = await PendingOrder.findOneAndUpdate(
+      { orderId: req.params.orderId }, // Use orderId to find the order
+      { items, subtotal, updatedAt: new Date() },
+      { new: true }
+    );
+    if (!updatedOrder) {
+      return res.status(404).json({ message: "Pending order not found" });
+    }
     res.status(200).json({ message: "Pending order updated successfully", order: updatedOrder });
   } catch (error) {
     console.error("Update pending order error:", error);
