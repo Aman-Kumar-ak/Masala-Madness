@@ -19,17 +19,11 @@ const PendingOrderSchema = new mongoose.Schema({
   status: { type: String, default: "pending" },
   createdAt: {
     type: Date,
-    default: () => {
-      const istOffset = 5.5 * 60 * 60000;
-      return new Date(Date.now() + istOffset);
-    },
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: () => {
-      const istOffset = 5.5 * 60 * 60000;
-      return new Date(Date.now() + istOffset);
-    },
+    default: Date.now,
   },
 });
 

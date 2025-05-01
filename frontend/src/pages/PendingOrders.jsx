@@ -105,7 +105,19 @@ export default function PendingOrders() {
             <ul className="space-y-6">
               {pendingOrders.map(order => (
                 <li key={order.orderId} className="bg-white dark:bg-gray-100 rounded-2xl shadow-lg p-6 max-w-4xl mx-auto">
-                  <h2 className="font-semibold text-xl tracking-tight mb-2 text-gray-800 dark:text-gray-700">Order ID: <span className="text-blue-600 font-mono">{order.orderId}</span></h2>
+                  <h2 className="font-semibold text-xl tracking-tight mb-1 text-gray-800 dark:text-gray-700">
+                    Order #{pendingOrders.length - pendingOrders.indexOf(order)} {/* Show order number counting down */}
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-500 mb-3">
+                    {new Date(order.createdAt).toLocaleString("en-IN", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })}
+                  </p>
                   <p className="text-md font-medium mb-4 text-gray-700 dark:text-gray-600">Subtotal: <span className="text-green-700 font-semibold">₹{order.subtotal.toFixed(2)}</span></p>
                   <ul className="divide-y divide-gray-300 dark:divide-gray-200 rounded-lg overflow-hidden shadow-inner">
                     {order.items.map((item, index) => (
