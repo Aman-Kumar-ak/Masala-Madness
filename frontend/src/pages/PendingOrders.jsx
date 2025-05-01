@@ -72,11 +72,10 @@ export default function PendingOrders() {
     }));
   };
 
-  const handleSaveItems = (selectedItems) => {
+  const handleSaveItems = (updatedOrder) => {
     setPendingOrders(prevOrders => prevOrders.map(order => {
-      if (order.orderId === currentOrderId) {
-        const updatedItems = [...order.items, ...selectedItems];
-        return { ...order, items: updatedItems };
+      if (order.orderId === updatedOrder.orderId) {
+        return updatedOrder;
       }
       return order;
     }));

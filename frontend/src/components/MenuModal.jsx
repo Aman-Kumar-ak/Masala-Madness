@@ -28,10 +28,11 @@ const MenuModal = ({ onClose, onSave, items, orderId }) => {
 
     const requestBody = {
       items: selectedItems.map(item => ({
-        ...item,
-        quantity: item.quantity || 1, // Default to 1 if not specified
-        totalPrice: item.price * (item.quantity || 1), // Calculate totalPrice
-        type: item.portion // Assuming portion is equivalent to type
+        name: item.name,
+        type: item.portion, // map portion to type
+        price: item.price,
+        quantity: item.quantity || 1,
+        totalPrice: item.price * (item.quantity || 1),
       })),
       subtotal: selectedItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0),
       isPaid: false, // Assuming the order is not paid yet
@@ -53,7 +54,7 @@ const MenuModal = ({ onClose, onSave, items, orderId }) => {
 
       const data = await response.json();
       alert(data.message);
-      onSave(selectedItems);
+      onSave(data.order);  // Pass updated order object instead of just selectedItems
     } catch (error) {
       console.error('Error updating order:', error);
       alert('Failed to update order');

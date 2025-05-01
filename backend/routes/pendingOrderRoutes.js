@@ -39,16 +39,28 @@ router.get("/", async (req, res) => {
 // Update a pending order
 router.put("/:orderId", async (req, res) => {
   try {
-    const { items, subtotal } = req.body;
-    const updatedOrder = await PendingOrder.findOneAndUpdate(
-      { orderId: req.params.orderId }, // Use orderId to find the order
-      { items, subtotal, updatedAt: new Date() },
-      { new: true }
-    );
-    if (!updatedOrder) {
+    const incomingItems = req.body.items || [];
+    const incomingSubtotal = req.body.subtotal || 0;
+
+    // Find existing order
+    const existingOrder = await PendingOrder.findOne({ orderId: req.params.orderId });
+    if (!existingOrder) {
       return res.status(404).json({ message: "Pending order not found" });
     }
-    res.status(200).json({ message: "Pending order updated successfully", order: updatedOrder });
+
+    // Merge items: combine existing items with incoming items (simply concatenate here)
+    const mergedItems = [...existingOrder.items, ...incomingItems];
+
+    // Recalculate subtotal
+    const newSubtotal = mergedItems.reduce((total, item) => total + item.totalPrice, 0);
+
+    existingOrder.items = mergedItems;
+    existingOrder.subtotal = newSubtotal;
+    existingOrder.updatedAt = new Date();
+
+    const savedOrder = await existingOrder.save();
+
+    res.status(200).json({ message: "Pending order updated successfully", order: savedOrder });
   } catch (error) {
     console.error("Update pending order error:", error);
     res.status(500).json({ message: "Failed to update pending order", error: error.message });
@@ -59,7 +71,7 @@ router.put("/:orderId", async (req, res) => {
 // Confirm a pending order and move it to orders
 router.post("/confirm/:id", async (req, res) => {
   try {
-    const pendingOrder = await PendingOrder.findById(req.params.id);
+    const pendingOrder = await PendingOrder.findOne({ orderId: req.params.id });
     if (!pendingOrder) {
       return res.status(404).json({ message: "Pending order not found" });
     }
@@ -79,7 +91,7 @@ router.post("/confirm/:id", async (req, res) => {
     });
 
     await newOrder.save();
-    await PendingOrder.findByIdAndDelete(req.params.id);
+    await PendingOrder.findOneAndDelete({ orderId: req.params.id });
 
     res.status(201).json({ message: "Order confirmed and moved to orders", orderId: newOrder.orderId });
   } catch (error) {
