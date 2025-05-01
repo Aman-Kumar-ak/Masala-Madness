@@ -61,15 +61,24 @@ export default function PendingOrders() {
     }
   };
 
-  const handleQuantityChange = (orderId, itemIndex, delta) => {
-    setPendingOrders(prevOrders => prevOrders.map(order => {
-      if (order.orderId === orderId) {
-        const updatedItems = [...order.items];
-        updatedItems[itemIndex].quantity += delta;
-        return { ...order, items: updatedItems };
-      }
-      return order;
-    }));
+  const handleQuantityChange = async (orderId, itemIndex, delta) => {
+    try {
+      const response = await fetch(`${API_URL}/api/pending-orders/${orderId}/item-quantity`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ itemIndex, delta })
+      });
+      if (!response.ok) throw new Error("Failed to update quantity");
+      const data = await response.json();
+      setPendingOrders(prevOrders =>
+        prevOrders.map(order => order.orderId === orderId ? data.order : order)
+      );
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+      alert("Failed to update quantity");
+    }
   };
 
   const handleSaveItems = (updatedOrder) => {
@@ -83,44 +92,94 @@ export default function PendingOrders() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 p-4 pt-16">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 p-6 pt-20">
       <BackButton />
-      <h1 className="text-2xl font-bold mb-4">Pending Orders</h1>
+      <h1 className="text-3xl font-extrabold mb-8 text-gray-900 dark:text-gray-800">Pending Orders</h1>
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-center text-lg text-gray-500">Loading...</p>
       ) : (
         <div>
           {pendingOrders.length === 0 ? (
-            <p>No pending orders found.</p>
+            <p className="text-center text-lg text-gray-600">No pending orders found.</p>
           ) : (
-            <ul>
+            <ul className="space-y-6">
               {pendingOrders.map(order => (
-                <li key={order.orderId} className="bg-white p-4 rounded shadow mb-2">
-                  <h2 className="font-bold">Order ID: {order.orderId}</h2>
-                  <p>Subtotal: ₹{order.subtotal}</p>
-                  <ul className="list-disc pl-5">
+                <li key={order.orderId} className="bg-white dark:bg-gray-100 rounded-2xl shadow-lg p-6 max-w-4xl mx-auto">
+                  <h2 className="font-semibold text-xl tracking-tight mb-2 text-gray-800 dark:text-gray-700">Order ID: <span className="text-blue-600 font-mono">{order.orderId}</span></h2>
+                  <p className="text-md font-medium mb-4 text-gray-700 dark:text-gray-600">Subtotal: <span className="text-green-700 font-semibold">₹{order.subtotal.toFixed(2)}</span></p>
+                  <ul className="divide-y divide-gray-300 dark:divide-gray-200 rounded-lg overflow-hidden shadow-inner">
                     {order.items.map((item, index) => (
-                      <li key={index} className="flex items-center justify-between">
-                        <span>{item.name} - {item.type} - ₹{item.price} x {item.quantity}</span>
-                        <div className="flex items-center">
-                          <button onClick={() => handleQuantityChange(order.orderId, index, -1)} className="px-2">-</button>
-                          <button onClick={() => handleQuantityChange(order.orderId, index, 1)} className="px-2">+</button>
+                      <li key={index} className="flex items-center justify-between py-3 px-4 bg-gray-50 dark:bg-gray-200 hover:bg-gray-100 dark:hover:bg-gray-300 transition rounded-lg">
+                        <span className="text-gray-800 dark:text-gray-700 font-medium">{item.name} - <span className="italic lowercase">{item.type}</span> - ₹{item.price.toFixed(2)} x {item.quantity}</span>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => handleQuantityChange(order.orderId, index, -1)}
+                            className="px-3 py-1 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-500"
+                          >
+                            -
+                          </button>
+                          <button
+                            onClick={() => handleQuantityChange(order.orderId, index, 1)}
+                            className="px-3 py-1 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-500"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const isLastItem = order.items.length === 1;
+                              const confirmMsg = isLastItem
+                                ? `Removing last item will delete entire order. Continue?`
+                                : `Remove ${item.name} from order?`;
+                              if (window.confirm(confirmMsg)) {
+                                try {
+                                  if (isLastItem) {
+                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
+                                      method: 'DELETE',
+                                    });
+                                    if (!response.ok) throw new Error('Failed to delete order');
+                                    setPendingOrders(prevOrders =>
+                                      prevOrders.filter(o => o.orderId !== order.orderId)
+                                    );
+                                  } else {
+                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}/item/${index}`, {
+                                      method: 'DELETE',
+                                    });
+                                    if (!response.ok) throw new Error('Failed to remove item');
+                                    const data = await response.json();
+                                    setPendingOrders(prevOrders =>
+                                      prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.error('Error removing item/order:', error);
+                                  alert('Failed to remove item/order');
+                                }
+                              }
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-700 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-600"
+                            aria-label={`Remove ${item.name}`}
+                            title={`Remove ${item.name}`}
+                          >
+                            &times;
+                          </button>
                         </div>
                       </li>
                     ))}
                   </ul>
-                  <button
-                    onClick={() => handleConfirmPayment(order.orderId)}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded mt-2"
-                  >
-                    Confirm Payment
-                  </button>
-                  <button
-                    onClick={() => { setShowMenu(true); setCurrentOrderId(order.orderId); }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mt-2"
-                  >
-                    Add Items
-                  </button>
+                  <div className="flex space-x-4 mt-6">
+                    <button
+                      onClick={() => handleConfirmPayment(order.orderId)}
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600"
+                    >
+                      Confirm Payment
+                    </button>
+                    <button
+                      onClick={() => { setShowMenu(true); setCurrentOrderId(order.orderId); }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600"
+                    >
+                      Add Items
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

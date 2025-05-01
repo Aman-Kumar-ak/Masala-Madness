@@ -100,4 +100,102 @@ router.post("/confirm/:id", async (req, res) => {
   }
 });
 
-module.exports = router; 
+
+// @route   PATCH /api/pending-orders/:orderId/item-quantity
+// Update quantity of a specific item in a pending order
+router.patch("/:orderId/item-quantity", async (req, res) => {
+  try {
+    const { itemIndex, delta } = req.body;
+    if (typeof itemIndex !== "number" || typeof delta !== "number") {
+      return res.status(400).json({ message: "Invalid request body" });
+    }
+
+    const pendingOrder = await PendingOrder.findOne({ orderId: req.params.orderId });
+    if (!pendingOrder) {
+      return res.status(404).json({ message: "Pending order not found" });
+    }
+
+    if (itemIndex < 0 || itemIndex >= pendingOrder.items.length) {
+      return res.status(400).json({ message: "Invalid item index" });
+    }
+
+    const item = pendingOrder.items[itemIndex];
+    const newQuantity = item.quantity + delta;
+    if (newQuantity < 1) {
+      return res.status(400).json({ message: "Quantity must be at least 1" });
+    }
+
+    item.quantity = newQuantity;
+    item.totalPrice = item.price * item.quantity;
+
+    // Recalculate subtotal
+    pendingOrder.subtotal = pendingOrder.items.reduce((total, i) => total + i.totalPrice, 0);
+    pendingOrder.updatedAt = new Date();
+
+    await pendingOrder.save();
+
+    res.status(200).json({ message: "Item quantity updated", order: pendingOrder });
+  } catch (error) {
+    console.error("Update item quantity error:", error);
+    res.status(500).json({ message: "Failed to update item quantity", error: error.message });
+  }
+});
+
+
+// @route   DELETE /api/pending-orders/:orderId/item/:itemIndex
+// Remove a specific item from a pending order
+router.delete("/:orderId/item/:itemIndex", async (req, res) => {
+  try {
+    const { orderId, itemIndex } = req.params;
+    const idx = parseInt(itemIndex, 10);
+    if (isNaN(idx)) {
+      return res.status(400).json({ message: "Invalid item index" });
+    }
+
+    const pendingOrder = await PendingOrder.findOne({ orderId });
+    if (!pendingOrder) {
+      return res.status(404).json({ message: "Pending order not found" });
+    }
+
+    if (idx < 0 || idx >= pendingOrder.items.length) {
+      return res.status(400).json({ message: "Item index out of bounds" });
+    }
+
+    // If only one item, delete the entire order
+    if (pendingOrder.items.length === 1) {
+      await PendingOrder.deleteOne({ orderId });
+      return res.status(200).json({ message: "Last item removed, entire order deleted", order: null });
+    }
+
+    pendingOrder.items.splice(idx, 1);
+
+    // Recalculate subtotal
+    pendingOrder.subtotal = pendingOrder.items.reduce((total, item) => total + item.totalPrice, 0);
+    pendingOrder.updatedAt = new Date();
+
+    await pendingOrder.save();
+
+    res.status(200).json({ message: "Item removed", order: pendingOrder });
+  } catch (error) {
+    console.error("Remove item error:", error);
+    res.status(500).json({ message: "Failed to remove item", error: error.message });
+  }
+});
+
+// @route DELETE /api/pending-orders/:orderId
+// Delete full pending order
+router.delete("/:orderId", async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const deleted = await PendingOrder.deleteOne({ orderId });
+    if (deleted.deletedCount === 0) {
+      return res.status(404).json({ message: "Pending order not found" });
+    }
+    res.status(200).json({ message: "Pending order deleted" });
+  } catch (error) {
+    console.error("Delete pending order error:", error);
+    res.status(500).json({ message: "Failed to delete pending order", error: error.message });
+  }
+});
+
+module.exports = router;
