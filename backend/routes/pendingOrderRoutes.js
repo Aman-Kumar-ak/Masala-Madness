@@ -79,9 +79,18 @@ router.post("/confirm/:id", async (req, res) => {
     const { items, subtotal } = pendingOrder;
     const { paymentMethod, isPaid } = req.body;
 
+    const startOfDay = new Date(pendingOrder.createdAt);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(pendingOrder.createdAt);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+    
+    const dailyOrderCount = await Order.countDocuments({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    });
+    
     const newOrder = new Order({
       orderId: pendingOrder.orderId,
-      orderNumber: await Order.countDocuments() + 1,
+      orderNumber: dailyOrderCount + 1,
       items,
       subtotal,
       totalAmount: subtotal, // Assuming no discount for simplicity
