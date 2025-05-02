@@ -267,6 +267,15 @@ export default function Cart() {
               >
                 Confirm Payment
               </button>
+              <button
+                onClick={() => {
+                  clearCart();
+                  setNotification({ message: "Cart cleared successfully", type: "info" });
+                }}
+                className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg"
+              >
+                Clear Cart
+              </button>
             </div>
           </div>
         )}
