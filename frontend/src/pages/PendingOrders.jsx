@@ -13,6 +13,9 @@ export default function PendingOrders() {
   const [currentOrderId, setCurrentOrderId] = useState(null);
   const [availableItems, setAvailableItems] = useState([]);
 
+  const [paymentOptionOrderId, setPaymentOptionOrderId] = useState(null); // track order awaiting payment option
+  const [paymentMethodToConfirm, setPaymentMethodToConfirm] = useState(null); // payment method pending admin confirmation
+
   useEffect(() => {
     const fetchPendingOrders = async () => {
       try {
@@ -43,19 +46,26 @@ export default function PendingOrders() {
     fetchAvailableItems();
   }, []);
 
-  const handleConfirmPayment = async (orderId) => {
+  const handleConfirmPayment = async (orderId, paymentMethod) => {
+    if (!paymentMethod) {
+      console.error('Payment method is not specified');
+      return;
+    }
+    console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
     try {
       const response = await fetch(`${API_URL}/api/pending-orders/confirm/${orderId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ paymentMethod: 'Cash', isPaid: true }),
+        body: JSON.stringify({ paymentMethod, isPaid: true }),
       });
       if (!response.ok) throw new Error('Failed to confirm payment');
       const data = await response.json();
       alert(data.message);
       setPendingOrders(pendingOrders.filter(order => order.orderId !== orderId));
+      setPaymentOptionOrderId(null); // reset payment option UI
+      setPaymentMethodToConfirm(null);
     } catch (error) {
       console.error('Error confirming payment:', error);
     }
@@ -178,13 +188,62 @@ export default function PendingOrders() {
                       </li>
                     ))}
                   </ul>
-                  <div className="flex space-x-4 mt-6">
+                  <div className="flex flex-col space-y-3 mt-6">
                     <button
-                      onClick={() => handleConfirmPayment(order.orderId)}
+                      onClick={() => {
+                        if (paymentOptionOrderId === order.orderId) {
+                          setPaymentOptionOrderId(null);
+                          setPaymentMethodToConfirm(null);
+                        } else {
+                          setPaymentOptionOrderId(order.orderId);
+                        }
+                      }}
                       className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600"
                     >
-                      Confirm Payment
+                      {paymentOptionOrderId === order.orderId ? 'Cancel' : 'Confirm Payment'}
                     </button>
+                    <div
+                      className={`overflow-hidden transition-[max-height,opacity,transform] duration-500 ease-in-out transform-gpu origin-top ${
+                        paymentOptionOrderId === order.orderId ? 'max-h-40 opacity-100 scale-y-100' : 'max-h-0 opacity-0 scale-y-0'
+                      }`}
+                    >
+                      {paymentOptionOrderId === order.orderId && (
+                        !paymentMethodToConfirm ? (
+                          <div className="flex space-x-4 mt-3">
+                            <button
+                              onClick={() => setPaymentMethodToConfirm('Cash')}
+                              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600"
+                            >
+                              Cash
+                            </button>
+                            <button
+                              onClick={() => setPaymentMethodToConfirm('Online')}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600"
+                            >
+                              Online
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 mt-3">
+                            <p className="text-gray-800 font-semibold">Admin confirm that you received the payment?</p>
+                            <div className="flex space-x-4 mt-1">
+                              <button
+                                onClick={() => handleConfirmPayment(order.orderId, paymentMethodToConfirm)}
+                                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600"
+                              >
+                                Confirm Received
+                              </button>
+                              <button
+                                onClick={() => setPaymentMethodToConfirm(null)}
+                                className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
                     <button
                       onClick={() => { setShowMenu(true); setCurrentOrderId(order.orderId); }}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600"

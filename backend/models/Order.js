@@ -32,6 +32,13 @@ const OrderSchema = new mongoose.Schema({
       return new Date(Date.now() + istOffset);
     },
   },
+  updatedAt: {
+    type: Date,
+    default: () => {
+      const istOffset = 5.5 * 60 * 60000;
+      return new Date(Date.now() + istOffset);
+    },
+  },
 });
 
 // Add compound indexes for better query performance

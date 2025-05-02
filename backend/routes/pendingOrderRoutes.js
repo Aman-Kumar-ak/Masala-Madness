@@ -70,9 +70,13 @@ router.put("/:orderId", async (req, res) => {
 // @route   POST /api/pending-orders/confirm/:id
 // Confirm a pending order and move it to orders
 router.post("/confirm/:id", async (req, res) => {
+  const session = await PendingOrder.startSession();
+  session.startTransaction();
   try {
-    const pendingOrder = await PendingOrder.findOne({ orderId: req.params.id });
+    const pendingOrder = await PendingOrder.findOne({ orderId: req.params.id }).session(session);
     if (!pendingOrder) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ message: "Pending order not found" });
     }
 
@@ -86,7 +90,7 @@ router.post("/confirm/:id", async (req, res) => {
     
     const dailyOrderCount = await Order.countDocuments({
       createdAt: { $gte: startOfDay, $lte: endOfDay },
-    });
+    }).session(session);
     
     const newOrder = new Order({
       orderId: pendingOrder.orderId,
@@ -97,13 +101,19 @@ router.post("/confirm/:id", async (req, res) => {
       paymentMethod,
       isPaid,
       createdAt: pendingOrder.createdAt,
+      updatedAt: new Date() // set updatedAt explicitly to current date/time
     });
 
-    await newOrder.save();
-    await PendingOrder.findOneAndDelete({ orderId: req.params.id });
+    await newOrder.save({ session });
+    await PendingOrder.findOneAndDelete({ orderId: req.params.id }).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(201).json({ message: "Order confirmed and moved to orders", orderId: newOrder.orderId });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Confirm pending order error:", error);
     res.status(500).json({ message: "Failed to confirm pending order", error: error.message });
   }
