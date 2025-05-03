@@ -75,6 +75,7 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
       console.error('Error fetching discount:', error);
     }
 
+    // Prepare the request body
     const requestBody = {
       items: selectedItems.map(item => ({
         name: item.name,
@@ -89,9 +90,6 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
       totalAmount,
       isPaid: false, // Assuming the order is not paid yet
     };
-
-    console.log('Request URL:', `${API_URL}/api/pending-orders/${orderId}`);
-    console.log('Request Body:', requestBody);
 
     try {
       const response = await fetch(`${API_URL}/api/pending-orders/${orderId}`, {

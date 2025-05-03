@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import Menu from "../components/Menu";
@@ -22,25 +22,59 @@ export default function PendingOrders() {
   const [paymentConfirmedOrderId, setPaymentConfirmedOrderId] = useState(null); // track payment confirmed for UI changes
   const [activeDiscount, setActiveDiscount] = useState(null);
 
-  const { triggerRefresh } = useRefresh();
+  const { refresh, triggerRefresh, socket, connected } = useRefresh();
 
   const [notification, setNotification] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
 
-  useEffect(() => {
-    const fetchPendingOrders = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/pending-orders`);
-        if (!response.ok) throw new Error('Failed to fetch pending orders');
-        const data = await response.json();
-        setPendingOrders(data);
-      } catch (error) {
-        console.error('Error fetching pending orders:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Create a memoized fetchPendingOrders function that we can call from multiple places
+  const fetchPendingOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/pending-orders`);
+      if (!response.ok) throw new Error('Failed to fetch pending orders');
+      const data = await response.json();
+      setPendingOrders(data);
+    } catch (error) {
+      console.error('Error fetching pending orders:', error);
+      setNotification({ 
+        message: 'Failed to fetch pending orders. Please try again.', 
+        type: 'error' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  // Listen for socket events
+  useEffect(() => {
+    if (socket) {
+      const orderUpdateHandler = (data) => {
+        console.log('Socket event received:', data.type);
+        
+        if (data.type === 'order-confirmed') {
+          // Remove the order from pending orders if it was just confirmed
+          setPendingOrders(prev => prev.filter(order => order.orderId !== data.pendingOrderId));
+        } else {
+          // For other update types, refresh all data
+          fetchPendingOrders();
+        }
+      };
+      
+      // Register socket event handler
+      socket.on('order-update', orderUpdateHandler);
+      
+      // Clean up event listener
+      return () => {
+        socket.off('order-update', orderUpdateHandler);
+      };
+    }
+  }, [socket, fetchPendingOrders]);
+
+  // Effect for initial data fetching
+  useEffect(() => {
+    fetchPendingOrders();
+    
     const fetchAvailableItems = async () => {
       try {
         const response = await fetch(`${API_URL}/api/dishes`);
@@ -65,10 +99,21 @@ export default function PendingOrders() {
       }
     };
 
-    fetchPendingOrders();
     fetchAvailableItems();
     fetchActiveDiscount();
-  }, []);
+  }, [refresh, fetchPendingOrders]);
+
+  // Periodic refresh for data sync - backup for socket issues
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!connected) {
+        console.log("Socket not connected, using interval-based refresh");
+        fetchPendingOrders();
+      }
+    }, 10000); // Refresh every 10 seconds if socket not connected
+    
+    return () => clearInterval(interval);
+  }, [connected, fetchPendingOrders]);
 
   const handleConfirmPayment = async (orderId, paymentMethod) => {
     if (!paymentMethod) {
@@ -80,15 +125,29 @@ export default function PendingOrders() {
     const order = pendingOrders.find(order => order.orderId === orderId);
     
     // Calculate discount if applicable
-    let discountedTotal = order.subtotal;
     let discountAmount = 0;
     let discountPercentage = 0;
+    let discountedTotal = order.subtotal;
     
     if (activeDiscount && order.subtotal >= activeDiscount.minOrderAmount) {
       discountAmount = Math.round((order.subtotal * activeDiscount.percentage) / 100);
       discountedTotal = order.subtotal - discountAmount;
       discountPercentage = activeDiscount.percentage;
     }
+    
+    // Immediately update UI to show payment confirmation
+    setPaymentConfirmedOrderId(orderId);
+    setPaymentOptionOrderId(null); 
+    setPaymentMethodToConfirm(null);
+    
+    // Update local state immediately to remove the confirmed order
+    const newPendingOrders = pendingOrders.filter(order => order.orderId !== orderId);
+    setPendingOrders(newPendingOrders);
+    
+    setNotification({ 
+      message: "Processing payment...", 
+      type: "success" 
+    });
     
     console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
     try {
@@ -105,20 +164,34 @@ export default function PendingOrders() {
           totalAmount: discountedTotal
         }),
       });
+      
       if (!response.ok) throw new Error('Failed to confirm payment');
+      
       const data = await response.json();
-      setNotification({ message: data.message, type: 'success' });
-      const newPendingOrders = pendingOrders.filter(order => order.orderId !== orderId);
-      setPendingOrders(newPendingOrders);
-      setPaymentOptionOrderId(null); // reset payment option UI
-      setPaymentMethodToConfirm(null);
-      setPaymentConfirmedOrderId(orderId); // mark payment confirmed for UI changes
+      setNotification({ 
+        message: data.message, 
+        type: 'success' 
+      });
+      
+      // Trigger manual refresh to ensure all components update
       triggerRefresh();
+      
       if (newPendingOrders.length === 0) {
         setTimeout(() => navigate('/'), 1500); // Delay navigation to allow notification to be displayed
       }
     } catch (error) {
       console.error('Error confirming payment:', error);
+      
+      // If there was an error, revert the UI changes
+      setNotification({ 
+        message: "Error confirming payment. Please try again.", 
+        type: "error" 
+      });
+      
+      // Put the order back in the list
+      const revertedOrders = [...pendingOrders];
+      setPendingOrders(revertedOrders);
+      setPaymentConfirmedOrderId(null);
     }
   };
 

@@ -5,11 +5,14 @@ import App from './App';
 import './style.css';
 
 import { CartProvider } from './components/CartContext'; // ✅ Import the CartProvider
+import { RefreshProvider } from './contexts/RefreshContext'; // ✅ Import the RefreshProvider
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
-    <CartProvider> {/* ✅ Wrap your entire app inside CartProvider */}
-      <App />
-    </CartProvider>
+    <RefreshProvider> {/* ✅ Wrap your entire app inside RefreshProvider */}
+      <CartProvider> {/* ✅ Wrap your entire app inside CartProvider */}
+        <App />
+      </CartProvider>
+    </RefreshProvider>
   </BrowserRouter>
 );

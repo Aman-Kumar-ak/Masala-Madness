@@ -19,6 +19,13 @@ router.post("/", async (req, res) => {
       totalAmount: totalAmount || subtotal
     });
     await newPendingOrder.save();
+    
+    // Emit event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'new-pending-order', order: newPendingOrder });
+    }
+    
     res.status(201).json({ message: "Pending order created successfully", orderId: newPendingOrder.orderId });
   } catch (error) {
     console.error("Create pending order error:", error);
@@ -71,6 +78,12 @@ router.put("/:orderId", async (req, res) => {
     existingOrder.updatedAt = new Date();
 
     const savedOrder = await existingOrder.save();
+    
+    // Emit event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'updated-pending-order', order: savedOrder });
+    }
 
     res.status(200).json({ message: "Pending order updated successfully", order: savedOrder });
   } catch (error) {
@@ -129,6 +142,16 @@ router.post("/confirm/:id", async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+    
+    // Emit events for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { 
+        type: 'order-confirmed', 
+        pendingOrderId: req.params.id,
+        newOrder: newOrder
+      });
+    }
 
     res.status(201).json({ message: "Order confirmed and moved to orders", orderId: newOrder.orderId });
   } catch (error) {
@@ -183,6 +206,12 @@ router.patch("/:orderId/item-quantity", async (req, res) => {
     pendingOrder.updatedAt = new Date();
 
     await pendingOrder.save();
+    
+    // Emit event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'pending-order-quantity-changed', order: pendingOrder });
+    }
 
     res.status(200).json({ message: "Item quantity updated", order: pendingOrder });
   } catch (error) {
@@ -214,6 +243,13 @@ router.delete("/:orderId/item/:itemIndex", async (req, res) => {
     // If only one item, delete the entire order
     if (pendingOrder.items.length === 1) {
       await PendingOrder.deleteOne({ orderId });
+      
+      // Emit event for real-time updates
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('order-update', { type: 'pending-order-deleted', orderId });
+      }
+      
       return res.status(200).json({ message: "Last item removed, entire order deleted", order: null });
     }
 
@@ -233,6 +269,12 @@ router.delete("/:orderId/item/:itemIndex", async (req, res) => {
     pendingOrder.updatedAt = new Date();
 
     await pendingOrder.save();
+    
+    // Emit event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'pending-order-item-removed', order: pendingOrder });
+    }
 
     res.status(200).json({ message: "Item removed", order: pendingOrder });
   } catch (error) {
@@ -250,6 +292,13 @@ router.delete("/:orderId", async (req, res) => {
     if (deleted.deletedCount === 0) {
       return res.status(404).json({ message: "Pending order not found" });
     }
+    
+    // Emit event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'pending-order-deleted', orderId });
+    }
+    
     res.status(200).json({ message: "Pending order deleted" });
   } catch (error) {
     console.error("Delete pending order error:", error);
