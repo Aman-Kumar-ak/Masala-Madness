@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import BackButton from "../components/BackButton";
+import { useRefresh } from "../contexts/RefreshContext";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -17,6 +18,8 @@ const Orders = () => {
     const now = new Date();
     return now.toISOString().split('T')[0];
   });
+
+  const { refreshKey } = useRefresh();
 
   const loadOrders = async () => {
     try {
@@ -44,7 +47,7 @@ const Orders = () => {
 
   useEffect(() => {
     loadOrders();
-  }, [selectedDate]);
+  }, [selectedDate, refreshKey]);
 
   const handleDateChange = (e) => {
     setSelectedDate(e.target.value);
@@ -191,7 +194,7 @@ const Orders = () => {
               <div className="bg-orange-50 p-4 rounded-lg shadow-sm">
                 <h3 className="text-lg font-semibold text-gray-700">Payment Success</h3>
                 <p className="text-3xl font-bold text-blue-600 mt-2">
-                  {stats.totalOrders > 0 
+                  {stats.totalOrders > 0
                     ? Math.round((stats.totalPaidOrders / stats.totalOrders) * 100)
                     : 0}%
                 </p>
@@ -210,7 +213,7 @@ const Orders = () => {
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <h3 className="text-lg font-semibold">Order #{order.orderNumber}</h3>
-                      <p className="text-sm text-gray-600">{formatDateIST(order.createdAt)}</p>
+                      <p className="text-sm text-gray-600">{formatDateIST(order.updatedAt)}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">

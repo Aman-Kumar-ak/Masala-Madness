@@ -63,7 +63,8 @@ router.post("/confirm", async (req, res) => {
         discountPercentage: discountPercentage || 0,
         paymentMethod,
         isPaid,
-        createdAt: now
+        createdAt: now,
+        updatedAt: now
       });
 
       await newOrder.save();
@@ -97,7 +98,7 @@ router.post("/confirm", async (req, res) => {
 //Get all orders sorted by createdAt in ascending order
 router.get("/", async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: 1 }).lean();
+    const orders = await Order.find().sort({ updatedAt: -1 }).lean();
     res.status(200).json(orders);
   } catch (error) {
     console.error('Fetch orders error:', error);
@@ -126,7 +127,7 @@ router.get("/today", async (req, res) => {
         createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
       })
       .select('-__v')
-      .sort({ createdAt: 1 })
+      .sort({ updatedAt: -1 })
       .lean()
     ]);
 
@@ -158,7 +159,7 @@ router.get("/date/:date", async (req, res) => {
         createdAt: { $gte: startOfDay, $lte: endOfDay }
       })
       .select('-__v')
-      .sort({ createdAt: 1 })
+      .sort({ updatedAt: -1 })
       .lean()
     ]);
 

@@ -27,17 +27,11 @@ const OrderSchema = new mongoose.Schema({
   isPaid: { type: Boolean, required: true },
   createdAt: {
     type: Date,
-    default: () => {
-      const istOffset = 5.5 * 60 * 60000;
-      return new Date(Date.now() + istOffset);
-    },
+    default: () => new Date(),
   },
   updatedAt: {
     type: Date,
-    default: () => {
-      const istOffset = 5.5 * 60 * 60000;
-      return new Date(Date.now() + istOffset);
-    },
+    default: () => new Date(),
   },
 });
 

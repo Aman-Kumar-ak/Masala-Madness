@@ -15,6 +15,7 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(false);
   const [activeDiscount, setActiveDiscount] = useState(null);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -48,6 +49,19 @@ export default function Home() {
     };
 
     fetchActiveDiscount();
+
+    const fetchPendingOrdersCount = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/pending-orders`);
+        if (!response.ok) throw new Error('Failed to fetch pending orders');
+        const data = await response.json();
+        setPendingOrdersCount(data.length || 0);
+      } catch (error) {
+        console.error('Error fetching pending orders count:', error);
+      }
+    };
+
+    fetchPendingOrdersCount();
   }, []);
 
   const getCurrentDate = () => {
@@ -140,6 +154,11 @@ export default function Home() {
               >
                 <span>🕒</span>
                 <span className="hidden md:inline">Pending Orders</span>
+                {pendingOrdersCount > 0 && (
+                  <span className="bg-white text-yellow-500 px-2 py-1 rounded-full text-sm font-bold">
+                    {pendingOrdersCount}
+                  </span>
+                )}
               </Link>
             </nav>
           </div>

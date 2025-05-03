@@ -53,7 +53,7 @@ const MenuModal = ({ onClose, onSave, items, orderId }) => {
       if (!response.ok) throw new Error('Failed to update order');
 
       const data = await response.json();
-      alert(data.message);
+      // Removed alert for save success to avoid popup after saving modifications
       onSave(data.order);  // Pass updated order object instead of just selectedItems
     } catch (error) {
       console.error('Error updating order:', error);

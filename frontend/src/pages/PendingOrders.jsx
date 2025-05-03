@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import Menu from "../components/Menu";
 import MenuModal from "../components/MenuModal";
+import { useRefresh } from "../contexts/RefreshContext";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function PendingOrders() {
+  const navigate = useNavigate();
   const [pendingOrders, setPendingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
@@ -15,6 +17,8 @@ export default function PendingOrders() {
 
   const [paymentOptionOrderId, setPaymentOptionOrderId] = useState(null); // track order awaiting payment option
   const [paymentMethodToConfirm, setPaymentMethodToConfirm] = useState(null); // payment method pending admin confirmation
+
+  const { triggerRefresh } = useRefresh();
 
   useEffect(() => {
     const fetchPendingOrders = async () => {
@@ -63,9 +67,14 @@ export default function PendingOrders() {
       if (!response.ok) throw new Error('Failed to confirm payment');
       const data = await response.json();
       alert(data.message);
-      setPendingOrders(pendingOrders.filter(order => order.orderId !== orderId));
+      const newPendingOrders = pendingOrders.filter(order => order.orderId !== orderId);
+      setPendingOrders(newPendingOrders);
       setPaymentOptionOrderId(null); // reset payment option UI
       setPaymentMethodToConfirm(null);
+      triggerRefresh();
+      if (newPendingOrders.length === 0) {
+        navigate('/');
+      }
     } catch (error) {
       console.error('Error confirming payment:', error);
     }

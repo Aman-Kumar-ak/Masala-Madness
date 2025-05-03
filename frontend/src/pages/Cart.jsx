@@ -132,7 +132,7 @@ export default function Cart() {
           });
           clearCart();
           setTimeout(() => {
-            navigate("/pending-orders");
+            navigate("/");
           }, 1500);
         } else {
           throw new Error(data.message || "Failed to add order to pending");
