@@ -9,11 +9,14 @@ const router = express.Router();
 // Create a new pending order
 router.post("/", async (req, res) => {
   try {
-    const { items, subtotal } = req.body;
+    const { items, subtotal, discountAmount, discountPercentage, totalAmount } = req.body;
     const newPendingOrder = new PendingOrder({
       orderId: uuidv4(),
       items,
       subtotal,
+      discountAmount: discountAmount || 0,
+      discountPercentage: discountPercentage || 0,
+      totalAmount: totalAmount || subtotal
     });
     await newPendingOrder.save();
     res.status(201).json({ message: "Pending order created successfully", orderId: newPendingOrder.orderId });
@@ -41,6 +44,9 @@ router.put("/:orderId", async (req, res) => {
   try {
     const incomingItems = req.body.items || [];
     const incomingSubtotal = req.body.subtotal || 0;
+    const discountAmount = req.body.discountAmount || 0;
+    const discountPercentage = req.body.discountPercentage || 0;
+    const specifiedTotalAmount = req.body.totalAmount;
 
     // Find existing order
     const existingOrder = await PendingOrder.findOne({ orderId: req.params.orderId });
@@ -53,9 +59,15 @@ router.put("/:orderId", async (req, res) => {
 
     // Recalculate subtotal
     const newSubtotal = mergedItems.reduce((total, item) => total + item.totalPrice, 0);
+    
+    // Calculate total amount
+    const totalAmount = specifiedTotalAmount || (newSubtotal - discountAmount);
 
     existingOrder.items = mergedItems;
     existingOrder.subtotal = newSubtotal;
+    existingOrder.discountAmount = discountAmount;
+    existingOrder.discountPercentage = discountPercentage;
+    existingOrder.totalAmount = totalAmount;
     existingOrder.updatedAt = new Date();
 
     const savedOrder = await existingOrder.save();
@@ -81,7 +93,13 @@ router.post("/confirm/:id", async (req, res) => {
     }
 
     const { items, subtotal } = pendingOrder;
-    const { paymentMethod, isPaid } = req.body;
+    const { paymentMethod, isPaid, discountAmount, discountPercentage, totalAmount } = req.body;
+
+    // Use provided discount values or fallback to the ones in the pending order
+    const finalDiscountAmount = discountAmount !== undefined ? discountAmount : (pendingOrder.discountAmount || 0);
+    const finalDiscountPercentage = discountPercentage !== undefined ? discountPercentage : (pendingOrder.discountPercentage || 0);
+    // Calculate final total amount, using the provided value, or calculate it from subtotal and discount
+    const finalTotalAmount = totalAmount !== undefined ? totalAmount : (pendingOrder.totalAmount || subtotal - finalDiscountAmount);
 
     const startOfDay = new Date(pendingOrder.createdAt);
     startOfDay.setUTCHours(0, 0, 0, 0);
@@ -97,7 +115,9 @@ router.post("/confirm/:id", async (req, res) => {
       orderNumber: dailyOrderCount + 1,
       items,
       subtotal,
-      totalAmount: subtotal, // Assuming no discount for simplicity
+      discountAmount: finalDiscountAmount,
+      discountPercentage: finalDiscountPercentage,
+      totalAmount: finalTotalAmount,
       paymentMethod,
       isPaid,
       createdAt: pendingOrder.createdAt,
@@ -149,6 +169,17 @@ router.patch("/:orderId/item-quantity", async (req, res) => {
 
     // Recalculate subtotal
     pendingOrder.subtotal = pendingOrder.items.reduce((total, i) => total + i.totalPrice, 0);
+    
+    // Update discount-related fields if a discount percentage is set
+    if (pendingOrder.discountPercentage > 0) {
+      // Check if order still qualifies for discount (could have a minimum subtotal requirement)
+      // For now we'll just recalculate based on existing percentage
+      pendingOrder.discountAmount = Math.round((pendingOrder.subtotal * pendingOrder.discountPercentage) / 100);
+      pendingOrder.totalAmount = pendingOrder.subtotal - pendingOrder.discountAmount;
+    } else {
+      pendingOrder.totalAmount = pendingOrder.subtotal;
+    }
+    
     pendingOrder.updatedAt = new Date();
 
     await pendingOrder.save();
@@ -190,6 +221,15 @@ router.delete("/:orderId/item/:itemIndex", async (req, res) => {
 
     // Recalculate subtotal
     pendingOrder.subtotal = pendingOrder.items.reduce((total, item) => total + item.totalPrice, 0);
+    
+    // Update discount-related fields if a discount percentage is set
+    if (pendingOrder.discountPercentage > 0) {
+      pendingOrder.discountAmount = Math.round((pendingOrder.subtotal * pendingOrder.discountPercentage) / 100);
+      pendingOrder.totalAmount = pendingOrder.subtotal - pendingOrder.discountAmount;
+    } else {
+      pendingOrder.totalAmount = pendingOrder.subtotal;
+    }
+    
     pendingOrder.updatedAt = new Date();
 
     await pendingOrder.save();

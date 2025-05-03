@@ -16,6 +16,9 @@ const PendingOrderSchema = new mongoose.Schema({
     },
   ],
   subtotal: { type: Number, required: true },
+  discountAmount: { type: Number, default: 0 },
+  discountPercentage: { type: Number, default: 0 },
+  totalAmount: { type: Number, default: function() { return this.subtotal - (this.discountAmount || 0); } },
   status: { type: String, default: "pending" },
   createdAt: {
     type: Date,

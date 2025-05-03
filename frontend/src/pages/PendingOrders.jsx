@@ -20,6 +20,7 @@ export default function PendingOrders() {
   const [paymentOptionOrderId, setPaymentOptionOrderId] = useState(null); // track order awaiting payment option
   const [paymentMethodToConfirm, setPaymentMethodToConfirm] = useState(null); // payment method pending admin confirmation
   const [paymentConfirmedOrderId, setPaymentConfirmedOrderId] = useState(null); // track payment confirmed for UI changes
+  const [activeDiscount, setActiveDiscount] = useState(null);
 
   const { triggerRefresh } = useRefresh();
 
@@ -52,8 +53,21 @@ export default function PendingOrders() {
       }
     };
 
+    const fetchActiveDiscount = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/discounts/active`);
+        if (response.ok) {
+          const data = await response.json();
+          setActiveDiscount(data);
+        }
+      } catch (error) {
+        console.error('Error fetching discount:', error);
+      }
+    };
+
     fetchPendingOrders();
     fetchAvailableItems();
+    fetchActiveDiscount();
   }, []);
 
   const handleConfirmPayment = async (orderId, paymentMethod) => {
@@ -61,6 +75,21 @@ export default function PendingOrders() {
       console.error('Payment method is not specified');
       return;
     }
+    
+    // Get the order data
+    const order = pendingOrders.find(order => order.orderId === orderId);
+    
+    // Calculate discount if applicable
+    let discountedTotal = order.subtotal;
+    let discountAmount = 0;
+    let discountPercentage = 0;
+    
+    if (activeDiscount && order.subtotal >= activeDiscount.minOrderAmount) {
+      discountAmount = Math.round((order.subtotal * activeDiscount.percentage) / 100);
+      discountedTotal = order.subtotal - discountAmount;
+      discountPercentage = activeDiscount.percentage;
+    }
+    
     console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
     try {
       const response = await fetch(`${API_URL}/api/pending-orders/confirm/${orderId}`, {
@@ -68,7 +97,13 @@ export default function PendingOrders() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ paymentMethod, isPaid: true }),
+        body: JSON.stringify({ 
+          paymentMethod, 
+          isPaid: true,
+          discountAmount,
+          discountPercentage,
+          totalAmount: discountedTotal
+        }),
       });
       if (!response.ok) throw new Error('Failed to confirm payment');
       const data = await response.json();
@@ -108,6 +143,25 @@ export default function PendingOrders() {
   };
 
   const handleSaveItems = (updatedOrder) => {
+    // Calculate discount if applicable
+    let discountAmount = 0;
+    let discountPercentage = 0;
+    let totalAmount = updatedOrder.subtotal;
+    
+    if (activeDiscount && updatedOrder.subtotal >= activeDiscount.minOrderAmount) {
+      discountPercentage = activeDiscount.percentage;
+      discountAmount = Math.round((updatedOrder.subtotal * discountPercentage) / 100);
+      totalAmount = updatedOrder.subtotal - discountAmount;
+    }
+    
+    // Add discount information to the order
+    updatedOrder = {
+      ...updatedOrder,
+      discountAmount,
+      discountPercentage,
+      totalAmount
+    };
+    
     setPendingOrders(prevOrders => prevOrders.map(order => {
       if (order.orderId === updatedOrder.orderId) {
         return updatedOrder;
@@ -185,7 +239,34 @@ export default function PendingOrders() {
                       hour12: false,
                     })}
                   </p>
-                  <p className="text-md font-medium mb-4 text-gray-700 dark:text-gray-600">Subtotal: <span className="text-green-700 font-semibold">₹{order.subtotal.toFixed(2)}</span></p>
+                  <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-md font-medium text-gray-700">Subtotal:</span>
+                      <span className="text-md font-medium">₹{order.subtotal.toFixed(2)}</span>
+                    </div>
+                    
+                    {activeDiscount && (
+                      <>
+                        {order.subtotal >= activeDiscount.minOrderAmount ? (
+                          <div className="flex justify-between text-green-600 mb-1">
+                            <span className="font-medium">Discount ({activeDiscount.percentage}%):</span>
+                            <span className="font-medium">-₹{(order.subtotal * activeDiscount.percentage / 100).toFixed(2)}</span>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-orange-600 mb-1">
+                            Add ₹{(activeDiscount.minOrderAmount - order.subtotal).toFixed(2)} more to get {activeDiscount.percentage}% discount!
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    <div className="flex justify-between font-semibold text-green-700 pt-1 border-t border-gray-200">
+                      <span>Total:</span>
+                      <span>₹{activeDiscount && order.subtotal >= activeDiscount.minOrderAmount
+                        ? (order.subtotal - (order.subtotal * activeDiscount.percentage / 100)).toFixed(2)
+                        : order.subtotal.toFixed(2)}</span>
+                    </div>
+                  </div>
                   <ul className="divide-y divide-gray-300 dark:divide-gray-200 rounded-lg overflow-hidden shadow-inner">
                     {order.items.map((item, index) => (
                       <li key={index} className="flex justify-between py-3 px-4 bg-gray-50 dark:bg-gray-200 hover:bg-gray-100 dark:hover:bg-gray-300 transition rounded-lg">

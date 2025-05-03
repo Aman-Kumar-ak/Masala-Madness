@@ -53,6 +53,28 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
   const handleSave = async () => {
     if (selectedItems.length === 0) return;
 
+    // Calculate the subtotal
+    const subtotal = selectedItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0);
+    
+    // Fetch active discount
+    let discountAmount = 0;
+    let discountPercentage = 0;
+    let totalAmount = subtotal;
+    
+    try {
+      const discountResponse = await fetch(`${API_URL}/api/discounts/active`);
+      if (discountResponse.ok) {
+        const activeDiscount = await discountResponse.json();
+        if (activeDiscount && subtotal >= activeDiscount.minOrderAmount) {
+          discountPercentage = activeDiscount.percentage;
+          discountAmount = Math.round((subtotal * discountPercentage) / 100);
+          totalAmount = subtotal - discountAmount;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching discount:', error);
+    }
+
     const requestBody = {
       items: selectedItems.map(item => ({
         name: item.name,
@@ -61,7 +83,10 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
         quantity: item.quantity || 1,
         totalPrice: item.price * (item.quantity || 1),
       })),
-      subtotal: selectedItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0),
+      subtotal,
+      discountAmount,
+      discountPercentage,
+      totalAmount,
       isPaid: false, // Assuming the order is not paid yet
     };
 
