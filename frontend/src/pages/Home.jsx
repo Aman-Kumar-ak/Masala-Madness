@@ -128,30 +128,36 @@ export default function Home() {
             </div>
 
             {/* Navigation */}
-            <nav className="flex items-center space-x-4">
-              {/* Removed Admin Panel button here */}
+            <nav className="flex items-center space-x-5">
               <Link
                 to="/cart"
-                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full transition-colors duration-300 flex items-center space-x-2 text-sm md:text-base font-semibold shadow-none"
-                aria-label={`Cart with ${cartItems.length} items`}
+                className="p-0 m-0 flex items-center justify-center text-sm md:text-base font-semibold shadow-none relative bg-transparent hover:bg-transparent"
+                aria-label={`Cart with ${cartItems.reduce((total, item) => total + item.quantity, 0)} items`}
               >
-                <span className="md:hidden text-lg">🛒</span>
-                <span className="hidden md:inline">Cart</span>
-                {cartItems.length > 0 && (
-                  <span className="bg-white text-orange-700 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold flex-shrink-0 min-w-[2rem] h-7 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-orange-500 transition-colors duration-300">
-                    <span className="text-lg font-bold">{cartItems.length}</span>
+                <img
+                  src="/images/menu.png"
+                  alt="Cart"
+                  className="w-15 h-12 md:w-10 md:h-10 object-contain"
+                />
+                {cartItems.reduce((total, item) => total + item.quantity, 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-white text-yellow-700 px-2.5 py-0.5 rounded-full text-xs md:text-sm font-bold flex-shrink-0 min-w-[1.25rem] h-5 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-yellow-500 transition-colors duration-300">
+                    <span>{cartItems.reduce((total, item) => total + item.quantity, 0)}</span>
                   </span>
                 )}
               </Link>
+
               <Link
                 to="/pending-orders"
-                className="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-full transition-colors duration-300 flex items-center space-x-2 text-sm md:text-base font-semibold shadow-none"
+                className="p-0 m-0 flex items-center justify-center text-sm md:text-base font-semibold shadow-none relative bg-transparent hover:bg-transparent"
                 aria-label={`Pending Orders: ${pendingOrdersCount}`}
               >
-                <span className="md:hidden text-lg">🕒</span>
-                <span className="hidden md:inline">Pending Orders</span>
+                <img
+                  src="/images/food-delivery.png"
+                  alt="Pending Orders"
+                  className="w-15 h-12 md:w-10 md:h-11 object-contain"
+                />
                 {pendingOrdersCount > 0 && (
-                  <span className="bg-white text-yellow-700 px-3 py-1.5 rounded-full text-lg font-bold flex-shrink-0 min-w-[2rem] h-7 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-yellow-500 transition-colors duration-300">
+                  <span className="absolute -top-1 -right-1 bg-white text-yellow-700 px-2.5 py-0.5 rounded-full text-xs md:text-sm font-bold flex-shrink-0 min-w-[1.25rem] h-5 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-yellow-500 transition-colors duration-300">
                     {pendingOrdersCount}
                   </span>
                 )}
@@ -212,7 +218,7 @@ export default function Home() {
                 <div>
                   <p className="text-sm text-gray-600">Today's Orders</p>
                   <p className="text-lg font-bold text-blue-600">
-                    {stats.totalPaidOrders}/{stats.totalOrders}
+                    {stats.totalPaidOrders}
                   </p>
                 </div>
               </div>

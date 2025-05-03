@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import BackButton from "../components/BackButton";
 import { useRefresh } from "../contexts/RefreshContext";
+import { useNavigate } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -10,14 +11,16 @@ const Orders = () => {
     totalOrders: 0,
     totalPaidOrders: 0,
     totalRevenue: 0,
-    avgOrderValue: 0
+    avgOrderValue: 0,
   });
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date();
     return now.toISOString().split('T')[0];
   });
+  const navigate = useNavigate();
 
   const { refreshKey } = useRefresh();
 
@@ -25,18 +28,31 @@ const Orders = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_URL}/api/orders/date/${selectedDate}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const [ordersResponse, pendingOrdersResponse] = await Promise.all([
+        fetch(`${API_URL}/api/orders/date/${selectedDate}`),
+        fetch(`${API_URL}/api/pending-orders`),
+      ]);
+
+      if (!ordersResponse.ok) {
+        throw new Error(`HTTP error! status: ${ordersResponse.status}`);
       }
-      const data = await response.json();
-      setOrders(data.orders || []);
-      setStats(data.stats || {
+
+      if (!pendingOrdersResponse.ok) {
+        throw new Error(`HTTP error! status: ${pendingOrdersResponse.status}`);
+      }
+
+      const ordersData = await ordersResponse.json();
+      const pendingOrdersData = await pendingOrdersResponse.json();
+
+      setOrders(ordersData.orders || []);
+      setStats(ordersData.stats || {
         totalOrders: 0,
         totalPaidOrders: 0,
         totalRevenue: 0,
         avgOrderValue: 0
       });
+
+      setPendingOrdersCount(pendingOrdersData.length || 0);
     } catch (error) {
       console.error('Error loading orders:', error);
       setError('Failed to load orders. Please try again.');
@@ -170,9 +186,25 @@ const Orders = () => {
               <div className="bg-orange-50 p-4 rounded-lg shadow-sm">
                 <h3 className="text-lg font-semibold text-gray-700">Total Orders</h3>
                 <p className="text-3xl font-bold text-orange-600 mt-2">
-                  {stats.totalPaidOrders}/{stats.totalOrders}
+                  {stats.totalPaidOrders}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">Paid/Total</p>
+              </div>
+
+              <div
+                role="button"
+                tabIndex={0}
+                className="bg-orange-50 p-4 rounded-lg shadow-sm"
+                onClick={() => navigate("/pending-orders")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    navigate("/pending-orders");
+                  }
+                }}
+                aria-label={`Pending Orders: ${pendingOrdersCount}`}
+              >
+                <h3 className="text-lg font-semibold text-gray-700 select-none">Pending Orders</h3>
+                <p className="text-3xl font-bold text-yellow-600 mt-2 select-none">{pendingOrdersCount}</p>
+                <p className="text-sm text-gray-500 mt-1 select-none">Orders awaiting confirmation</p>
               </div>
               
               <div className="bg-orange-50 p-4 rounded-lg shadow-sm">
@@ -189,16 +221,6 @@ const Orders = () => {
                   ₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">Per Paid Order</p>
-              </div>
-
-              <div className="bg-orange-50 p-4 rounded-lg shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-700">Payment Success</h3>
-                <p className="text-3xl font-bold text-blue-600 mt-2">
-                  {stats.totalOrders > 0
-                    ? Math.round((stats.totalPaidOrders / stats.totalOrders) * 100)
-                    : 0}%
-                </p>
-                <p className="text-sm text-gray-500 mt-1">Success Rate</p>
               </div>
             </div>
           )}
