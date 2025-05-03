@@ -125,7 +125,7 @@ export default function PendingOrders() {
           ) : (
             <ul className="space-y-6">
               {pendingOrders.map(order => (
-                <li key={order.orderId} className="bg-white dark:bg-gray-100 rounded-2xl shadow-lg p-6 max-w-4xl mx-auto">
+                <li key={order.orderId} className="bg-white dark:bg-gray-100 rounded-md shadow-md p-6 max-w-6xl mx-auto border-t border-gray-300 dark:border-gray-600 first:border-t-0">
                   <h2 className="font-semibold text-xl tracking-tight mb-1 text-gray-800 dark:text-gray-700">
                     Order #{pendingOrders.length - pendingOrders.indexOf(order)} {/* Show order number counting down */}
                   </h2>
@@ -147,13 +147,17 @@ export default function PendingOrders() {
                         <div className="flex items-center space-x-3">
                           <button
                             onClick={() => handleQuantityChange(order.orderId, index, -1)}
-                            className="px-3 py-1 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-500"
+                            className="w-8 h-8 rounded-full bg-white text-orange-600 font-bold flex items-center justify-center shadow-md hover:bg-orange-50 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-600"
+                            aria-label={`Decrease quantity of ${item.name}`}
+                            title={`Decrease quantity of ${item.name}`}
                           >
                             -
                           </button>
                           <button
                             onClick={() => handleQuantityChange(order.orderId, index, 1)}
-                            className="px-3 py-1 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-500"
+                            className="w-8 h-8 rounded-full bg-white text-orange-600 font-bold flex items-center justify-center shadow-md hover:bg-orange-50 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-600"
+                            aria-label={`Increase quantity of ${item.name}`}
+                            title={`Increase quantity of ${item.name}`}
                           >
                             +
                           </button>
@@ -189,7 +193,7 @@ export default function PendingOrders() {
                                 }
                               }
                             }}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-700 transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-600"
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition font-bold text-xl uppercase focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-600"
                             aria-label={`Remove ${item.name}`}
                             title={`Remove ${item.name}`}
                           >
