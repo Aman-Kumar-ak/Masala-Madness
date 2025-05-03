@@ -129,33 +129,29 @@ export default function Home() {
 
             {/* Navigation */}
             <nav className="flex items-center space-x-4">
-              <Link
-                to="/admin"
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full transition-colors duration-200 flex items-center space-x-2"
-              >
-                <span className="hidden md:inline">Admin Panel</span>
-                <span className="md:hidden">👨‍💼</span>
-              </Link>
+              {/* Removed Admin Panel button here */}
               <Link
                 to="/cart"
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full transition-colors duration-200 flex items-center space-x-2"
+                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full transition-colors duration-300 flex items-center space-x-2 text-sm md:text-base font-semibold shadow-none"
+                aria-label={`Cart with ${cartItems.length} items`}
               >
-                <span>🛒</span>
+                <span className="md:hidden text-lg">🛒</span>
                 <span className="hidden md:inline">Cart</span>
                 {cartItems.length > 0 && (
-                  <span className="bg-white text-orange-500 px-2 py-1 rounded-full text-sm font-bold">
-                    {cartItems.length}
+                  <span className="bg-white text-orange-700 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold flex-shrink-0 min-w-[2rem] h-7 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-orange-500 transition-colors duration-300">
+                    <span className="text-lg font-bold">{cartItems.length}</span>
                   </span>
                 )}
               </Link>
               <Link
                 to="/pending-orders"
-                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors duration-200 flex items-center space-x-2"
+                className="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-full transition-colors duration-300 flex items-center space-x-2 text-sm md:text-base font-semibold shadow-none"
+                aria-label={`Pending Orders: ${pendingOrdersCount}`}
               >
-                <span>🕒</span>
+                <span className="md:hidden text-lg">🕒</span>
                 <span className="hidden md:inline">Pending Orders</span>
                 {pendingOrdersCount > 0 && (
-                  <span className="bg-white text-yellow-500 px-2 py-1 rounded-full text-sm font-bold">
+                  <span className="bg-white text-yellow-700 px-3 py-1.5 rounded-full text-lg font-bold flex-shrink-0 min-w-[2rem] h-7 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-yellow-500 transition-colors duration-300">
                     {pendingOrdersCount}
                   </span>
                 )}
@@ -177,26 +173,35 @@ export default function Home() {
                   {getCurrentDate()}
                 </p>
               </div>
-              <button 
+              <button
                 onClick={fetchStats}
                 disabled={loading}
                 className={`p-2 rounded-full ${loading ? 'bg-gray-300' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-colors duration-200`}
                 title="Refresh Stats"
               >
-                <svg 
-                  className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
               </button>
+              {/* Admin Panel Button moved here */}
+              <Link
+                to="/admin"
+                className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transition-colors duration-300 flex items-center justify-center md:space-x-2 md:text-base font-semibold md:shadow-none shadow-none"
+                aria-label="Admin Panel"
+              >
+                <span className="md:hidden text-lg">👨‍💼</span>
+                <span className="hidden md:inline">Admin Panel</span>
+              </Link>
             </div>
             
             {/* Stats */}
@@ -307,3 +312,4 @@ export default function Home() {
     </div>
   );
 }
+

@@ -103,8 +103,7 @@ const Menu = () => {
                 : 'bg-white text-gray-700 hover:bg-orange-100'
             }`}
           >
-            <span>🍽️</span>
-            <span>All Items</span>
+          <span>All Items</span>
           </button>
           {categories.map((category) => (
             <button
@@ -170,18 +169,17 @@ const Menu = () => {
 // Helper function to get emoji for category
 const getCategoryEmoji = (category) => {
   const emojiMap = {
-    'Starters': '🥟',
-    'Main Course': '🍛',
-    'Breads': '🫓',
-    'Rice': '🍚',
-    'Desserts': '🍨',
-    'Beverages': '🥤',
-    'Chinese': '🥢',
-    'Soups': '🥣',
-    'Thali': '🍱',
-    'Momos': '🥟',
+    'Starters': '',
+    'Main Course': '',
+    'Breads': '',
+    'Rice': '',
+    'Desserts': '',
+    'Beverages': '',
+    'Chinese': '',
+    'Soups': '',
+    'Thali': '',
+    'Momos': '',
   };
-  return emojiMap[category] || '🍽️';
 };
 
 export default Menu;

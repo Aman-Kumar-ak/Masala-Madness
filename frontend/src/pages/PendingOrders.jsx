@@ -17,6 +17,7 @@ export default function PendingOrders() {
 
   const [paymentOptionOrderId, setPaymentOptionOrderId] = useState(null); // track order awaiting payment option
   const [paymentMethodToConfirm, setPaymentMethodToConfirm] = useState(null); // payment method pending admin confirmation
+  const [paymentConfirmedOrderId, setPaymentConfirmedOrderId] = useState(null); // track payment confirmed for UI changes
 
   const { triggerRefresh } = useRefresh();
 
@@ -71,6 +72,7 @@ export default function PendingOrders() {
       setPendingOrders(newPendingOrders);
       setPaymentOptionOrderId(null); // reset payment option UI
       setPaymentMethodToConfirm(null);
+      setPaymentConfirmedOrderId(orderId); // mark payment confirmed for UI changes
       triggerRefresh();
       if (newPendingOrders.length === 0) {
         navigate('/');
@@ -207,14 +209,24 @@ export default function PendingOrders() {
                           setPaymentOptionOrderId(order.orderId);
                         }
                       }}
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600"
+                      className={`px-6 py-3 rounded-full font-semibold shadow-md transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                        paymentConfirmedOrderId === order.orderId
+                          ? 'bg-gray-400 text-white cursor-not-allowed focus:ring-gray-600'
+                          : paymentOptionOrderId === order.orderId
+                          ? 'bg-gray-400 hover:bg-gray-500 text-white focus:ring-gray-600' // After click Confirm payment button changes to cancel with grey
+                          : 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-600'
+                      }`}
+                      disabled={paymentConfirmedOrderId === order.orderId}
                     >
                       {paymentOptionOrderId === order.orderId ? 'Cancel' : 'Confirm Payment'}
                     </button>
                     <div
-                      className={`overflow-hidden transition-[max-height,opacity,transform] duration-500 ease-in-out transform-gpu origin-top ${
-                        paymentOptionOrderId === order.orderId ? 'max-h-40 opacity-100 scale-y-100' : 'max-h-0 opacity-0 scale-y-0'
+                      className={`overflow-hidden transition-all duration-300 ease-in-out transform-gpu origin-top ${
+                        paymentOptionOrderId === order.orderId
+                          ? 'max-h-40 opacity-100 translate-y-0'
+                          : 'max-h-0 opacity-0 -translate-y-4 pointer-events-none'
                       }`}
+                      style={{ transitionProperty: 'max-height, opacity, transform' }}
                     >
                       {paymentOptionOrderId === order.orderId && (
                         !paymentMethodToConfirm ? (
