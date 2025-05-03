@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import Notification from './Notification';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const MenuModal = ({ onClose, onSave, items, orderId }) => {
   const [selectedItems, setSelectedItems] = useState([]);
+  const [notification, setNotification] = useState(null);
 
   const handleSelectItem = (item, portion, price, index) => {
     const existingIndex = selectedItems.findIndex(
@@ -55,6 +57,7 @@ const MenuModal = ({ onClose, onSave, items, orderId }) => {
       const data = await response.json();
       // Removed alert for save success to avoid popup after saving modifications
       onSave(data.order);  // Pass updated order object instead of just selectedItems
+      setNotification({ message: 'Items added successfully!', type: 'success' });
     } catch (error) {
       console.error('Error updating order:', error);
       alert('Failed to update order');
@@ -207,6 +210,13 @@ const MenuModal = ({ onClose, onSave, items, orderId }) => {
           </button>
         </div>
       </div>
+      {notification && (
+        <Notification 
+          message={notification.message} 
+          type={notification.type} 
+          onClose={() => setNotification(null)}
+        />
+      )}
     </div>
   );
 };

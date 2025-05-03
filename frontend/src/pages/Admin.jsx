@@ -124,7 +124,7 @@ const Admin = () => {
           />
         )}
         <div className="bg-white shadow-md rounded-lg p-6">
-          <h1 className="text-2xl font-bold mb-6">Admin Panel</h1>
+          <h1 className="text-2xl font-bold mb-6 text-center">Admin Panel</h1>
           <div className="space-y-4">
             {/* Navigation Links */}
             <div className="bg-orange-50 p-4 rounded-lg flex flex-wrap gap-4">
