@@ -202,6 +202,17 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-3">
+              <Link
+                to="/qr"
+                className="w-10 h-10 rounded-full bg-yellow-100 hover:bg-yellow-200 transition-colors duration-200 flex items-center justify-center shadow-sm"
+                title="QR Code"
+              >
+                <img
+                  src="/images/qr-code.png"
+                  alt="QR Code"
+                  className="w-10 h-10 object-contain"
+                />
+              </Link>
               <button
                 onClick={fetchStats}
                 disabled={loading}
