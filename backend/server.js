@@ -9,6 +9,8 @@ const orderRoutes = require('./routes/orderRoutes');
 const discountRoutes = require('./routes/discountRoutes');
 const pendingOrderRoutes = require('./routes/pendingOrderRoutes');
 const upiRoutes = require('./routes/upiRoutes');
+const authRoutes = require('./routes/authRoutes');
+const { restoreAdminIfMissing, backupAdminCredentials } = require('./scripts/admin-recovery-service');
 
 dotenv.config();
 
@@ -36,6 +38,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/discounts', discountRoutes);
 app.use('/api/pending-orders', pendingOrderRoutes);
 app.use('/api/upi', upiRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => {
   res.send('Masala Madness API is running.');
@@ -50,10 +53,57 @@ io.on('connection', (socket) => {
   });
 });
 
+// Enhanced admin recovery mechanism
+const Admin = require('./models/Admin');
+
+// Function to check and recover admin collection
+async function checkAndRecoverAdminCollection() {
+  try {
+    // Check if admin collection exists and has admin users
+    const adminCount = await Admin.countDocuments().catch(err => {
+      console.warn('Error checking admin count:', err.message);
+      return 0;
+    });
+    
+    if (adminCount === 0) {
+      console.log('No admin users found. Restoring admin account...');
+      await restoreAdminIfMissing();
+    } else {
+      console.log(`Found ${adminCount} admin users.`);
+      // Backup existing admins
+      await backupAdminCredentials();
+    }
+  } catch (error) {
+    console.error('Error in admin recovery process:', error);
+  }
+}
+
+// Setup database watchdog to monitor admin collection
+// This helps prevent issues when the collection is accidentally deleted
+function setupCollectionWatchdog() {
+  // Check admin collection every hour
+  const interval = 1000 * 60 * 60; // 1 hour
+  setInterval(checkAndRecoverAdminCollection, interval);
+  
+  // Also register watchdog for MongoDB events
+  mongoose.connection.on('reconnected', () => {
+    console.log('MongoDB reconnected. Checking admin collection...');
+    checkAndRecoverAdminCollection();
+  });
+}
+
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log('MongoDB connected.');
+    
+    // First run the admin recovery to ensure admin exists
+    await checkAndRecoverAdminCollection();
+    
+    // Setup watchdog timer
+    setupCollectionWatchdog();
+    
+    // Start the server
     server.listen(5000, () => console.log('Server running on port 5000'));
   })
   .catch((err) => console.error(err));
