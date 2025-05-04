@@ -5,6 +5,7 @@ import Cart from './pages/Cart';  // Import Cart component (add other pages simi
 import Admin from './pages/Admin';  // Import Admin page
 import Orders from './pages/Orders';  // Import Orders page
 import PendingOrders from './pages/PendingOrders';  // Import Pending Orders page
+import Qr from './pages/Qr';  // Import QR page
 import { NotificationProvider } from './components/NotificationContext';  // Import our notification context
 
 const App = () => {
@@ -16,6 +17,7 @@ const App = () => {
         <Route path="/admin" element={<Admin />} />  {/* Admin page */}
         <Route path="/orders" element={<Orders />} />  {/* Orders page */}
         <Route path="/pending-orders" element={<PendingOrders />} />  {/* Pending Orders page */}
+        <Route path="/qr" element={<Qr />} />  {/* QR page */}
       </Routes>
     </NotificationProvider>
   );
