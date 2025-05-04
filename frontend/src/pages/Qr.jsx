@@ -329,7 +329,7 @@ export default function Qr() {
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
       <BackButton />
       <div className="container mx-auto px-4 py-8 pt-16">
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-400 to-yellow-400 p-4 text-white">
             <h1 className="text-2xl font-bold text-center">UPI Payment QR Code</h1>
@@ -407,7 +407,7 @@ export default function Qr() {
                   No saved UPI addresses. Add one to get started.
                 </div>
               ) : (
-                <div className="space-y-6 max-h-96 overflow-y-auto pr-2 pb-4 pt-2 px-1 md:px-2">
+                <div className="space-y-6 max-h-96 overflow-y-auto pr-2 pb-4 pt-2 px-1 md:px-2 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:space-y-0">
                   {savedUpiAddresses.map((address) => (
                     <div 
                       key={address._id}
@@ -795,7 +795,7 @@ export default function Qr() {
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                  className="w-full md:w-auto md:px-8 md:ml-auto md:flex md:items-center bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -817,26 +817,28 @@ export default function Qr() {
 
             {/* QR Code Display - only show when not editing/adding UPI */}
             {qrCodeUrl && !isAddingUpi && !isEditingUpi && (
-              <div className="flex flex-col items-center border-t border-gray-200 pt-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Your UPI QR Code</h2>
-                <div 
-                  ref={qrRef}
-                  className="bg-white p-6 border-2 border-orange-200 rounded-lg shadow-md mb-4 flex items-center justify-center"
-                >
-                  <img
-                    src={qrCodeUrl}
-                    alt="UPI QR Code"
-                    className="w-56 h-56 md:w-64 md:h-64 object-contain"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = "/images/qr-code.png";
-                      showError("QR code generation failed. Please try again.");
-                    }}
-                  />
+              <div className="flex flex-col md:flex-row md:items-start md:justify-evenly border-t border-gray-200 pt-6">
+                <div className="flex flex-col items-center md:w-1/2">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Your UPI QR Code</h2>
+                  <div 
+                    ref={qrRef}
+                    className="bg-white p-6 border-2 border-orange-200 rounded-lg shadow-md mb-4 flex items-center justify-center"
+                  >
+                    <img
+                      src={qrCodeUrl}
+                      alt="UPI QR Code"
+                      className="w-56 h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 object-contain"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "/images/qr-code.png";
+                        showError("QR code generation failed. Please try again.");
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {/* UPI Payment Information */}
-                <div className="w-full text-center mb-4">
+                <div className="md:w-1/2 md:pt-16 text-center mb-4">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 inline-block">
                     <p className="text-sm text-gray-600">Paying to:</p>
                     <p className="font-medium text-gray-800 text-lg">{upiId}</p>
@@ -853,33 +855,33 @@ export default function Qr() {
                       </div>
                     )}
                   </div>
-                </div>
                 
-                <p className="text-sm text-gray-600 mb-4 text-center">
-                  Scan this QR code with any UPI app (GPay, PhonePe, Paytm, etc.) to make a payment
-                </p>
-                
-                <div className="flex flex-wrap gap-3 justify-center">
-                  <button
-                    onClick={copyToClipboard}
-                    className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center gap-2 border border-blue-200"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    <span>Copy</span>
-                  </button>
+                  <p className="text-sm text-gray-600 mb-4 text-center">
+                    Scan this QR code with any UPI app (GPay, PhonePe, Paytm, etc.) to make a payment
+                  </p>
                   
-                  <a
-                    href={qrCodeUrl}
-                    download="upi-qr-code.png"
-                    className="bg-green-50 text-green-600 hover:bg-green-100 font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center gap-2 border border-green-200"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span>Download</span>
-                  </a>
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    <button
+                      onClick={copyToClipboard}
+                      className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center gap-2 border border-blue-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span>Copy</span>
+                    </button>
+                    
+                    <a
+                      href={qrCodeUrl}
+                      download="upi-qr-code.png"
+                      className="bg-green-50 text-green-600 hover:bg-green-100 font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center gap-2 border border-green-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      <span>Download</span>
+                    </a>
+                  </div>
                 </div>
               </div>
             )}
