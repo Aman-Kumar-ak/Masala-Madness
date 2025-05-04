@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNotification } from '../components/NotificationContext';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -10,14 +11,17 @@ const Login = () => {
   const [showRecovery, setShowRecovery] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess } = useNotification();
   
   // If already authenticated, redirect to home page
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/');
+      navigate('/home');
     }
   }, [isAuthenticated, navigate]);
   
@@ -37,7 +41,13 @@ const Login = () => {
       const result = await login(username, password);
       
       if (result.success) {
-        navigate('/');
+        // Show success notification
+        showSuccess(`Welcome to Masala Madness!`, 3000);
+        
+        // Delay navigation slightly to allow notification to be seen
+        setTimeout(() => {
+          navigate('/home');
+        }, 800);
       } else {
         setError(result.message);
         // Show recovery instructions if we get an indication that admin user doesn't exist
@@ -56,13 +66,90 @@ const Login = () => {
   
   // Function to handle the login button click
   const handleLoginClick = () => {
-    setShowForm(true);
+    setIsTransitioning(true);
+    // Delay showing the form slightly to allow exit animations to complete
+    setTimeout(() => {
+      setShowForm(true);
+      setIsTransitioning(false);
+    }, 600);
+  };
+  
+  // Shine animation variant - modified to work with hover state
+  const shineVariants = {
+    initial: {
+      x: "-100%",
+      opacity: 0
+    },
+    animate: {
+      x: ["-100%", "400%"],
+      opacity: [0, 1, 0],
+      transition: {
+        duration: 1.5,
+        repeat: Infinity,
+        repeatType: "loop",
+        ease: "easeInOut"
+      }
+    },
+    hover: {
+      x: ["0%", "100%"],
+      opacity: 0.5,
+      transition: {
+        duration: 1,
+        delay: 0.2, // Slight delay after the gradient fill starts
+        ease: "easeInOut"
+      }
+    }
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 overflow-hidden">
-      <div className="w-full max-w-md p-8 space-y-8">
-        <AnimatePresence>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-orange-100 to-red-50">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Top circles */}
+        <div className="absolute top-0 left-1/4 w-64 h-64 bg-gradient-to-br from-red-200 to-orange-300 rounded-full opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute top-20 right-10 w-40 h-40 bg-gradient-to-bl from-yellow-200 to-orange-300 rounded-full opacity-30"></div>
+        
+        {/* Bottom circles */}
+        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-gradient-to-tl from-red-300 to-yellow-200 rounded-full opacity-20 translate-x-1/3 translate-y-1/2"></div>
+        <div className="absolute bottom-10 left-10 w-32 h-32 bg-gradient-to-tr from-orange-200 to-yellow-300 rounded-full opacity-30"></div>
+        
+        {/* Spice pattern - stylized elements */}
+        <div className="absolute top-1/3 left-10 w-8 h-8 border-2 border-orange-300 opacity-30 rotate-45"></div>
+        <div className="absolute top-1/4 right-20 w-6 h-6 border-2 border-red-300 opacity-20 rotate-12"></div>
+        <div className="absolute bottom-1/3 left-1/4 w-10 h-10 border-2 border-yellow-400 opacity-20 -rotate-12"></div>
+        <div className="absolute bottom-1/4 right-1/3 w-7 h-7 border-2 border-orange-400 opacity-20 rotate-30"></div>
+        
+        {/* Additional decorative spice patterns */}
+        <motion.div 
+          className="absolute top-1/2 left-20 w-3 h-10 bg-red-400/20 rounded-full"
+          animate={{ 
+            y: ["-5px", "5px"],
+            opacity: [0.5, 0.7]
+          }}
+          transition={{ 
+            duration: 3,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut"
+          }}
+        ></motion.div>
+        <motion.div 
+          className="absolute bottom-1/2 right-24 w-3 h-10 bg-orange-400/20 rounded-full"
+          animate={{ 
+            y: ["5px", "-5px"],
+            opacity: [0.5, 0.7]
+          }}
+          transition={{ 
+            duration: 4,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut"
+          }}
+        ></motion.div>
+      </div>
+      
+      <div className="w-full max-w-md p-8 space-y-8 z-10">
+        <AnimatePresence mode="wait">
           {!showForm ? (
             // Logo splash screen with login button
             <motion.div 
@@ -71,141 +158,416 @@ const Login = () => {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, y: -100, scale: 0.5 }}
-              transition={{ duration: 0.5 }}
+              transition={{ 
+                duration: 0.5,
+                exit: { duration: 0.5 }
+              }}
             >
-              <motion.img 
-                src="/images/m_logo.png" 
-                alt="Masala Madness Logo" 
-                className="w-64 h-64 object-contain mb-8"
-                animate={{ rotate: [0, 5, -5, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
-              />
+              <motion.div 
+                className="flex justify-center mb-8"
+                initial={{ y: 0, opacity: 1 }}
+                animate={{ y: 0, opacity: 1 }}
+              >
+                <div className="relative">
+                  <motion.div 
+                    className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-full opacity-75 blur-sm"
+                    animate={{ 
+                      rotate: [0, 360],
+                      scale: [1, 1.05, 1],
+                    }}
+                    transition={{ 
+                      rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+                      scale: { duration: 3, repeat: Infinity, ease: "easeInOut" }
+                    }}
+                  ></motion.div>
+                  <div className="relative bg-white p-1 rounded-full">
+                    <motion.img 
+                      src="/images/m_logo.png" 
+                      alt="Masala Madness Logo" 
+                      className="w-64 h-64 object-contain rounded-full"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ 
+                        duration: 1.2,
+                        ease: "easeOut"
+                      }}
+                      style={{ filter: "drop-shadow(0 10px 15px rgba(0, 0, 0, 0.2))" }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+              <motion.h1 
+                className="text-3xl font-bold text-gray-800 mb-4 text-center"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <span className="bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
+                  Masala Madness
+                </span>
+              </motion.h1>
+              <motion.p 
+                className="text-gray-600 mb-8 text-center text-lg"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                Restaurant Management System
+              </motion.p>
               <motion.button
                 onClick={handleLoginClick}
-                className="mt-8 px-6 py-3 bg-red-600 text-white font-bold rounded-full shadow-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                className="relative flex items-center overflow-hidden px-10 py-4 rounded-2xl bg-white border-2 border-orange-500 shadow-lg group hover:border-red-600 disabled:opacity-70"
+                whileHover={{ 
+                  scale: 1.03,
+                  boxShadow: "0 15px 30px rgba(0, 0, 0, 0.2)"
+                }}
+                whileTap={{ 
+                  scale: 0.96,
+                  boxShadow: "0 5px 10px rgba(0, 0, 0, 0.1)",
+                  backgroundColor: "rgba(254, 215, 170, 0.5)"
+                }}
+                disabled={isTransitioning}
               >
-                Admin Login
+                {/* Decorative elements */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-red-500 to-orange-500 transform origin-left -translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
+                <div className="absolute inset-0 bg-gradient-to-tr from-orange-400 to-yellow-300 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100 blur-sm"></div>
+                
+                {/* Animated shine effect */}
+                <motion.span 
+                  className="absolute top-0 left-0 w-16 h-full bg-white opacity-0 transform -skew-x-20"
+                  variants={shineVariants}
+                  initial="initial"
+                  animate="animate"
+                  whileHover="hover"
+                ></motion.span>
+                
+                {/* Custom shine effect that follows the gradient fill */}
+                <motion.span
+                  className="absolute top-0 left-0 w-20 h-full bg-gradient-to-r from-transparent via-white to-transparent opacity-0 transform -skew-x-20"
+                  initial={{ x: "-100%" }}
+                  whileHover={{
+                    x: "200%",
+                    opacity: 0.3,
+                    transition: {
+                      delay: 0.3,
+                      duration: 0.8,
+                      ease: "easeOut"
+                    }
+                  }}
+                  whileTap={{
+                    opacity: 0.6,
+                    x: "100%",
+                    transition: {
+                      duration: 0.2
+                    }
+                  }}
+                ></motion.span>
+                
+                {/* Press effect overlay */}
+                <motion.div 
+                  className="absolute inset-0 bg-orange-600 opacity-0"
+                  whileTap={{
+                    opacity: 0.15,
+                    transition: { duration: 0.1 }
+                  }}
+                ></motion.div>
+                
+                {/* Button content */}
+                <div className="relative flex items-center">
+                  {/* Fork and spoon icon */}
+                  <svg className="w-6 h-6 mr-3 text-red-600 group-hover:text-white transition-colors duration-300" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 5V19M7 5C7 3.89543 6.10457 3 5 3C3.89543 3 3 3.89543 3 5M7 5C7 3.89543 7.89543 3 9 3C10.1046 3 11 3.89543 11 5M3 5V9C3 11.1217 4.26522 13.1566 7 14M11 5V9C11 11.1217 9.73478 13.1566 7 14M21 3V11.2C21 12.8802 21 13.7202 20.673 14.362C20.3854 14.9265 19.9265 15.3854 19.362 15.673C18.7202 16 17.8802 16 16.2 16H15.5M14 21L17.5 16L14 11" 
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  
+                  {/* Text with transition */}
+                  <span className="font-bold text-lg text-red-600 group-hover:text-white transition-colors duration-300">
+                    Sign In to Admin
+                  </span>
+                </div>
               </motion.button>
             </motion.div>
           ) : (
-            // Login form
+            // Enhanced login form
             <motion.div 
               key="form"
-              className="bg-white rounded-lg shadow-xl overflow-hidden"
+              className="bg-white rounded-xl shadow-2xl overflow-hidden border border-orange-100"
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 100, 
+                damping: 15,
+                delay: 0.3
+              }}
+              style={{
+                backdropFilter: "blur(10px)",
+                boxShadow: "0 25px 50px -12px rgba(251, 113, 32, 0.15), 0 0 0 1px rgba(251, 113, 32, 0.05)"
+              }}
             >
+              {/* Header with glass morphism effect */}
+              <div className="relative bg-gradient-to-r from-red-600 to-orange-500 px-6 py-5 overflow-hidden">
+                {/* Animated spice illustrations */}
+                <motion.div 
+                  className="absolute top-2 right-5 w-8 h-8 rounded-full bg-white/10"
+                  animate={{ 
+                    y: ["-5px", "5px"],
+                    opacity: [0.5, 0.7]
+                  }}
+                  transition={{ 
+                    duration: 3,
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    ease: "easeInOut"
+                  }}
+                ></motion.div>
+                <motion.div 
+                  className="absolute bottom-2 left-10 w-6 h-6 rounded-full bg-white/10"
+                  animate={{ 
+                    y: ["3px", "-3px"],
+                    opacity: [0.5, 0.7]
+                  }}
+                  transition={{ 
+                    duration: 2.5,
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    ease: "easeInOut"
+                  }}
+                ></motion.div>
+                
+                <h2 className="text-2xl font-bold text-white flex items-center justify-center">
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                    className="flex items-center"
+                  >
+                    <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Admin Dashboard
+                  </motion.span>
+                </h2>
+              </div>
+              
               <div className="p-8">
                 <motion.div 
                   className="flex justify-center mb-6"
-                  initial={{ y: -100, opacity: 0 }}
+                  initial={{ y: -50, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  transition={{ duration: 0.5 }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 200, 
+                    damping: 20,
+                    delay: 0.5
+                  }}
                 >
-                  <img 
-                    src="/images/m_logo.png" 
-                    alt="Masala Madness Logo" 
-                    className="w-24 h-24 object-contain"
-                  />
+                  <div className="relative">
+                    <motion.div 
+                      className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-full opacity-75 blur-sm"
+                      animate={{ 
+                        rotate: [0, 360],
+                        scale: [1, 1.05, 1],
+                      }}
+                      transition={{ 
+                        rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+                        scale: { duration: 3, repeat: Infinity, ease: "easeInOut" }
+                      }}
+                    ></motion.div>
+                    <div className="relative bg-white p-1 rounded-full">
+                      <img 
+                        src="/images/m_logo.png" 
+                        alt="Masala Madness Logo" 
+                        className="w-24 h-24 object-contain rounded-full"
+                        style={{ filter: "drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15))" }}
+                      />
+                    </div>
+                  </div>
                 </motion.div>
                 
-                <div className="text-center mb-6">
-                  <h1 className="text-2xl font-extrabold text-gray-900">Masala Madness</h1>
-                  <h2 className="mt-1 text-lg font-semibold text-gray-700">Admin Login</h2>
+                <div className="text-center mb-8">
+                  <motion.h1 
+                    className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-500"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    Masala Madness
+                  </motion.h1>
+                  <motion.h2 
+                    className="mt-1 text-lg font-medium text-gray-700"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    Admin Access Portal
+                  </motion.h2>
                 </div>
                 
                 {error && (
                   <motion.div 
-                    className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" 
+                    className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg" 
                     role="alert"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: "spring", stiffness: 100 }}
                   >
-                    <span className="block sm:inline">{error}</span>
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-red-700">{error}</p>
+                      </div>
+                    </div>
                   </motion.div>
                 )}
                 
-                <form className="space-y-6" onSubmit={handleSubmit}>
+                <form className="space-y-6" onSubmit={handleSubmit} autoComplete="off">
                   <motion.div 
                     className="space-y-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
+                    transition={{ delay: 0.7 }}
                   >
                     <div>
                       <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                      <input
-                        id="username"
-                        name="username"
-                        type="text"
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                        placeholder="Enter your username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        disabled={isLoading}
-                      />
+                      <div className="relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg className="h-5 w-5 text-orange-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <input
+                          id="username"
+                          name="username"
+                          type="text"
+                          required
+                          className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
+                          placeholder="Enter your username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck="false"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                      <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                      />
+                      <div className="relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg className="h-5 w-5 text-orange-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <input
+                          id="password"
+                          name="password"
+                          type="password"
+                          required
+                          className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
+                          placeholder="Enter your password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          disabled={isLoading}
+                          autoComplete="new-password"
+                        />
+                      </div>
                     </div>
                   </motion.div>
                   
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.9 }}
+                    className="space-y-3"
                   >
                     <button
                       type="submit"
-                      className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${
+                      className={`relative w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-300 ${
                         isLoading ? 'opacity-70 cursor-not-allowed' : ''
-                      }`}
+                      } overflow-hidden group`}
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Signing in...' : 'Sign in'}
+                      {/* Button shine effect */}
+                      <span className="absolute inset-0 overflow-hidden rounded-lg">
+                        <motion.span
+                          className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white to-transparent opacity-0 transform -skew-x-12"
+                          animate={isLoading ? {} : {
+                            x: ["-100%", "100%"],
+                            opacity: [0, 0.3, 0]
+                          }}
+                          transition={{
+                            duration: 1.5,
+                            repeat: Infinity,
+                            repeatDelay: 3,
+                          }}
+                        />
+                      </span>
+                      
+                      {/* Button content */}
+                      <span className="relative flex items-center">
+                        {isLoading ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Signing in...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5 mr-2 transform group-hover:scale-110 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                            </svg>
+                            <span>Sign in to Dashboard</span>
+                          </>
+                        )}
+                      </span>
                     </button>
                     
                     <button
                       type="button"
-                      className="mt-3 w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                      className="w-full flex justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200"
                       onClick={() => setShowForm(false)}
                     >
-                      Go Back
+                      <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                      </svg>
+                      Return
                     </button>
                   </motion.div>
                 </form>
                 
                 {showRecovery && (
                   <motion.div 
-                    className="mt-6 bg-blue-50 border border-blue-300 text-blue-800 px-4 py-3 rounded"
+                    className="mt-8 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
+                    transition={{ delay: 0.3, type: "spring", stiffness: 100 }}
                   >
-                    <h3 className="font-semibold text-blue-900 mb-2">Account Recovery Instructions</h3>
-                    <ul className="list-disc pl-5 text-sm space-y-1">
-                      <li>The admin collection might have been deleted.</li>
-                      <li>Run the admin recovery script on the server:</li>
-                      <li><code className="bg-blue-100 px-1 py-0.5 rounded">cd backend && node scripts/reset-admin-password.js</code></li>
-                      <li>This will recreate the admin account with default credentials.</li>
-                      <li>Default username: <strong>admin</strong></li>
-                      <li>Default password: <strong>MasalaMadness2024!</strong></li>
-                    </ul>
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-blue-800">Account Recovery Instructions</h3>
+                        <div className="mt-2 text-sm text-blue-700 space-y-1">
+                          <p>The admin collection might have been deleted. Run the admin recovery script:</p>
+                          <p className="bg-blue-100/50 p-2 rounded font-mono text-xs mt-1 border border-blue-200">
+                            cd backend && node scripts/reset-admin-password.js
+                          </p>
+                          <p className="mt-1">Default username: <span className="font-semibold">admin</span></p>
+                          <p>Default password: <span className="font-semibold">MasalaMadness2024!</span></p>
+                        </div>
+                      </div>
+                    </div>
                   </motion.div>
                 )}
               </div>

@@ -12,12 +12,12 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess }) => {
   // Get the username when component mounts
   useEffect(() => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (user && user.username) {
         setUsername(user.username);
       }
     } catch (error) {
-      console.error('Error getting username from local storage:', error);
+      console.error('Error getting username from session storage:', error);
     }
   }, []);
   
@@ -34,7 +34,7 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess }) => {
     
     try {
       // Use fetch directly instead of api utility to avoid automatic redirect on 401
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/auth/verify-password`, {
         method: 'POST',
         headers: {

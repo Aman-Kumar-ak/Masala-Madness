@@ -1,5 +1,5 @@
 import React from 'react';
-import { Route, Routes } from 'react-router-dom';  // Import Route and Routes for routing
+import { Route, Routes, Navigate } from 'react-router-dom';  // Import Navigate for redirects
 import Home from './pages/Home';  // Import your Home component
 import Cart from './pages/Cart';  // Import Cart component (add other pages similarly)
 import Admin from './pages/Admin';  // Import Admin page
@@ -9,8 +9,27 @@ import Qr from './pages/Qr';  // Import QR page
 import Login from './pages/Login';
 import Settings from './pages/Settings';  // Import Settings page
 import ProtectedRoute from './components/ProtectedRoute';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './components/NotificationContext';
+
+// Component to redirect based on authentication
+const RedirectBasedOnAuth = () => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    // Show loading state while checking authentication
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading Masala Madness...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return isAuthenticated ? <Navigate to="/home" /> : <Navigate to="/login" />;
+};
 
 const App = () => {
   return (
@@ -19,12 +38,23 @@ const App = () => {
         <div className="min-h-screen flex flex-col">
           <div className="flex-grow">
             <Routes>  {/* Routes for handling different paths */}
-              {/* Public Routes */}
-              <Route path="/" element={<Home />} />  {/* Home page */}
-              <Route path="/cart" element={<Cart />} />  {/* Cart page */}
+              {/* Root Route - Redirects based on auth state */}
+              <Route path="/" element={<RedirectBasedOnAuth />} />
+              
+              {/* Auth Routes */}
               <Route path="/login" element={<Login />} />
               
               {/* Protected Routes */}
+              <Route path="/home" element={
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
+              } />
+              <Route path="/cart" element={
+                <ProtectedRoute>
+                  <Cart />
+                </ProtectedRoute>
+              } />
               <Route path="/admin" element={
                 <ProtectedRoute>
                   <Admin />
@@ -50,6 +80,9 @@ const App = () => {
                   <Settings />
                 </ProtectedRoute>
               } />
+              
+              {/* Catch-all redirect to root */}
+              <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </div>
         </div>

@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import BackButton from '../components/BackButton';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import { useNotification } from '../components/NotificationContext';
 import api from '../utils/api';
 
 const Settings = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess } = useNotification();
   
   // State for password change
   const [currentPassword, setCurrentPassword] = useState('');
@@ -41,7 +43,7 @@ const Settings = () => {
     
     try {
       // Use fetch directly instead of api utility to avoid automatic redirect on 401
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch('http://localhost:5000/api/auth/verify-password', {
         method: 'POST',
         headers: {
@@ -95,7 +97,7 @@ const Settings = () => {
     
     try {
       // Use fetch directly instead of api utility to avoid automatic redirect on 401
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch('http://localhost:5000/api/auth/change-password', {
         method: 'POST',
         headers: {
@@ -144,8 +146,14 @@ const Settings = () => {
   };
   
   const confirmLogout = () => {
-    logout();
-    setShowLogoutConfirm(false);
+    // Display logout notification first
+    showSuccess('Logging out successfully...', 3000);
+    
+    // Short delay before actual logout to allow notification to be seen
+    setTimeout(() => {
+      logout();
+      setShowLogoutConfirm(false);
+    }, 1000);
   };
   
   return (

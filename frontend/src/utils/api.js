@@ -1,8 +1,8 @@
 // src/utils/api.js
 const API_BASE_URL = "http://localhost:5000/api"; // Backend base URL
 
-// Get auth token from localStorage
-const getToken = () => localStorage.getItem('token');
+// Get auth token from sessionStorage
+const getToken = () => sessionStorage.getItem('token');
 
 // Common options for fetch requests
 const getHeaders = (includeAuth = true) => {
@@ -93,7 +93,8 @@ async function handleResponse(response) {
   if (!response.ok) {
     // If unauthorized, redirect to login
     if (response.status === 401) {
-      localStorage.removeItem('token'); // Clear invalid token
+      sessionStorage.removeItem('token'); // Clear invalid token
+      sessionStorage.removeItem('user'); // Clear user data
       window.location.href = '/login'; // Redirect to login
     }
     
