@@ -114,50 +114,59 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm shadow-md sticky top-0 z-50 border-b border-gray-200">
+      <header className="bg-white shadow-md sticky top-0 z-50 border-b border-orange-200">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center py-3">
             {/* Logo and Title */}
             <div className="flex items-center space-x-2">
-              <img 
-                src="/images/m_logo.png" 
-                alt="Masala Madness Logo" 
-                className="w-10 h-10 object-contain"
-              />
-              <h1 className="text-2xl font-bold text-gray-800/95">Masala Madness</h1>
+              <div className="w-11 h-11 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full p-0.5 shadow-sm flex items-center justify-center">
+                <img 
+                  src="/images/m_logo.png" 
+                  alt="Masala Madness Logo" 
+                  className="w-9 h-9 object-contain"
+                />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800 bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent">Masala Madness</h1>
+                <p className="text-xs text-gray-500 -mt-1">Authentic Indian Cuisine</p>
+              </div>
             </div>
 
             {/* Navigation */}
-            <nav className="flex items-center space-x-5">
+            <nav className="flex items-center gap-5">
               <Link
                 to="/cart"
-                className="p-0 m-0 flex items-center justify-center text-sm md:text-base font-semibold shadow-none relative bg-transparent hover:bg-transparent"
+                className="p-0 m-0 flex items-center justify-center relative bg-transparent hover:bg-transparent group"
                 aria-label={`Cart with ${cartItems.reduce((total, item) => total + item.quantity, 0)} items`}
               >
-                <img
-                  src="/images/receipt.png"
-                  alt="Cart"
-                  className="w-15 h-12 md:w-10 md:h-10 object-contain"
-                />
+                <div className="w-11 h-11 bg-orange-100 rounded-full flex items-center justify-center transition-all duration-200 group-hover:bg-orange-200">
+                  <img
+                    src="/images/receipt.png"
+                    alt="Cart"
+                    className="w-7 h-7 object-contain"
+                  />
+                </div>
                 {cartItems.reduce((total, item) => total + item.quantity, 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-white text-yellow-700 px-2.5 py-0.5 rounded-full text-xs md:text-sm font-bold flex-shrink-0 min-w-[1.25rem] h-5 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-yellow-500 transition-colors duration-300">
-                    <span>{cartItems.reduce((total, item) => total + item.quantity, 0)}</span>
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold min-w-[1.25rem] h-5 flex items-center justify-center shadow-sm">
+                    {cartItems.reduce((total, item) => total + item.quantity, 0)}
                   </span>
                 )}
               </Link>
 
               <Link
                 to="/pending-orders"
-                className="p-0 m-0 flex items-center justify-center text-sm md:text-base font-semibold shadow-none relative bg-transparent hover:bg-transparent"
+                className="p-0 m-0 flex items-center justify-center relative bg-transparent hover:bg-transparent group"
                 aria-label={`Pending Orders: ${pendingOrdersCount}`}
               >
-                <img
-                  src="/images/order.png"
-                  alt="Pending Orders"
-                  className="w-15 h-12 md:w-10 md:h-11 object-contain"
-                />
+                <div className="w-11 h-11 bg-blue-100 rounded-full flex items-center justify-center transition-all duration-200 group-hover:bg-blue-200">
+                  <img
+                    src="/images/order.png"
+                    alt="Pending Orders"
+                    className="w-7 h-7 object-contain"
+                  />
+                </div>
                 {pendingOrdersCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-white text-yellow-700 px-2.5 py-0.5 rounded-full text-xs md:text-sm font-bold flex-shrink-0 min-w-[1.25rem] h-5 text-center leading-none flex items-center justify-center shadow-md ring-1 ring-yellow-500 transition-colors duration-300">
+                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white px-2 py-0.5 rounded-full text-xs font-bold min-w-[1.25rem] h-5 flex items-center justify-center shadow-sm">
                     {pendingOrdersCount}
                   </span>
                 )}
@@ -167,22 +176,26 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Date and Stats Banner */}
-      <div className="bg-white shadow-md mt-4 py-4">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            {/* Date and Refresh Button */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center space-x-2">
-                <span className="text-2xl">📅</span>
-                <p className="text-lg font-medium text-gray-700">
+      {/* Date Banner */}
+      <div className="bg-white shadow-sm rounded-lg mx-4 mt-4 overflow-hidden">
+        <div className="container mx-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-blue-50">
+            <div className="flex-1 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-2xl shadow-sm">
+                📅
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-gray-800">
                   {getCurrentDate()}
                 </p>
               </div>
+            </div>
+
+            <div className="flex items-center gap-3">
               <button
                 onClick={fetchStats}
                 disabled={loading}
-                className={`p-2 rounded-full ${loading ? 'bg-gray-300' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-colors duration-200`}
+                className={`w-10 h-10 rounded-full ${loading ? 'bg-gray-300' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-colors duration-200 flex items-center justify-center shadow-sm`}
                 title="Refresh Stats"
               >
                 <svg
@@ -199,125 +212,144 @@ export default function Home() {
                   />
                 </svg>
               </button>
-              {/* Admin Panel Button moved here */}
               <Link
                 to="/admin"
-                className="bg-yellow-400 hover:bg-yellow-500 text-white p-2 rounded-full transition-colors duration-300 flex items-center justify-center md:space-x-1 md:text-base font-semibold md:shadow-none shadow-none"
+                className="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white px-4 py-2 rounded-full transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-yellow-300 focus:outline-none"
                 aria-label="Admin Panel"
               >
                 <img
                   src="/images/admin.png"
                   alt="Admin"
-                  className="w-6 h-6 md:w-5 md:h-5 object-contain md:mr-1"
+                  className="w-5 h-5 object-contain"
                 />
-                <span className="hidden md:inline">Admin Panel</span>
+                <span className="font-medium">Admin Panel</span>
               </Link>
             </div>
-            
-            {/* Stats */}
-            <div className="flex items-center gap-6">
-              {/* Orders Count */}
-              <div className="flex items-center space-x-2">
-                <span className="text-2xl">📋</span>
-                <div>
-                  <p className="text-sm text-gray-600">Today's Orders</p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {stats.totalPaidOrders}
-                  </p>
-                </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Stats Banner */}
+      <div className="bg-white shadow-sm rounded-lg mx-4 mt-4 overflow-hidden">
+        <div className="container mx-auto">
+          <div className="grid grid-cols-3 gap-2 p-4 bg-gradient-to-r from-blue-50 to-purple-50">
+            {/* Orders Count - Now Clickable */}
+            <Link 
+              to="/orders" 
+              className="bg-white p-3 rounded-lg shadow-sm border border-blue-100 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-md hover:border-blue-300 group"
+            >
+              <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center text-2xl mb-2 group-hover:bg-blue-200 transition-colors duration-200">
+                📋
               </div>
+              <p className="text-sm text-gray-600 text-center">Orders</p>
+              <p className="text-xl font-bold text-blue-600">
+                {stats.totalPaidOrders}
+              </p>
+            </Link>
 
-              {/* Revenue */}
-              <div className="flex items-center space-x-2">
-                <span className="text-2xl">💰</span>
-                <div>
-                  <p className="text-sm text-gray-600">Today's Revenue</p>
-                  <p className="text-lg font-bold text-green-600">
-                    ₹{stats.totalRevenue.toLocaleString('en-IN')}
-                  </p>
-                </div>
+            {/* Revenue */}
+            <div className="bg-white p-3 rounded-lg shadow-sm border border-green-100 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-md">
+              <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center text-2xl mb-2">
+                💰
               </div>
+              <p className="text-sm text-gray-600 text-center">Revenue</p>
+              <p className="text-xl font-bold text-green-600">
+                ₹{stats.totalRevenue.toLocaleString('en-IN')}
+              </p>
+            </div>
 
-              {/* Average Order Value */}
-              <div className="flex items-center space-x-2">
-                <span className="text-2xl">📊</span>
-                <div>
-                  <p className="text-sm text-gray-600">Avg. Order</p>
-                  <p className="text-lg font-bold text-purple-600">
-                    ₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}
-                  </p>
-                </div>
+            {/* Average Order Value */}
+            <div className="bg-white p-3 rounded-lg shadow-sm border border-purple-100 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-md">
+              <div className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-2xl mb-2">
+                📊
               </div>
+              <p className="text-sm text-gray-600 text-center">Avg. Order</p>
+              <p className="text-xl font-bold text-purple-600">
+                ₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* New Compact Floating Cart with Light Theme */}
+      {/* Floating Cart */}
       {cartItems.length > 0 && (
         <div className="fixed bottom-4 right-4 left-4 z-50 flex justify-center">
-          <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-lg px-4 py-3 text-gray-800 border border-gray-200 flex items-center justify-between gap-3 max-w-md w-full">
+          <div className="bg-white shadow-lg rounded-full border border-orange-200 flex items-center justify-between gap-3 max-w-md w-full overflow-hidden">
             {/* Cart Info */}
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-xl flex-shrink-0">🛒</span>
+            <div className="flex items-center gap-3 flex-1 min-w-0 pl-4 py-3">
+              <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center text-xl">
+                🛒
+              </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center space-x-1 overflow-hidden">
                   {discountAmount > 0 ? (
                     <div className="flex items-baseline gap-2 text-base overflow-hidden">
                       <div className="flex items-center gap-1">
-                        <span className="font-bold text-base flex-shrink-0">₹{totalAmount}</span>
-                        <span className="text-green-600 font-medium text-sm flex-shrink-0">(-{activeDiscount.percentage}%)</span>
+                        <span className="font-bold text-base text-green-600">₹{totalAmount}</span>
+                        <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-xs font-medium">
+                          {activeDiscount.percentage}% off
+                        </span>
                       </div>
-                      <span className="text-gray-400 text-sm line-through flex-shrink-0">₹{subtotal}</span>
+                      <span className="text-gray-400 text-sm line-through flex-shrink-0 hidden sm:inline">₹{subtotal}</span>
                     </div>
                   ) : (
-                    <span className="font-bold text-base flex-shrink-0">₹{totalAmount}</span>
+                    <span className="font-bold text-base text-gray-800">₹{totalAmount}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
+                  <span className="text-sm text-gray-500 whitespace-nowrap">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
                   {activeDiscount && subtotal < activeDiscount.minOrderAmount && (
-                    <span className="text-xs text-orange-600 whitespace-nowrap">
-                      (₹{activeDiscount.minOrderAmount - subtotal} for {activeDiscount.percentage}% off)
+                    <span className="text-xs text-orange-600 whitespace-nowrap overflow-hidden text-ellipsis">
+                      ₹{activeDiscount.minOrderAmount - subtotal} more for {activeDiscount.percentage}% off
                     </span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Link
-                to="/cart"
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full transition-colors duration-200 text-sm font-medium flex items-center gap-2 whitespace-nowrap"
-              >
-                <span className="hidden sm:inline">View Cart</span>
-                <span className="sm:hidden">Cart</span>
-                <span className="bg-orange-600 text-white px-2 py-0.5 rounded-full text-xs">
-                  {cartItems.length}
-                </span>
-              </Link>
-            </div>
+            {/* View Cart Button */}
+            <Link
+              to="/cart"
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white h-full px-4 py-3 flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-200 font-medium"
+            >
+              <span>Cart</span>
+              <span className="bg-orange-700/30 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                {cartItems.length}
+              </span>
+            </Link>
           </div>
         </div>
       )}
 
-      {/* Clear Cart Button - Moved before Menu Component */}
+      {/* Clear Cart Button */}
       {cartItems.length > 0 && (
-        <div className="container mx-auto px-4 mt-4">
+        <div className="container mx-auto px-4 mt-4 flex justify-center">
           <button
             onClick={clearCart}
-            className="w-full md:w-auto bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full transition-colors duration-200 flex items-center justify-center space-x-2 mx-auto"
+            className="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-500 font-medium px-6 py-2 rounded-full border border-red-200 transition-all duration-200 shadow-sm hover:shadow"
           >
-            <span>🗑️</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
             <span>Clear Cart</span>
           </button>
         </div>
       )}
 
-      {/* Menu Component with smaller bottom padding */}
-      <div className="container mx-auto px-4 py-8 pb-24">
-        <Menu />
+      {/* Menu Section */}
+      <div className="container mx-auto px-4 py-8 pb-28">
+        <div className="bg-white rounded-lg shadow-sm border border-orange-100 overflow-hidden">
+          <div className="bg-gradient-to-r from-orange-100 to-orange-50 p-3 border-b border-orange-200">
+            <h2 className="text-xl font-bold text-orange-700 flex items-center gap-2">
+              <span className="text-2xl">🍽️</span>
+              <span>Our Menu</span>
+            </h2>
+          </div>
+          <div className="p-4">
+            <Menu />
+          </div>
+        </div>
       </div>
     </div>
   );
