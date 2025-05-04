@@ -12,7 +12,6 @@ export default function Qr() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [upiLink, setUpiLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showRawLink, setShowRawLink] = useState(false);
   
   // For stored UPI addresses
   const [savedUpiAddresses, setSavedUpiAddresses] = useState([]);
@@ -27,8 +26,7 @@ export default function Qr() {
   });
   
   const qrRef = useRef(null);
-  const upiLinkRef = useRef(null);
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, showInfo } = useNotification();
 
   // Load saved UPI ID from localStorage on component mount
   useEffect(() => {
@@ -218,7 +216,6 @@ export default function Qr() {
       // Clear the QR code and related states
       setQrCodeUrl("");
       setUpiLink("");
-      setShowRawLink(false);
     }
     
     setCurrentUpiAddress(address);
@@ -228,6 +225,10 @@ export default function Qr() {
 
   // Start editing a UPI address
   const startEditingUpiAddress = (address) => {
+    // Clear any existing QR code when editing
+    setQrCodeUrl("");
+    setUpiLink("");
+    
     setNewUpiAddress({
       name: address.name,
       upiId: address.upiId,
@@ -235,6 +236,7 @@ export default function Qr() {
       isDefault: address.isDefault
     });
     setIsEditingUpi(true);
+    setIsAddingUpi(false);
   };
 
   // Function to generate QR code
@@ -298,14 +300,6 @@ export default function Qr() {
     // Not implementing actual copy functionality since we're dealing with an image
     showSuccess("QR code ready for sharing");
   };
-  
-  const copyUpiLink = () => {
-    if (upiLinkRef.current) {
-      upiLinkRef.current.select();
-      document.execCommand('copy');
-      showSuccess("UPI link copied to clipboard");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
@@ -319,10 +313,49 @@ export default function Qr() {
           </div>
 
           <div className="p-6">
-            {/* Saved UPI Addresses */}
+            {/* Mode switch buttons */}
+            <div className="mb-6 flex justify-center">
+              <div className="inline-flex bg-gray-100 p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingUpi(false);
+                    setIsEditingUpi(false);
+                  }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                    !isAddingUpi && !isEditingUpi
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Generate QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isAddingUpi && !isEditingUpi) {
+                      setIsAddingUpi(true);
+                      setQrCodeUrl("");
+                      setUpiLink("");
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                    isAddingUpi || isEditingUpi
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Manage UPI
+                </button>
+              </div>
+            </div>
+
+            {/* Saved UPI Addresses - Show in both modes but style differently */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-800">Saved UPI Addresses</h2>
+                <h2 className="text-lg font-semibold text-gray-800">
+                  {isAddingUpi || isEditingUpi ? 'Manage UPI Addresses' : 'Saved UPI Addresses'}
+                </h2>
                 <button
                   onClick={() => {
                     setIsAddingUpi(true);
@@ -335,6 +368,7 @@ export default function Qr() {
                     });
                   }}
                   className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                  disabled={isEditingUpi} // Disable when editing
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -343,6 +377,7 @@ export default function Qr() {
                 </button>
               </div>
 
+              {/* Helper text for different modes */}
               {savedUpiAddresses.length === 0 ? (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-500">
                   No saved UPI addresses. Add one to get started.
@@ -353,18 +388,32 @@ export default function Qr() {
                     <div 
                       key={address._id}
                       className={`border rounded-lg p-3 ${
-                        currentUpiAddress && currentUpiAddress._id === address._id
+                        isEditingUpi && newUpiAddress.upiId === address.upiId
+                          ? 'bg-yellow-50 border-yellow-300'
+                        : currentUpiAddress && currentUpiAddress._id === address._id
                           ? qrCodeUrl 
                             ? 'bg-green-50 border-green-300' 
                             : 'bg-blue-50 border-blue-300'
                           : 'bg-white border-gray-200 hover:bg-gray-50'
-                      } transition-colors duration-200`}
+                      } transition-colors duration-200 cursor-pointer`}
+                      onClick={() => {
+                        // Different behavior based on mode
+                        if (isAddingUpi || isEditingUpi) {
+                          // In UPI management mode - fill the form with this UPI's details
+                          startEditingUpiAddress(address);
+                        } else {
+                          // In QR generation mode - select this UPI for the QR code
+                          selectUpiAddress(address);
+                        }
+                      }}
                     >
                       <div className="flex justify-between">
                         <div className="flex items-start gap-2">
                           <div 
                             className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                              currentUpiAddress && currentUpiAddress._id === address._id
+                              isEditingUpi && newUpiAddress.upiId === address.upiId
+                                ? 'bg-yellow-100 text-yellow-600'
+                              : currentUpiAddress && currentUpiAddress._id === address._id
                                 ? qrCodeUrl 
                                   ? 'bg-green-100 text-green-600' 
                                   : 'bg-blue-100 text-blue-600'
@@ -373,7 +422,11 @@ export default function Qr() {
                                   : 'bg-gray-100 text-gray-600'
                             }`}
                           >
-                            {currentUpiAddress && currentUpiAddress._id === address._id ? (
+                            {isEditingUpi && newUpiAddress.upiId === address.upiId ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            ) : currentUpiAddress && currentUpiAddress._id === address._id ? (
                               qrCodeUrl ? (
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -396,7 +449,11 @@ export default function Qr() {
                           <div>
                             <div className="font-medium text-gray-800">
                               {address.name}
-                              {currentUpiAddress && currentUpiAddress._id === address._id && (
+                              {isEditingUpi && newUpiAddress.upiId === address.upiId ? (
+                                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                                  Editing
+                                </span>
+                              ) : currentUpiAddress && currentUpiAddress._id === address._id && (
                                 <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${qrCodeUrl ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                                   {qrCodeUrl ? 'QR Active' : 'Selected'}
                                 </span>
@@ -410,24 +467,12 @@ export default function Qr() {
                         </div>
                         
                         <div className="flex gap-1">
-                          <button
-                            onClick={() => selectUpiAddress(address)}
-                            className={`p-1.5 ${
-                              currentUpiAddress && currentUpiAddress._id === address._id 
-                                ? qrCodeUrl 
-                                  ? 'text-green-600 hover:bg-green-50' 
-                                  : 'text-blue-600 hover:bg-blue-50' 
-                                : 'text-blue-600 hover:bg-blue-50'
-                            } rounded`}
-                            title={currentUpiAddress && currentUpiAddress._id === address._id ? "Already selected" : "Use this UPI"}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </button>
                           {!address.isDefault && (
                             <button
-                              onClick={() => setDefaultUpiAddress(address._id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDefaultUpiAddress(address._id);
+                              }}
                               className="p-1.5 text-green-600 hover:bg-green-50 rounded"
                               title="Set as default"
                             >
@@ -437,7 +482,10 @@ export default function Qr() {
                             </button>
                           )}
                           <button
-                            onClick={() => startEditingUpiAddress(address)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingUpiAddress(address);
+                            }}
                             className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
                             title="Edit"
                           >
@@ -446,7 +494,10 @@ export default function Qr() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => deleteUpiAddress(address._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteUpiAddress(address._id);
+                            }}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded"
                             title="Delete"
                           >
@@ -465,9 +516,26 @@ export default function Qr() {
             {/* Form to Add/Edit UPI Address */}
             {(isAddingUpi || isEditingUpi) && (
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                  {isEditingUpi ? 'Edit UPI Address' : 'Add New UPI Address'}
-                </h3>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    {isEditingUpi ? 
+                      `Edit "${newUpiAddress.name}" UPI` : 
+                      'Add New UPI Address'
+                    }
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setIsAddingUpi(false);
+                      setIsEditingUpi(false);
+                    }}
+                    className="text-gray-500 hover:text-gray-700 p-1"
+                    title="Close"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -538,7 +606,7 @@ export default function Qr() {
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          <span>{isEditingUpi ? 'Update' : 'Save'}</span>
+                          <span>{isEditingUpi ? 'Update UPI' : 'Save New UPI'}</span>
                         </>
                       )}
                     </button>
@@ -557,77 +625,154 @@ export default function Qr() {
               </div>
             )}
 
-            {/* QR Code Generator Form */}
-            <form onSubmit={generateQRCode} className="mb-6 space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">Generate QR Code</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* QR Code Generator Form - only show when not editing/adding UPI */}
+            {!isAddingUpi && !isEditingUpi && (
+              <form onSubmit={generateQRCode} className="mb-6 space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-lg font-semibold text-gray-800">Generate QR Code</h3>
+                  {qrCodeUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQrCodeUrl("");
+                        setUpiLink("");
+                        showInfo("QR code cleared");
+                      }}
+                      className="text-gray-500 hover:text-red-500 flex items-center text-sm"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Clear QR
+                    </button>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="upiId" className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+                      <span>UPI ID <span className="text-red-500">*</span></span>
+                      {currentUpiAddress && (
+                        <span className="text-xs text-blue-600 flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Using saved UPI
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        id="upiId"
+                        value={upiId}
+                        onChange={(e) => {
+                          // Only allow changes if no UPI address is selected
+                          if (!currentUpiAddress) {
+                            setUpiId(e.target.value);
+                          }
+                        }}
+                        placeholder={currentUpiAddress ? "UPI address selected" : "yourname@upi"}
+                        className={`w-full p-3 border ${
+                          currentUpiAddress 
+                            ? "bg-gray-50 border-gray-300 cursor-not-allowed" 
+                            : "bg-white border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        } rounded-lg`}
+                        required
+                        readOnly={!!currentUpiAddress}
+                      />
+                      {currentUpiAddress && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentUpiAddress(null);
+                              setUpiId("");
+                            }}
+                            className="text-gray-500 hover:text-red-500 p-1 rounded-full hover:bg-gray-100"
+                            title="Clear selection"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Clear QR code and transition to edit mode
+                              setQrCodeUrl("");
+                              setUpiLink("");
+                              startEditingUpiAddress(currentUpiAddress);
+                            }}
+                            className="text-gray-500 hover:text-blue-500 p-1 rounded-full hover:bg-gray-100"
+                            title="Edit this UPI address"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {!currentUpiAddress && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Enter a UPI ID or select from saved addresses above
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
+                      Amount (₹) <span className="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="amount"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="Enter amount"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label htmlFor="upiId" className="block text-sm font-medium text-gray-700 mb-1">
-                    UPI ID <span className="text-red-500">*</span>
+                  <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-1">
+                    Payment Note
                   </label>
                   <input
                     type="text"
-                    id="upiId"
-                    value={upiId}
-                    onChange={(e) => setUpiId(e.target.value)}
-                    placeholder="yourname@upi"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
-                    Amount (₹) <span className="text-gray-500 text-xs">(Optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    id="amount"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="Enter amount"
+                    id="note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Payment note"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment Note
-                </label>
-                <input
-                  type="text"
-                  id="note"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Payment note"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Generate QR Code</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
 
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span>Generate QR Code</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* QR Code Display */}
-            {qrCodeUrl && (
+            {/* QR Code Display - only show when not editing/adding UPI */}
+            {qrCodeUrl && !isAddingUpi && !isEditingUpi && (
               <div className="flex flex-col items-center border-t border-gray-200 pt-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Your UPI QR Code</h2>
                 <div 
@@ -645,42 +790,30 @@ export default function Qr() {
                     }}
                   />
                 </div>
-                <p className="text-sm text-gray-600 mb-4 text-center">
-                  Scan this QR code with any UPI app (GPay, PhonePe, Paytm, etc.) to make a payment
-                </p>
-                
-                {/* UPI Link Section */}
-                {upiLink && (
-                  <div className="w-full mb-4">
-                    <button 
-                      onClick={() => setShowRawLink(!showRawLink)}
-                      className="text-blue-600 text-sm mb-2 flex items-center gap-1 mx-auto"
-                    >
-                      {showRawLink ? 'Hide UPI Link' : 'Show UPI Link'} 
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showRawLink ? "M19 9l-7 7-7-7" : "M9 5l7 7-7 7"} />
-                      </svg>
-                    </button>
-                    
-                    {showRawLink && (
-                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 flex items-center">
-                        <input
-                          ref={upiLinkRef}
-                          type="text"
-                          value={upiLink}
-                          readOnly
-                          className="w-full text-sm bg-transparent border-none focus:ring-0 text-gray-600"
-                        />
-                        <button
-                          onClick={copyUpiLink}
-                          className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded-lg border border-blue-200"
-                        >
-                          Copy
-                        </button>
+
+                {/* UPI Payment Information */}
+                <div className="w-full text-center mb-4">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 inline-block">
+                    <p className="text-sm text-gray-600">Paying to:</p>
+                    <p className="font-medium text-gray-800 text-lg">{upiId}</p>
+                    {currentUpiAddress && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {currentUpiAddress.name}
+                        {currentUpiAddress.description && ` • ${currentUpiAddress.description}`}
+                      </p>
+                    )}
+                    {amount && Number(amount) > 0 && (
+                      <div className="mt-2 pt-2 border-t border-yellow-200">
+                        <p className="text-sm text-gray-600">Amount:</p>
+                        <p className="font-medium text-green-600 text-lg">₹{Number(amount).toLocaleString('en-IN')}</p>
                       </div>
                     )}
                   </div>
-                )}
+                </div>
+                
+                <p className="text-sm text-gray-600 mb-4 text-center">
+                  Scan this QR code with any UPI app (GPay, PhonePe, Paytm, etc.) to make a payment
+                </p>
                 
                 <div className="flex flex-wrap gap-3 justify-center">
                   <button
