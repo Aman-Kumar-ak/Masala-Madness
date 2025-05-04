@@ -218,7 +218,7 @@ Order Number is reset on the basis of UTC timinig.
 
 ## Things to do now
 
-Testing
+1. Work on Authentication - Login Page 
 
 ## Future Features
 

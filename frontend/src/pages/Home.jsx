@@ -202,10 +202,14 @@ export default function Home() {
               {/* Admin Panel Button moved here */}
               <Link
                 to="/admin"
-                className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transition-colors duration-300 flex items-center justify-center md:space-x-2 md:text-base font-semibold md:shadow-none shadow-none"
+                className="bg-yellow-400 hover:bg-yellow-500 text-white p-2 rounded-full transition-colors duration-300 flex items-center justify-center md:space-x-1 md:text-base font-semibold md:shadow-none shadow-none"
                 aria-label="Admin Panel"
               >
-                <span className="md:hidden text-lg">👨‍💼</span>
+                <img
+                  src="/images/admin.png"
+                  alt="Admin"
+                  className="w-6 h-6 md:w-5 md:h-5 object-contain md:mr-1"
+                />
                 <span className="hidden md:inline">Admin Panel</span>
               </Link>
             </div>
