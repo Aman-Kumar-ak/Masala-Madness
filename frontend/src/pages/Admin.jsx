@@ -4,6 +4,7 @@ import MenuManager from "../components/MenuManager";
 import { fetchCategories } from "../utils/fetchCategories";
 import BackButton from "../components/BackButton";
 import Notification from "../components/Notification";
+import ConfirmationDialog from "../components/ConfirmationDialog";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -18,6 +19,7 @@ const Admin = () => {
     isActive: true
   });
   const [notification, setNotification] = useState(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   const loadCategories = async () => {
     try {
@@ -80,29 +82,33 @@ const Admin = () => {
     }
   };
 
-  const handleRemoveDiscount = async () => {
+  const handleRemoveDiscount = () => {
     if (!activeDiscount?._id) return;
+    setShowDeleteConfirmation(true);
+  };
 
-    if (window.confirm('Are you sure you want to remove this discount?')) {
-      try {
-        const response = await fetch(`${API_URL}/api/discounts/${activeDiscount._id}`, {
-          method: 'DELETE'
-        });
+  const confirmRemoveDiscount = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/discounts/${activeDiscount._id}`, {
+        method: 'DELETE'
+      });
 
-        if (!response.ok) {
-          throw new Error('Failed to delete discount');
-        }
-
-        // Clear the active discount from local state
-        setActiveDiscount(null);
-        setNotification({ message: "Discount removed successfully", type: "success" });
-
-        // Trigger a refresh of the active discount
-        loadActiveDiscount();
-      } catch (error) {
-        console.error('Error removing discount:', error);
-        setNotification({ message: "Failed to remove discount. Please try again.", type: "error" });
+      if (!response.ok) {
+        throw new Error('Failed to delete discount');
       }
+
+      // Clear the active discount from local state
+      setActiveDiscount(null);
+      setNotification({ message: "Discount removed successfully", type: "success" });
+
+      // Trigger a refresh of the active discount
+      loadActiveDiscount();
+      
+    } catch (error) {
+      console.error('Error removing discount:', error);
+      setNotification({ message: "Failed to remove discount. Please try again.", type: "error" });
+    } finally {
+      setShowDeleteConfirmation(false);
     }
   };
 
@@ -113,7 +119,7 @@ const Admin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-orange-100">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
       <BackButton />
       <div className="p-4 pt-16">
         {notification && (
@@ -123,48 +129,54 @@ const Admin = () => {
             onClose={() => setNotification(null)}
           />
         )}
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h1 className="text-2xl font-bold mb-6 text-center">Admin Panel</h1>
-          <div className="space-y-4">
-            {/* Navigation Links */}
-            <div className="bg-orange-50 p-4 rounded-lg flex flex-wrap gap-4">
+        <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200">
+          <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">Admin Panel</h1>
+          <div className="space-y-6">
+            {/* Navigation Links - Larger buttons */}
+            <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-3 sm:p-5 rounded-lg border border-orange-200 shadow-sm text-center">
               <Link
                 to="/orders"
-                className="inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                className="inline-flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-blue-300 focus:outline-none whitespace-nowrap mr-6 sm:mr-8 min-w-[100px] sm:min-w-[120px]"
               >
-                View Orders
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>Orders</span>
               </Link>
               <button
                 onClick={() => setShowDiscountForm(!showDiscountForm)}
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                className={`inline-flex items-center justify-center ${showDiscountForm ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'} text-white px-3 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base sm:text-lg font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-green-300 focus:outline-none whitespace-nowrap min-w-[110px] sm:min-w-[130px]`}
               >
-                {showDiscountForm ? 'Cancel' : 'Add Discount'}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span>{showDiscountForm ? 'Cancel' : 'Discount'}</span>
               </button>
             </div>
 
             {/* Active Discount Display */}
             {activeDiscount && (
-              <div className="bg-orange-50 p-4 rounded-lg">
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-5 rounded-lg border border-yellow-200 shadow-sm">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">🏷️</span>
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl bg-yellow-100 h-10 w-10 rounded-full flex items-center justify-center shadow-sm">🏷️</div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-800">Active Discount</h3>
-                        <p className="text-gray-600">
-                          {activeDiscount.percentage}% off on orders above ₹{activeDiscount.minOrderAmount}
+                        <p className="text-gray-700">
+                          <span className="font-medium text-green-600">{activeDiscount.percentage}% off</span> on orders above <span className="font-medium">₹{activeDiscount.minOrderAmount}</span>
                         </p>
                       </div>
                     </div>
                   </div>
                   <button
                     onClick={handleRemoveDiscount}
-                    className="p-2 hover:bg-red-100 active:bg-red-100 rounded-full transition-colors duration-200 group focus:outline-none focus:ring-2 focus:ring-red-300"
+                    className="p-2.5 bg-red-50 hover:bg-red-100 active:bg-red-100 rounded-lg transition-colors duration-200 group focus:outline-none focus:ring-2 focus:ring-red-300 border border-red-200"
                     title="Remove Discount"
                   >
                     <svg 
                       xmlns="http://www.w3.org/2000/svg" 
-                      className="h-6 w-6 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
+                      className="h-5 w-5 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
                       fill="none" 
                       viewBox="0 0 24 24" 
                       stroke="currentColor"
@@ -183,11 +195,11 @@ const Admin = () => {
 
             {/* Discount Form */}
             {showDiscountForm && (
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h3 className="text-lg font-semibold mb-4">Add New Discount</h3>
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 p-5 rounded-lg border border-green-200 shadow-sm">
+                <h3 className="text-lg font-semibold mb-4 text-gray-800">Add New Discount</h3>
                 <form onSubmit={handleDiscountSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Discount Percentage
                     </label>
                     <input
@@ -200,12 +212,12 @@ const Admin = () => {
                         ...newDiscount,
                         percentage: e.target.value
                       })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"
+                      className="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-4 bg-white focus:ring-2 focus:ring-green-300 focus:border-green-300 transition-all duration-200"
                       placeholder="Enter percentage (0-100)"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Minimum Order Amount
                     </label>
                     <input
@@ -217,14 +229,17 @@ const Admin = () => {
                         ...newDiscount,
                         minOrderAmount: e.target.value
                       })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"
+                      className="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-4 bg-white focus:ring-2 focus:ring-green-300 focus:border-green-300 transition-all duration-200"
                       placeholder="Enter minimum amount"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600"
+                    className="w-full bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-lg font-medium transition-all duration-200 focus:ring-2 focus:ring-green-300 focus:outline-none shadow-sm flex items-center justify-center"
                   >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                     Save Discount
                   </button>
                 </form>
@@ -233,15 +248,30 @@ const Admin = () => {
 
             {/* Menu Manager */}
             {loading ? (
-              <div className="text-center py-4">Loading categories...</div>
+              <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading categories...</p>
+              </div>
             ) : (
-              <div className="bg-orange-50 p-4 rounded-lg">
+              <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-5 rounded-lg border border-blue-200 shadow-sm">
                 <MenuManager categories={categories} onUpdate={handleMenuUpdate} />
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Delete Discount Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(false)}
+        onConfirm={confirmRemoveDiscount}
+        title="Remove Discount"
+        message="Are you sure you want to remove the active discount? This action cannot be undone."
+        confirmText="Remove Discount"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };
