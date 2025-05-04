@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import Menu from "../components/Menu";
@@ -26,25 +26,45 @@ export default function PendingOrders() {
 
   const [notification, setNotification] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  
+  // Refs for scroll position
+  const scrollPositionRef = useRef(0);
+  const ordersContainerRef = useRef(null);
+
+  // Save the scroll position before updates
+  const saveScrollPosition = () => {
+    if (ordersContainerRef.current) {
+      scrollPositionRef.current = ordersContainerRef.current.scrollTop;
+    }
+  };
+
+  // Restore the scroll position after updates
+  const restoreScrollPosition = useCallback(() => {
+    if (ordersContainerRef.current && scrollPositionRef.current) {
+      ordersContainerRef.current.scrollTop = scrollPositionRef.current;
+    }
+  }, []);
 
   // Create a memoized fetchPendingOrders function that we can call from multiple places
   const fetchPendingOrders = useCallback(async () => {
-      try {
+    try {
       setLoading(true);
-        const response = await fetch(`${API_URL}/api/pending-orders`);
-        if (!response.ok) throw new Error('Failed to fetch pending orders');
-        const data = await response.json();
-        setPendingOrders(data);
-      } catch (error) {
-        console.error('Error fetching pending orders:', error);
+      const response = await fetch(`${API_URL}/api/pending-orders`);
+      if (!response.ok) throw new Error('Failed to fetch pending orders');
+      const data = await response.json();
+      setPendingOrders(data);
+    } catch (error) {
+      console.error('Error fetching pending orders:', error);
       setNotification({ 
         message: 'Failed to fetch pending orders. Please try again.', 
         type: 'error' 
       });
-      } finally {
-        setLoading(false);
-      }
-  }, []);
+    } finally {
+      setLoading(false);
+      // Restore scroll position after data loads
+      setTimeout(restoreScrollPosition, 0);
+    }
+  }, [restoreScrollPosition]);
 
   // Listen for socket events
   useEffect(() => {
@@ -56,7 +76,9 @@ export default function PendingOrders() {
           // Remove the order from pending orders if it was just confirmed
           setPendingOrders(prev => prev.filter(order => order.orderId !== data.pendingOrderId));
         } else {
-          // For other update types, refresh all data
+          // For other update types, save scroll position before refresh
+          saveScrollPosition();
+          // Then refresh all data
           fetchPendingOrders();
         }
       };
@@ -108,6 +130,7 @@ export default function PendingOrders() {
     const interval = setInterval(() => {
       if (!connected) {
         console.log("Socket not connected, using interval-based refresh");
+        saveScrollPosition(); // Save position before refresh
         fetchPendingOrders();
       }
     }, 10000); // Refresh every 10 seconds if socket not connected
@@ -196,6 +219,9 @@ export default function PendingOrders() {
   };
 
   const handleQuantityChange = async (orderId, itemIndex, delta) => {
+    // Save scroll position before update
+    saveScrollPosition();
+    
     try {
       const response = await fetch(`${API_URL}/api/pending-orders/${orderId}/item-quantity`, {
         method: "PATCH",
@@ -209,9 +235,15 @@ export default function PendingOrders() {
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
+      
+      // Restore scroll position after state update
+      setTimeout(restoreScrollPosition, 0);
     } catch (error) {
       console.error("Error updating quantity:", error);
-      alert("Failed to update quantity");
+      setNotification({
+        message: "Failed to update quantity. Please try again.",
+        type: "error"
+      });
     }
   };
 
@@ -340,7 +372,10 @@ export default function PendingOrders() {
             <p className="text-gray-600">Loading pending orders...</p>
           </div>
         ) : (
-          <div>
+          <div 
+            ref={ordersContainerRef} 
+            className="space-y-6 overflow-y-auto max-h-[calc(100vh-160px)]"
+          >
             {pendingOrders.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200">
                 <div className="text-5xl mb-4">🍽️</div>
