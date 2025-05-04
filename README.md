@@ -226,5 +226,3 @@ Testing
 By adding this feature, admin can view the order which are coming from these platfrom.
 
 2. We can use the Din In feature where we will give the QR to the table Numbers, by which customer can scan the QR and order the dishes from sitting in the Restaurant only.
-
-Make the original price and discount amount with percent has to be in one line space because of less space in floating cart. give spaces and better. Change the floating cart to light color

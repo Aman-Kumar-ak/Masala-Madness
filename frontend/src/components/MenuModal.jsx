@@ -79,7 +79,7 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
     const requestBody = {
       items: selectedItems.map(item => ({
         name: item.name,
-        type: item.portion, // map portion to type
+        type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion, // Use H and F abbreviations
         price: item.price,
         quantity: item.quantity || 1,
         totalPrice: item.price * (item.quantity || 1),
@@ -223,7 +223,7 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
                                     : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                                 }`}
                               >
-                                {isSelectedHalf ? 'Added' : 'Add Half'}
+                                {isSelectedHalf ? 'Added' : 'Add H'}
                               </button>
                             </div>
                             <div className="flex flex-col items-center">
@@ -238,7 +238,7 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
                                     : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                                 }`}
                               >
-                                {isSelectedFull ? 'Added' : 'Add Full'}
+                                {isSelectedFull ? 'Added' : 'Add F'}
                               </button>
                             </div>
                           </div>
