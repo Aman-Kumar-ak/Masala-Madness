@@ -173,36 +173,47 @@ const Orders = () => {
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Select Date:
             </label>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={handleDateChange}
-                max={getCurrentDate()}
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              />
+            <div className="flex gap-3 flex-wrap md:flex-nowrap">
+              <div className="relative w-full">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  max={getCurrentDate()}
+                  className="shadow-sm border border-orange-200 rounded-lg w-full py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 transition-all duration-200"
+                  required
+                  style={{
+                    colorScheme: 'light'
+                  }}
+                />
+              </div>
               <button
                 onClick={resetToCurrentDate}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                className="bg-orange-100 hover:bg-orange-200 text-orange-800 font-medium py-2.5 px-5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-200 flex items-center"
                 title="Reset to today"
               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
                 Today
               </button>
               <button
                 onClick={handleDownloadExcel}
                 disabled={orders.length === 0}
-                className={`relative group ${
+                className={`relative group flex items-center ${
                   orders.length === 0
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-500 hover:bg-blue-600'
-                } text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline`}
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+                } font-medium py-2.5 px-5 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200`}
               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 Download Excel
               </button>
             </div>
             {orders.length === 0 && (
-              <div className="mt-2 text-center text-red-600 font-semibold">
+              <div className="mt-2 text-center text-red-600 font-medium">
                 No orders available to download
               </div>
             )}
@@ -211,7 +222,7 @@ const Orders = () => {
           {/* Enhanced Stats Display */}
           {orders.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-orange-50 p-4 rounded-lg shadow-sm">
+              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg shadow-sm border border-orange-200 transition-all duration-300 hover:shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700">Total Orders</h3>
                 <p className="text-3xl font-bold text-orange-600 mt-2">
                   {stats.totalPaidOrders}
@@ -221,7 +232,7 @@ const Orders = () => {
               <div
                 role="button"
                 tabIndex={0}
-                className="bg-orange-50 p-4 rounded-lg shadow-sm"
+                className="bg-gradient-to-br from-orange-50 to-yellow-100 p-4 rounded-lg shadow-sm border border-yellow-200 transition-all duration-300 hover:shadow-md cursor-pointer"
                 onClick={() => navigate("/pending-orders")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -235,7 +246,7 @@ const Orders = () => {
                 <p className="text-sm text-gray-500 mt-1 select-none">Orders awaiting confirmation</p>
               </div>
               
-              <div className="bg-orange-50 p-4 rounded-lg shadow-sm">
+              <div className="bg-gradient-to-br from-orange-50 to-green-100 p-4 rounded-lg shadow-sm border border-green-200 transition-all duration-300 hover:shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700">Revenue</h3>
                 <p className="text-3xl font-bold text-green-600 mt-2">
                   ₹{stats.totalRevenue.toLocaleString('en-IN')}
@@ -243,7 +254,7 @@ const Orders = () => {
                 <p className="text-sm text-gray-500 mt-1">From Paid Orders</p>
               </div>
 
-              <div className="bg-orange-50 p-4 rounded-lg shadow-sm">
+              <div className="bg-gradient-to-br from-orange-50 to-purple-100 p-4 rounded-lg shadow-sm border border-purple-200 transition-all duration-300 hover:shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700">Avg. Order Value</h3>
                 <p className="text-3xl font-bold text-purple-600 mt-2">
                   ₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}
@@ -256,11 +267,11 @@ const Orders = () => {
           {/* Orders List */}
           <div className="space-y-4">
             {orders.length === 0 ? (
-              <p className="text-gray-600 text-center">No orders found for this date</p>
+              <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this date</p>
             ) : (
               orders.map((order) => (
-                <div key={order.orderId} className="bg-orange-50 p-4 rounded-lg">
-                  <div className="flex justify-between items-start mb-2">
+                <div key={order.orderId} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300">
+                  <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="text-lg font-semibold">Order #{order.orderNumber}</h3>
                       <p className="text-sm text-gray-600">{formatDateIST(order.updatedAt)}</p>
@@ -270,29 +281,31 @@ const Orders = () => {
                         {order.discountAmount > 0 ? (
                           <>
                             <span className="text-gray-500 line-through mr-2">₹{order.subtotal}</span>
-                            <span>₹{order.totalAmount}</span>
+                            <span className="text-orange-600">₹{order.totalAmount}</span>
                           </>
                         ) : (
-                          <span>₹{order.totalAmount}</span>
+                          <span className="text-orange-600">₹{order.totalAmount}</span>
                         )}
                       </p>
-                      <p className={`text-sm ${order.isPaid ? 'text-green-600' : 'text-red-600'}`}>
+                      <p className={`text-sm font-medium px-2 py-0.5 rounded-full inline-block ${order.isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {order.isPaid ? 'Paid' : 'Unpaid'} - {order.paymentMethod}
                       </p>
                     </div>
                   </div>
-                  <div className="mt-2">
-                    <h4 className="font-medium mb-1">Items:</h4>
-                    <ul className="space-y-1">
+                  <div className="mt-3 bg-gray-50 p-3 rounded-lg">
+                    <h4 className="font-medium mb-2">Items:</h4>
+                    <ul className="space-y-1.5">
                       {order.items.map((item, index) => (
-                        <li key={index} className="text-sm">
-                          {item.name} ({item.type}) - {item.quantity} x ₹{item.price} = ₹{item.totalPrice}
+                        <li key={index} className="text-sm flex justify-between">
+                          <span>{item.name} ({item.type}) - {item.quantity} x ₹{item.price}</span>
+                          <span className="font-medium">₹{item.totalPrice}</span>
                         </li>
                       ))}
                     </ul>
                     {order.discountAmount > 0 && (
-                      <div className="mt-2 text-sm text-green-600">
-                        Discount Applied: {order.discountPercentage}% (-₹{order.discountAmount})
+                      <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-green-600 flex justify-between">
+                        <span>Discount Applied: {order.discountPercentage}%</span>
+                        <span>-₹{order.discountAmount}</span>
                       </div>
                     )}
                   </div>
