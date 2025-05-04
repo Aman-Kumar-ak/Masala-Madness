@@ -212,9 +212,7 @@ Order Number is reset on the basis of UTC timinig.
 
 ## Issue 
 
-1.  In orders.jsx, In order Management while choosing the date from calendar there is a option of clear button. While pressing that all the orders is disappearning. We have to fix that.
-
-2. Orders confirming from the pending orders is not reflected in home screen's order's count until we go to orders page and see if it is added or not.
+Issue Resolved
 
 ## Things to do now
 

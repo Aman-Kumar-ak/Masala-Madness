@@ -14,6 +14,9 @@ export default function Cart() {
   const navigate = useNavigate();
   const [notification, setNotification] = useState(null);
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showPendingConfirm, setShowPendingConfirm] = useState(false);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -59,22 +62,66 @@ export default function Cart() {
   }, []);
 
   const handlePaymentMethodSelect = (method) => {
-    setPaymentMethod(paymentMethod === method ? "" : method);
+    setPaymentMethod(method);
+    setShowPaymentConfirm(true);
+    setShowPaymentOptions(false);
   };
 
-  const handlePayment = async () => {
-    if (!paymentMethod) {
+  const handleShowPaymentOptions = () => {
+    if (cartItems.length === 0) {
       setNotification({
-        message: "Please select a payment method before confirming.",
+        message: "Your cart is empty. Add items before proceeding.",
         type: "warning"
       });
       return;
     }
+    
+    if (isProcessing) return;
+    
+    setShowPaymentOptions(true);
+  };
 
-    setShowPaymentConfirm(true);
+  const handleAddToPending = async () => {
+    if (cartItems.length === 0) {
+      setNotification({
+        message: "Your cart is empty. Add items before proceeding.",
+        type: "warning"
+      });
+      return;
+    }
+    
+    if (isProcessing) return;
+    
+    // Show confirmation dialog instead of processing immediately
+    setShowPendingConfirm(true);
+  };
+
+  const confirmAddToPending = async () => {
+    setShowPendingConfirm(false);
+    await processPayment(false);
   };
 
   const processPayment = async (isPaid) => {
+    // Prevent multiple simultaneous submissions
+    if (isProcessing) return;
+    setIsProcessing(true);
+    
+    // Immediately close all dialogs and show notification
+    setShowPaymentConfirm(false);
+    setShowPaymentOptions(false);
+    
+    if (isPaid) {
+      setNotification({
+        message: "Processing payment...",
+        type: "info"
+      });
+    } else {
+      setNotification({
+        message: "Adding to pending orders...",
+        type: "info"
+      });
+    }
+
     const payload = {
       items: cartItems.map((item) => ({
         dishId: item.id || "custom",
@@ -88,7 +135,7 @@ export default function Cart() {
       totalAmount,
       discountAmount,
       discountPercentage: activeDiscount?.percentage || 0,
-      paymentMethod,
+      paymentMethod: isPaid ? paymentMethod : "",
       isPaid,
     };
 
@@ -144,6 +191,8 @@ export default function Cart() {
         message: "Failed to process order: " + error.message,
         type: "error"
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -237,36 +286,23 @@ export default function Cart() {
             </div>
 
             <div className="mt-4">
-              <h3 className="text-lg font-bold mb-2">Select Payment Method:</h3>
               <div className="flex gap-4 mb-4">
                 <button
-                  onClick={() => handlePaymentMethodSelect("Cash")}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    paymentMethod === "Cash"
-                      ? "bg-orange-500 text-white shadow-md"
-                      : "bg-white border-2 border-orange-500 text-orange-500 hover:bg-orange-50"
-                  }`}
+                  onClick={handleShowPaymentOptions}
+                  disabled={isProcessing}
+                  className={`flex-1 py-3 rounded-lg font-medium transition-all duration-200 text-white shadow-md ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                 >
-                  Cash
+                  Confirm Payment
                 </button>
                 <button
-                  onClick={() => handlePaymentMethodSelect("Online")}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    paymentMethod === "Online"
-                      ? "bg-orange-500 text-white shadow-md"
-                      : "bg-white border-2 border-orange-500 text-orange-500 hover:bg-orange-50"
-                  }`}
+                  onClick={handleAddToPending}
+                  disabled={isProcessing}
+                  className={`flex-1 py-3 rounded-lg font-medium transition-all duration-200 text-white shadow-md ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'}`}
                 >
-                  QR
+                  Add to Pending
                 </button>
               </div>
 
-              <button
-                onClick={handlePayment}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg"
-              >
-                Confirm Payment
-              </button>
               <button
                 onClick={() => {
                   clearCart();
@@ -290,22 +326,58 @@ export default function Cart() {
         />
       )}
 
+      {/* Payment Options Dialog */}
+      <ConfirmationDialog
+        isOpen={showPaymentOptions}
+        onClose={() => setShowPaymentOptions(false)}
+        title="Select Payment Method"
+        message="How would the customer like to pay?"
+        customContent={
+          <div className="flex flex-row gap-4 w-full">
+            <button
+              onClick={() => handlePaymentMethodSelect("Cash")}
+              className="flex-1 py-3 px-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-base"
+            >
+              Cash
+            </button>
+            <button
+              onClick={() => handlePaymentMethodSelect("Online")}
+              className="flex-1 py-3 px-3 rounded-lg font-medium bg-purple-500 hover:bg-purple-600 text-white shadow-md transition-colors text-base"
+            >
+              QR / Online
+            </button>
+          </div>
+        }
+        confirmText={null}
+        cancelText="Cancel"
+        type="info"
+      />
+
       {/* Payment Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showPaymentConfirm}
         onClose={() => setShowPaymentConfirm(false)}
         onConfirm={() => {
           setShowPaymentConfirm(false);
+          setShowPaymentOptions(false);
           processPayment(true);
         }}
-        onCancel={() => {
-          setShowPaymentConfirm(false);
-          processPayment(false); // Process as unpaid/pending order
-        }}
         title="Confirm Payment"
-        message="Is the payment successful?"
-        confirmText="Yes, Payment Successful"
-        cancelText="No, Add to Pending"
+        message={`Confirm ${paymentMethod} payment of ₹${totalAmount}?`}
+        confirmText="Yes, Payment Received"
+        cancelText="Cancel"
+        type="warning"
+      />
+
+      {/* Add to Pending Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showPendingConfirm}
+        onClose={() => setShowPendingConfirm(false)}
+        onConfirm={confirmAddToPending}
+        title="Add to Pending Orders"
+        message={`Add this order (₹${totalAmount}) to pending orders?`}
+        confirmText="Yes, Add to Pending"
+        cancelText="Cancel"
         type="warning"
       />
     </div>

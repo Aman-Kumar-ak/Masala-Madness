@@ -9,7 +9,8 @@ const ConfirmationDialog = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  type = 'warning'
+  type = 'warning',
+  customContent = null
 }) => {
   if (!isOpen) return null;
 
@@ -42,25 +43,35 @@ const ConfirmationDialog = ({
       />
       
       {/* Dialog */}
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm relative animate-scale-in">
-        <div className="p-6">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xs sm:max-w-sm relative animate-scale-in mx-4">
+        <div className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-          <p className="text-gray-600 mb-6">{message}</p>
+          <p className="text-gray-600 mb-4 text-sm sm:text-base">{message}</p>
           
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={onConfirm}
-              className={`${getConfirmButtonStyle()} text-white px-4 py-2 rounded-lg flex-1 font-medium transition-colors duration-200`}
-            >
-              {confirmText}
-            </button>
-            <button
-              onClick={handleCancel}
-              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg flex-1 font-medium hover:bg-gray-200 transition-colors duration-200"
-            >
-              {cancelText}
-            </button>
-          </div>
+          {/* Render custom content if provided */}
+          {customContent && (
+            <div className="mb-4 sm:mb-6">
+              {customContent}
+            </div>
+          )}
+          
+          {/* Only render buttons if confirmText is not null */}
+          {confirmText !== null && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={onConfirm}
+                className={`${getConfirmButtonStyle()} text-white px-4 py-2 rounded-lg flex-1 font-medium transition-colors duration-200`}
+              >
+                {confirmText}
+              </button>
+              <button
+                onClick={handleCancel}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg flex-1 font-medium hover:bg-gray-200 transition-colors duration-200"
+              >
+                {cancelText}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -28,8 +28,12 @@ const Orders = () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Ensure we have a valid date to query
+      const dateToQuery = selectedDate || getCurrentDate();
+      
       const [ordersResponse, pendingOrdersResponse] = await Promise.all([
-        fetch(`${API_URL}/api/orders/date/${selectedDate}`),
+        fetch(`${API_URL}/api/orders/date/${dateToQuery}`),
         fetch(`${API_URL}/api/pending-orders`),
       ]);
 
@@ -62,11 +66,22 @@ const Orders = () => {
   };
 
   useEffect(() => {
-    loadOrders();
+    // Only load orders if we have a valid selectedDate
+    if (selectedDate) {
+      loadOrders();
+    } else {
+      // If somehow selectedDate becomes invalid, reset it to current date
+      setSelectedDate(getCurrentDate());
+    }
   }, [selectedDate, refreshKey]);
 
   const handleDateChange = (e) => {
-    setSelectedDate(e.target.value);
+    if (!e.target.value) {
+      const today = getCurrentDate();
+      setSelectedDate(today);
+    } else {
+      setSelectedDate(e.target.value);
+    }
   };
 
   const getCurrentDate = () => {
@@ -108,6 +123,11 @@ const Orders = () => {
     }
     const url = `${API_URL}/api/orders/excel/${selectedDate}`;
     window.open(url, '_blank');
+  };
+
+  const resetToCurrentDate = () => {
+    const today = getCurrentDate();
+    setSelectedDate(today);
   };
 
   if (loading) {
@@ -160,7 +180,15 @@ const Orders = () => {
                 onChange={handleDateChange}
                 max={getCurrentDate()}
                 className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                required
               />
+              <button
+                onClick={resetToCurrentDate}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                title="Reset to today"
+              >
+                Today
+              </button>
               <button
                 onClick={handleDownloadExcel}
                 disabled={orders.length === 0}
