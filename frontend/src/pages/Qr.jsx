@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link } from 'react-router-dom';
 import BackButton from "../components/BackButton";
 import { useNotification } from "../components/NotificationContext";
+import ConfirmationDialog from "../components/ConfirmationDialog";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -23,6 +24,15 @@ export default function Qr() {
     upiId: '',
     description: '',
     isDefault: false
+  });
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    upiAddressId: null
   });
   
   const qrRef = useRef(null);
@@ -184,6 +194,20 @@ export default function Qr() {
     }
   };
 
+  // Open delete confirmation dialog
+  const openDeleteConfirmation = (address) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete UPI Address',
+      message: `Are you sure you want to delete "${address.name}" (${address.upiId})? This cannot be undone.`,
+      onConfirm: () => {
+        deleteUpiAddress(address._id);
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      type: 'danger'
+    });
+  };
+
   // Set a UPI address as default
   const setDefaultUpiAddress = async (id) => {
     if (!id) return;
@@ -312,9 +336,9 @@ export default function Qr() {
             <p className="text-center opacity-90">Generate QR codes for customer payments</p>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 md:p-8">
             {/* Mode switch buttons */}
-            <div className="mb-6 flex justify-center">
+            <div className="mb-8 flex justify-center">
               <div className="inline-flex bg-gray-100 p-1 rounded-lg">
                 <button
                   type="button"
@@ -351,8 +375,8 @@ export default function Qr() {
             </div>
 
             {/* Saved UPI Addresses - Show in both modes but style differently */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-4">
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-semibold text-gray-800">
                   {isAddingUpi || isEditingUpi ? 'Manage UPI Addresses' : 'Saved UPI Addresses'}
                 </h2>
@@ -379,15 +403,15 @@ export default function Qr() {
 
               {/* Helper text for different modes */}
               {savedUpiAddresses.length === 0 ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-500">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500">
                   No saved UPI addresses. Add one to get started.
                 </div>
               ) : (
-                <div className="space-y-3 max-h-60 overflow-y-auto">
+                <div className="space-y-6 max-h-96 overflow-y-auto pr-2 pb-4 pt-2 px-1 md:px-2">
                   {savedUpiAddresses.map((address) => (
                     <div 
                       key={address._id}
-                      className={`border rounded-lg p-3 ${
+                      className={`border-2 rounded-xl p-5 shadow-sm hover:shadow-md ${
                         isEditingUpi && newUpiAddress.upiId === address.upiId
                           ? 'bg-yellow-50 border-yellow-300'
                         : currentUpiAddress && currentUpiAddress._id === address._id
@@ -395,7 +419,7 @@ export default function Qr() {
                             ? 'bg-green-50 border-green-300' 
                             : 'bg-blue-50 border-blue-300'
                           : 'bg-white border-gray-200 hover:bg-gray-50'
-                      } transition-colors duration-200 cursor-pointer`}
+                      } transition-all duration-200 cursor-pointer transform hover:-translate-y-1`}
                       onClick={() => {
                         // Different behavior based on mode
                         if (isAddingUpi || isEditingUpi) {
@@ -407,10 +431,10 @@ export default function Qr() {
                         }
                       }}
                     >
-                      <div className="flex justify-between">
-                        <div className="flex items-start gap-2">
+                      <div className="flex flex-col md:flex-row md:justify-between gap-4">
+                        <div className="flex items-start gap-4">
                           <div 
-                            className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                               isEditingUpi && newUpiAddress.upiId === address.upiId
                                 ? 'bg-yellow-100 text-yellow-600'
                               : currentUpiAddress && currentUpiAddress._id === address._id
@@ -423,62 +447,80 @@ export default function Qr() {
                             }`}
                           >
                             {isEditingUpi && newUpiAddress.upiId === address.upiId ? (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                               </svg>
                             ) : currentUpiAddress && currentUpiAddress._id === address._id ? (
                               qrCodeUrl ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                               ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
                               )
                             ) : address.isDefault ? (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                               </svg>
                             ) : (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             )}
                           </div>
                           <div>
-                            <div className="font-medium text-gray-800">
+                            <div className="font-medium text-gray-800 text-lg flex items-center flex-wrap gap-2">
                               {address.name}
                               {isEditingUpi && newUpiAddress.upiId === address.upiId ? (
-                                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                                <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-normal">
                                   Editing
                                 </span>
                               ) : currentUpiAddress && currentUpiAddress._id === address._id && (
-                                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${qrCodeUrl ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                <span className={`text-xs px-2 py-1 rounded-full ${qrCodeUrl ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} font-normal`}>
                                   {qrCodeUrl ? 'QR Active' : 'Selected'}
                                 </span>
                               )}
+                              {address.isDefault && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-normal flex items-center gap-1">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                  </svg>
+                                  Default
+                                </span>
+                              )}
                             </div>
-                            <div className="text-sm text-gray-600">{address.upiId}</div>
+                            <div className="text-base md:text-lg text-gray-600 mt-2 font-mono">
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-500">UPI ID:</span>
+                                <div className="overflow-hidden max-w-full pr-2 bg-gray-50 p-2 rounded-md mt-1">
+                                  <span className="font-medium truncate inline-block max-w-full">{address.upiId}</span>
+                                </div>
+                              </div>
+                            </div>
                             {address.description && (
-                              <div className="text-xs text-gray-500 mt-1">{address.description}</div>
+                              <div className="text-sm text-gray-500 mt-2">
+                                {address.description}
+                              </div>
                             )}
                           </div>
                         </div>
                         
-                        <div className="flex gap-1">
+                        <div className="flex md:flex-col gap-2 ml-auto md:ml-0">
                           {!address.isDefault && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setDefaultUpiAddress(address._id);
                               }}
-                              className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 flex items-center gap-1"
                               title="Set as default"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                               </svg>
+                              <span className="hidden md:inline text-xs">Default</span>
                             </button>
                           )}
                           <button
@@ -486,24 +528,26 @@ export default function Qr() {
                               e.stopPropagation();
                               startEditingUpiAddress(address);
                             }}
-                            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-1"
                             title="Edit"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
+                            <span className="hidden md:inline text-xs">Edit</span>
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteUpiAddress(address._id);
+                              openDeleteConfirmation(address);
                             }}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 flex items-center gap-1"
                             title="Delete"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
+                            <span className="hidden md:inline text-xs">Delete</span>
                           </button>
                         </div>
                       </div>
@@ -515,7 +559,7 @@ export default function Qr() {
 
             {/* Form to Add/Edit UPI Address */}
             {(isAddingUpi || isEditingUpi) && (
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+              <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 mb-8">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-lg font-semibold text-gray-800">
                     {isEditingUpi ? 
@@ -627,7 +671,7 @@ export default function Qr() {
 
             {/* QR Code Generator Form - only show when not editing/adding UPI */}
             {!isAddingUpi && !isEditingUpi && (
-              <form onSubmit={generateQRCode} className="mb-6 space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <form onSubmit={generateQRCode} className="mb-8 space-y-4 bg-gray-50 p-5 rounded-lg border border-gray-200">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-lg font-semibold text-gray-800">Generate QR Code</h3>
                   {qrCodeUrl && (
@@ -863,6 +907,18 @@ export default function Qr() {
           />
         </div>
       </div>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type || 'warning'}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
