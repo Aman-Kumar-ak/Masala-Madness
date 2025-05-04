@@ -47,23 +47,23 @@ export default function PendingOrders() {
 
   // Create a memoized fetchPendingOrders function that we can call from multiple places
   const fetchPendingOrders = useCallback(async () => {
-    try {
+      try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/pending-orders`);
-      if (!response.ok) throw new Error('Failed to fetch pending orders');
-      const data = await response.json();
-      setPendingOrders(data);
-    } catch (error) {
-      console.error('Error fetching pending orders:', error);
+        const response = await fetch(`${API_URL}/api/pending-orders`);
+        if (!response.ok) throw new Error('Failed to fetch pending orders');
+        const data = await response.json();
+        setPendingOrders(data);
+      } catch (error) {
+        console.error('Error fetching pending orders:', error);
       setNotification({ 
         message: 'Failed to fetch pending orders. Please try again.', 
         type: 'error' 
       });
-    } finally {
-      setLoading(false);
+      } finally {
+        setLoading(false);
       // Restore scroll position after data loads
       setTimeout(restoreScrollPosition, 0);
-    }
+      }
   }, [restoreScrollPosition]);
 
   // Listen for socket events
@@ -277,41 +277,41 @@ export default function PendingOrders() {
   };
 
   const handleRemoveItemOrOrder = async (order, item, index) => {
-    const isLastItem = order.items.length === 1;
-    const confirmMsg = isLastItem
-      ? `Removing last item will delete entire order. Continue?`
-      : `Remove ${item.name} from order?`;
+                              const isLastItem = order.items.length === 1;
+                              const confirmMsg = isLastItem
+                                ? `Removing last item will delete entire order. Continue?`
+                                : `Remove ${item.name} from order?`;
 
     setConfirmDialog({
       isOpen: true,
       title: 'Confirm Removal',
       message: confirmMsg,
       onConfirm: async () => {
-        try {
-          if (isLastItem) {
-            const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
-              method: 'DELETE',
-            });
-            if (!response.ok) throw new Error('Failed to delete order');
-            setPendingOrders(prevOrders =>
-              prevOrders.filter(o => o.orderId !== order.orderId)
-            );
-          } else {
-            const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}/item/${index}`, {
-              method: 'DELETE',
-            });
-            if (!response.ok) throw new Error('Failed to remove item');
-            const data = await response.json();
-            setPendingOrders(prevOrders =>
-              prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
-            );
-          }
-        } catch (error) {
-          console.error('Error removing item/order:', error);
-          alert('Failed to remove item/order');
+                                try {
+                                  if (isLastItem) {
+                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
+                                      method: 'DELETE',
+                                    });
+                                    if (!response.ok) throw new Error('Failed to delete order');
+                                    setPendingOrders(prevOrders =>
+                                      prevOrders.filter(o => o.orderId !== order.orderId)
+                                    );
+                                  } else {
+                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}/item/${index}`, {
+                                      method: 'DELETE',
+                                    });
+                                    if (!response.ok) throw new Error('Failed to remove item');
+                                    const data = await response.json();
+                                    setPendingOrders(prevOrders =>
+                                      prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.error('Error removing item/order:', error);
+                                  alert('Failed to remove item/order');
         } finally {
           setConfirmDialog(null);
-        }
+                              }
       },
       onCancel: () => setConfirmDialog(null),
     });
@@ -515,14 +515,14 @@ export default function PendingOrders() {
                               <button
                                 onClick={() => handleRemoveItemOrOrder(order, item, index)}
                                 className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
-                                aria-label={`Remove ${item.name}`}
-                              >
+                            aria-label={`Remove ${item.name}`}
+                          >
                                 ×
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
 
                       {/* Action Buttons */}
                       <div className="flex gap-3 border-t border-gray-200 pt-4">
@@ -539,101 +539,101 @@ export default function PendingOrders() {
                           <span>Add Items</span>
                         </button>
                         
-                        <button
-                          onClick={() => {
-                            if (paymentOptionOrderId === order.orderId) {
-                              setPaymentOptionOrderId(null);
-                              setPaymentMethodToConfirm(null);
-                            } else {
-                              setPaymentOptionOrderId(order.orderId);
-                            }
-                          }}
+                    <button
+                      onClick={() => {
+                        if (paymentOptionOrderId === order.orderId) {
+                          setPaymentOptionOrderId(null);
+                          setPaymentMethodToConfirm(null);
+                        } else {
+                          setPaymentOptionOrderId(order.orderId);
+                        }
+                      }}
                           className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2 ${
-                            paymentConfirmedOrderId === order.orderId
+                        paymentConfirmedOrderId === order.orderId
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : paymentOptionOrderId === order.orderId
+                          : paymentOptionOrderId === order.orderId
                               ? 'bg-gray-700 text-white'
                               : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
-                          }`}
-                          disabled={paymentConfirmedOrderId === order.orderId}
-                        >
+                      }`}
+                      disabled={paymentConfirmedOrderId === order.orderId}
+                    >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <span>{paymentOptionOrderId === order.orderId ? 'Cancel' : 'Confirm Payment'}</span>
-                        </button>
+                    </button>
                       </div>
 
                       {/* Payment Options */}
-                      <div
+                    <div
                         className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                          paymentOptionOrderId === order.orderId
+                        paymentOptionOrderId === order.orderId
                             ? 'max-h-40 opacity-100 mt-4'
                             : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        {paymentOptionOrderId === order.orderId && (
-                          !paymentMethodToConfirm ? (
+                      }`}
+                    >
+                      {paymentOptionOrderId === order.orderId && (
+                        !paymentMethodToConfirm ? (
                             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                               <p className="text-sm text-gray-600 mb-3 text-center">Select payment method:</p>
                               <div className="flex justify-center space-x-4">
-                                <button
-                                  onClick={() => setPaymentMethodToConfirm('Cash')}
+                            <button
+                              onClick={() => setPaymentMethodToConfirm('Cash')}
                                   className="bg-white border border-green-300 text-green-600 hover:bg-green-50 px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
-                                >
+                            >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
                                   </svg>
-                                  Cash
-                                </button>
-                                <button
-                                  onClick={() => setPaymentMethodToConfirm('Online')}
+                              Cash
+                            </button>
+                            <button
+                              onClick={() => setPaymentMethodToConfirm('Online')}
                                   className="bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
-                                >
+                            >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                   </svg>
-                                  Online
-                                </button>
+                              Online
+                            </button>
                               </div>
-                            </div>
-                          ) : (
+                          </div>
+                        ) : (
                             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                               <p className="text-gray-800 font-medium mb-3 text-center">
                                 Confirm that you received the payment via <span className="font-bold">{paymentMethodToConfirm}</span>?
                               </p>
                               <div className="flex justify-center gap-4">
-                                <button
-                                  onClick={() => handleConfirmPayment(order.orderId, paymentMethodToConfirm)}
+                              <button
+                                onClick={() => handleConfirmPayment(order.orderId, paymentMethodToConfirm)}
                                   className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
-                                >
+                              >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                   </svg>
                                   Confirm
-                                </button>
-                                <button
-                                  onClick={() => setPaymentMethodToConfirm(null)}
+                              </button>
+                              <button
+                                onClick={() => setPaymentMethodToConfirm(null)}
                                   className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
-                                >
+                              >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                   </svg>
-                                  Cancel
-                                </button>
-                              </div>
+                                Cancel
+                              </button>
                             </div>
-                          )
-                        )}
-                      </div>
+                          </div>
+                        )
+                      )}
+                    </div>
                     </div>
                   </div>
-                ))}
+              ))}
               </div>
             )}
           </div>
-        )}
-      </div>
+          )}
+        </div>
       
       {showMenu && (
         <MenuModal 

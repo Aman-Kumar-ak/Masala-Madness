@@ -340,7 +340,7 @@ const MenuManager = ({ categories, onUpdate }) => {
 
           <button
             onClick={() => setShowAddDish(!showAddDish)}
-            className={`w-full sm:w-auto px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${showAddDish ? 'bg-gray-500 hover:bg-gray-600' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+            className={`w-full sm:w-auto px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${showAddDish ? 'bg-gray-500 hover:bg-gray-600' : 'bg-blue-500 hover:bg-blue-600'} text-white whitespace-nowrap`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {showAddDish ? (
@@ -349,7 +349,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               )}
             </svg>
-            <span>{showAddDish ? 'Cancel' : 'Add New Dish'}</span>
+            <span>{showAddDish ? 'Cancel' : 'Add Dish'}</span>
           </button>
         </div>
 
