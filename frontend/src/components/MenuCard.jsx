@@ -25,7 +25,7 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
 
   const handleAddToCart = () => {
     if (price) {
-      addToCart({ name, quantity, type: "N/A", price });
+      addToCart({ name, quantity, type: "Fixed", price });
     } else if (selectedType) {
       const selectedPrice = selectedType === "H" ? priceHalf : priceFull;
       addToCart({ name, quantity, type: selectedType.toUpperCase(), price: selectedPrice });

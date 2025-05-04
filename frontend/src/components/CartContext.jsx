@@ -40,8 +40,11 @@ function CartProvider({ children }) {
   }, [cartItems, isInitialized]);
 
   const addToCart = (dish) => {
-    // Normalize type to uppercase for consistency
-    const dishWithNormalizedType = { ...dish, type: dish.type?.toUpperCase() };
+    // Normalize type to uppercase for consistency, but preserve "Fixed" type
+    const dishWithNormalizedType = { 
+      ...dish, 
+      type: dish.type === "Fixed" ? "Fixed" : dish.type?.toUpperCase() 
+    };
     setCartItems((prev) => {
       const existing = prev.find((item) => item.name === dishWithNormalizedType.name && item.type === dishWithNormalizedType.type);
       if (existing) {

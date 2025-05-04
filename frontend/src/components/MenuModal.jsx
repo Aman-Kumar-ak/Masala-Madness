@@ -91,7 +91,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     const requestBody = {
       items: selectedItems.map(item => ({
         name: item.name,
-        type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion, // Use H and F abbreviations
+        type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion === 'fixed' ? 'Fixed' : item.portion,
         price: item.price,
         quantity: item.quantity || 1,
         totalPrice: item.price * (item.quantity || 1),
@@ -269,7 +269,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
                       (i) => i.name === item.name && i.type === 'F'
                     );
                     const isExistingFixed = existingItems.some(
-                      (i) => i.name === item.name && (i.type === 'N/A' || i.type === 'fixed')
+                      (i) => i.name === item.name && (i.type === 'N/A' || i.type === 'Fixed' || i.type === 'FIXED')
                     );
                     
                     return (

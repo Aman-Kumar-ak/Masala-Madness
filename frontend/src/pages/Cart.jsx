@@ -18,6 +18,9 @@ export default function Cart() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showPendingConfirm, setShowPendingConfirm] = useState(false);
   const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [defaultUpiAddress, setDefaultUpiAddress] = useState(null);
   const { showSuccess, showError, showWarning, showInfo } = useNotification();
 
   const subtotal = cartItems.reduce(
@@ -46,7 +49,7 @@ export default function Cart() {
   const discountAmount = calculateDiscount();
   const totalAmount = subtotal - discountAmount;
 
-  // Fetch active discount on component mount
+  // Fetch active discount and default UPI address on component mount
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
@@ -60,13 +63,86 @@ export default function Cart() {
       }
     };
 
+    const fetchDefaultUpiAddress = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/upi`);
+        if (response.ok) {
+          const data = await response.json();
+          const defaultAddress = data.find(addr => addr.isDefault);
+          if (defaultAddress) {
+            setDefaultUpiAddress(defaultAddress);
+          } else if (data.length > 0) {
+            // If no default is set, use the first one
+            setDefaultUpiAddress(data[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching UPI addresses:', error);
+      }
+    };
+
     fetchActiveDiscount();
+    fetchDefaultUpiAddress();
   }, []);
 
   const handlePaymentMethodSelect = (method) => {
     setPaymentMethod(method);
-    setShowPaymentConfirm(true);
+    
+    if (method === "Online") {
+      // Check if we have a default UPI address to generate QR code
+      if (defaultUpiAddress) {
+        generateQRCode();
+      } else {
+        // If no UPI addresses are set up, just show regular confirmation
+        setShowPaymentConfirm(true);
+      }
+    } else {
+      // For Cash payments, show the regular confirmation
+      setShowPaymentConfirm(true);
+    }
+    
     setShowPaymentOptions(false);
+  };
+
+  const generateQRCode = () => {
+    if (!defaultUpiAddress) {
+      showError("No UPI address configured for QR payments");
+      return;
+    }
+    
+    try {
+      // Create UPI payment URL
+      // Format: upi://pay?pa=UPI_ID&pn=PAYEE_NAME&am=AMOUNT&cu=INR&tn=NOTE
+      let upiUrl = `upi://pay?pa=${encodeURIComponent(defaultUpiAddress.upiId)}`;
+      
+      // Add merchant name
+      upiUrl += `&pn=${encodeURIComponent("Masala Madness")}`;
+      
+      // Add amount
+      upiUrl += `&am=${encodeURIComponent(totalAmount)}`;
+      
+      // Always add currency as INR
+      upiUrl += `&cu=INR`;
+      
+      // Add payment note
+      upiUrl += `&tn=${encodeURIComponent(`Payment for Order - Masala Madness`)}`;
+      
+      // Use a QR code generation service
+      const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiUrl)}&margin=10`;
+      
+      setQrCodeUrl(qrCodeImageUrl);
+      setShowQrCode(true);
+    } catch (error) {
+      console.error("Error generating QR code:", error);
+      showError("Failed to generate QR code");
+      // Fall back to regular confirmation
+      setShowPaymentConfirm(true);
+    }
+  };
+
+  const handleQrConfirmPayment = () => {
+    setShowQrCode(false);
+    processPayment(true);
   };
 
   const handleShowPaymentOptions = () => {
@@ -245,7 +321,7 @@ export default function Cart() {
                         <div key={`${type.type}-${idx}`} className="bg-amber-50 rounded-lg p-3">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-base font-medium text-gray-700">
-                              {type.type === 'H' ? 'Half' : type.type === 'F' ? 'Full' : type.type}
+                              {type.type === 'H' ? 'Half' : type.type === 'F' ? 'Full' : type.type === 'N/A' || type.type === 'Fixed' || type.type === 'FIXED' ? 'Fixed' : type.type}
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-base text-gray-500">₹{type.price} × {type.quantity}</span>
@@ -365,6 +441,53 @@ export default function Cart() {
           </div>
         )}
       </div>
+
+      {/* QR Code Payment Dialog */}
+      <ConfirmationDialog
+        isOpen={showQrCode}
+        onClose={() => setShowQrCode(false)}
+        title="Scan QR Code to Pay"
+        message={`Total Amount: ₹${totalAmount}`}
+        customContent={
+          <div className="flex flex-col items-center gap-4 w-full">
+            <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">
+              {qrCodeUrl ? (
+                <img
+                  src={qrCodeUrl}
+                  alt="Payment QR Code"
+                  className="w-64 h-64 object-contain"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "/images/qr-code.png";
+                    showError("QR code generation failed. Please try again.");
+                  }}
+                />
+              ) : (
+                <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+                  <div className="animate-spin h-12 w-12 border-4 border-orange-500 rounded-full border-t-transparent"></div>
+                </div>
+              )}
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 w-full text-center">
+              <p className="font-medium text-gray-700">Paying to:</p>
+              <p className="font-medium text-blue-600 text-lg">{defaultUpiAddress?.upiId}</p>
+              <p className="text-sm text-gray-600 mt-1">{defaultUpiAddress?.name}</p>
+            </div>
+            <button
+              onClick={handleQrConfirmPayment}
+              className="w-full py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Confirm Payment Received
+            </button>
+          </div>
+        }
+        confirmText={null}
+        cancelText="Cancel"
+        type="info"
+      />
 
       {/* Payment Options Dialog */}
       <ConfirmationDialog
