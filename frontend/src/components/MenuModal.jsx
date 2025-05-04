@@ -151,58 +151,58 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   {selectedItems.map((item, idx) => (
                     <div
-                      key={`${item.id}-${item.portion}-${item.index}`}
+                  key={`${item.id}-${item.portion}-${item.index}`}
                       className="flex items-center bg-blue-100 dark:bg-blue-800 rounded-full px-3 py-1 shadow-sm overflow-hidden"
-                    >
+                >
                       <span className="text-blue-800 dark:text-blue-200 text-sm font-medium truncate flex-1 min-w-0">
                         {item.name} ({item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion})
-                      </span>
-                      <button
+                  </span>
+                  <button
                         onClick={() => {
                           setSelectedItems((prev) => prev.filter((_, i) => i !== idx));
                         }}
-                        aria-label={`Remove ${item.name}`}
+                    aria-label={`Remove ${item.name}`}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 rounded-full p-0.5 ml-2 flex-shrink-0"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                     </div>
-                  ))}
+              ))}
                 </div>
               </div>
             </div>
           )}
-          
+
           {/* Menu items container */}
           <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
             <section
-              id="menu-modal-description"
+          id="menu-modal-description"
               className="h-full overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-50 dark:scrollbar-thumb-blue-700 dark:scrollbar-track-blue-900 p-4"
               aria-label="Items of the selected category"
-            >
+        >
               <h3 className="text-xl font-semibold mb-4 text-orange-600">{selectedCategory} Menu</h3>
               <ul>
                 {categories
                   .find(cat => cat.categoryName === selectedCategory)
                   ?.dishes.map((item, index) => {
-                    const isSelectedHalf = selectedItems.some(
+            const isSelectedHalf = selectedItems.some(
                       (i) => i.id === item._id && i.portion === 'half' && i.index === index
-                    );
-                    const isSelectedFull = selectedItems.some(
+            );
+            const isSelectedFull = selectedItems.some(
                       (i) => i.id === item._id && i.portion === 'full' && i.index === index
-                    );
-                    const isSelectedFixed = selectedItems.some(
+            );
+            const isSelectedFixed = selectedItems.some(
                       (i) => i.id === item._id && i.portion === 'fixed' && i.index === index
-                    );
+            );
                     
                     // Check if item already exists in the current order
                     const isExistingHalf = existingItems.some(
@@ -215,93 +215,93 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
                       (i) => i.name === item.name && i.type === 'fixed'
                     );
                     
-                    return (
-                      <li
+            return (
+              <li
                         key={item._id}
                         className="p-4 border border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-between mb-4"
-                      >
+              >
                         <p className="text-gray-900 dark:text-gray-100 font-semibold mb-2 text-center">{item.name}</p>
-                        {typeof item.priceHalf === 'number' && typeof item.priceFull === 'number' ? (
-                          <div className="flex space-x-4">
-                            <div className="flex flex-col items-center">
-                              <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
+                {typeof item.priceHalf === 'number' && typeof item.priceFull === 'number' ? (
+                  <div className="flex space-x-4">
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
                                 Half (H) - ₹{item.priceHalf.toFixed(2)}
-                              </span>
-                              <button
-                                onClick={() => handleSelectItem(item, 'half', item.priceHalf, index)}
+                      </span>
+                      <button
+                        onClick={() => handleSelectItem(item, 'half', item.priceHalf, index)}
                                 disabled={isExistingHalf}
                                 className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
                                   isSelectedHalf || isExistingHalf
                                     ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                                }`}
-                              >
+                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
+                        }`}
+                      >
                                 {isSelectedHalf ? 'Added' : isExistingHalf ? 'In Order' : 'Add H'}
-                              </button>
-                            </div>
-                            <div className="flex flex-col items-center">
-                              <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
+                      </button>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
                                 Full (F) - ₹{item.priceFull.toFixed(2)}
-                              </span>
-                              <button
-                                onClick={() => handleSelectItem(item, 'full', item.priceFull, index)}
+                      </span>
+                      <button
+                        onClick={() => handleSelectItem(item, 'full', item.priceFull, index)}
                                 disabled={isExistingFull}
                                 className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
                                   isSelectedFull || isExistingFull
                                     ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                                }`}
-                              >
+                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
+                        }`}
+                      >
                                 {isSelectedFull ? 'Added' : isExistingFull ? 'In Order' : 'Add F'}
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center">
-                            <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
-                              ₹{typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'}
-                            </span>
-                            <button
-                              onClick={() => handleSelectItem(item, 'fixed', item.price, index)}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
+                      ₹{typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'}
+                    </span>
+                    <button
+                      onClick={() => handleSelectItem(item, 'fixed', item.price, index)}
                               disabled={isExistingFixed}
                               className={`px-6 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
                                 isSelectedFixed || isExistingFixed
                                   ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
-                                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                              }`}
-                            >
+                          : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
+                      }`}
+                    >
                               {isSelectedFixed ? 'Added' : isExistingFixed ? 'In Order' : 'Add'}
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-              </ul>
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
             </section>
           </div>
-          
+
           {/* Buttons at the bottom */}
           <div className="flex justify-center space-x-4 mt-3">
-            <button
-              onClick={handleSave}
-              disabled={selectedItems.length === 0}
+          <button
+            onClick={handleSave}
+            disabled={selectedItems.length === 0}
               className={`px-8 py-3 rounded-2xl font-semibold focus:outline-none ${
-                selectedItems.length === 0
-                  ? 'bg-green-300 text-green-700 cursor-not-allowed shadow-inner'
-                  : 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
-              }`}
-            >
-              Save
-            </button>
-            <button
-              onClick={onClose}
+              selectedItems.length === 0
+                ? 'bg-green-300 text-green-700 cursor-not-allowed shadow-inner'
+                : 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
+            }`}
+          >
+            Save
+          </button>
+          <button
+            onClick={onClose}
               className="px-8 py-3 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-semibold focus:outline-none"
-            >
-              Close
-            </button>
-          </div>
+          >
+            Close
+          </button>
         </div>
+      </div>
       </div>
       {notification && (
         <Notification

@@ -29,21 +29,21 @@ export default function PendingOrders() {
 
   // Create a memoized fetchPendingOrders function that we can call from multiple places
   const fetchPendingOrders = useCallback(async () => {
-    try {
+      try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/pending-orders`);
-      if (!response.ok) throw new Error('Failed to fetch pending orders');
-      const data = await response.json();
-      setPendingOrders(data);
-    } catch (error) {
-      console.error('Error fetching pending orders:', error);
+        const response = await fetch(`${API_URL}/api/pending-orders`);
+        if (!response.ok) throw new Error('Failed to fetch pending orders');
+        const data = await response.json();
+        setPendingOrders(data);
+      } catch (error) {
+        console.error('Error fetching pending orders:', error);
       setNotification({ 
         message: 'Failed to fetch pending orders. Please try again.', 
         type: 'error' 
       });
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
   }, []);
 
   // Listen for socket events
@@ -74,7 +74,7 @@ export default function PendingOrders() {
   // Effect for initial data fetching
   useEffect(() => {
     fetchPendingOrders();
-    
+
     const fetchAvailableItems = async () => {
       try {
         const response = await fetch(`${API_URL}/api/dishes`);
@@ -285,6 +285,38 @@ export default function PendingOrders() {
     });
   };
 
+  const handleRemoveEntireOrder = async (order) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirm Order Deletion',
+      message: `Are you sure you want to delete the entire order #${pendingOrders.length - pendingOrders.indexOf(order)}?`,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
+            method: 'DELETE',
+          });
+          if (!response.ok) throw new Error('Failed to delete order');
+          setPendingOrders(prevOrders =>
+            prevOrders.filter(o => o.orderId !== order.orderId)
+          );
+          setNotification({ 
+            message: "Order successfully deleted", 
+            type: "success" 
+          });
+        } catch (error) {
+          console.error('Error removing order:', error);
+          setNotification({ 
+            message: "Failed to delete order", 
+            type: "error" 
+          });
+        } finally {
+          setConfirmDialog(null);
+        }
+      },
+      onCancel: () => setConfirmDialog(null),
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 p-6 pt-20">
       <BackButton />
@@ -298,8 +330,19 @@ export default function PendingOrders() {
           ) : (
             <ul className="space-y-6">
               {pendingOrders.map(order => (
-                <li key={order.orderId} className="bg-white dark:bg-gray-100 rounded-md shadow-md p-6 max-w-6xl mx-auto border-t border-gray-300 dark:border-gray-600 first:border-t-0">
-                  <h2 className="font-semibold text-xl tracking-tight mb-1 text-gray-800 dark:text-gray-700">
+                <li key={order.orderId} className="bg-white dark:bg-gray-100 rounded-md shadow-md p-6 max-w-6xl mx-auto border-t border-gray-300 dark:border-gray-600 first:border-t-0 relative">
+                  <button
+                    onClick={() => handleRemoveEntireOrder(order)}
+                    className="absolute top-4 right-4 flex items-center justify-center px-3 py-1 rounded-md bg-red-100 text-red-600 hover:bg-red-200 border border-red-300 transition-colors duration-200 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 group"
+                    aria-label="Delete entire order"
+                    title="Delete entire order"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete</span>
+                  </button>
+                  <h2 className="font-semibold text-xl tracking-tight mb-1 text-gray-800 dark:text-gray-700 pr-24">
                     Order #{pendingOrders.length - pendingOrders.indexOf(order)} {/* Show order number counting down */}
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-500 mb-3">

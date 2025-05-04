@@ -114,7 +114,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
       {/* Header */}
-      <header className="bg-white shadow-lg sticky top-0 z-50">
+      <header className="bg-white/90 backdrop-blur-sm shadow-md sticky top-0 z-50 border-b border-gray-200">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center py-4">
             {/* Logo and Title */}
@@ -124,7 +124,7 @@ export default function Home() {
                 alt="Masala Madness Logo" 
                 className="w-10 h-10 object-contain"
               />
-              <h1 className="text-2xl font-bold text-gray-800">Masala Madness</h1>
+              <h1 className="text-2xl font-bold text-gray-800/95">Masala Madness</h1>
             </div>
 
             {/* Navigation */}
@@ -135,7 +135,7 @@ export default function Home() {
                 aria-label={`Cart with ${cartItems.reduce((total, item) => total + item.quantity, 0)} items`}
               >
                 <img
-                  src="/images/menu.png"
+                  src="/images/receipt.png"
                   alt="Cart"
                   className="w-15 h-12 md:w-10 md:h-10 object-contain"
                 />
@@ -152,7 +152,7 @@ export default function Home() {
                 aria-label={`Pending Orders: ${pendingOrdersCount}`}
               >
                 <img
-                  src="/images/food-delivery.png"
+                  src="/images/order.png"
                   alt="Pending Orders"
                   className="w-15 h-12 md:w-10 md:h-11 object-contain"
                 />
