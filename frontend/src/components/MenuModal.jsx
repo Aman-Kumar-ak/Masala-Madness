@@ -3,7 +3,7 @@ import Notification from './Notification';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const MenuModal = ({ onClose, onSave, orderId }) => {
+const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [notification, setNotification] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -203,6 +203,18 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
                     const isSelectedFixed = selectedItems.some(
                       (i) => i.id === item._id && i.portion === 'fixed' && i.index === index
                     );
+                    
+                    // Check if item already exists in the current order
+                    const isExistingHalf = existingItems.some(
+                      (i) => i.name === item.name && i.type === 'H'
+                    );
+                    const isExistingFull = existingItems.some(
+                      (i) => i.name === item.name && i.type === 'F'
+                    );
+                    const isExistingFixed = existingItems.some(
+                      (i) => i.name === item.name && i.type === 'fixed'
+                    );
+                    
                     return (
                       <li
                         key={item._id}
@@ -217,13 +229,14 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
                               </span>
                               <button
                                 onClick={() => handleSelectItem(item, 'half', item.priceHalf, index)}
+                                disabled={isExistingHalf}
                                 className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
-                                  isSelectedHalf
+                                  isSelectedHalf || isExistingHalf
                                     ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
                                     : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                                 }`}
                               >
-                                {isSelectedHalf ? 'Added' : 'Add H'}
+                                {isSelectedHalf ? 'Added' : isExistingHalf ? 'In Order' : 'Add H'}
                               </button>
                             </div>
                             <div className="flex flex-col items-center">
@@ -232,13 +245,14 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
                               </span>
                               <button
                                 onClick={() => handleSelectItem(item, 'full', item.priceFull, index)}
+                                disabled={isExistingFull}
                                 className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
-                                  isSelectedFull
+                                  isSelectedFull || isExistingFull
                                     ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
                                     : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                                 }`}
                               >
-                                {isSelectedFull ? 'Added' : 'Add F'}
+                                {isSelectedFull ? 'Added' : isExistingFull ? 'In Order' : 'Add F'}
                               </button>
                             </div>
                           </div>
@@ -249,13 +263,14 @@ const MenuModal = ({ onClose, onSave, orderId }) => {
                             </span>
                             <button
                               onClick={() => handleSelectItem(item, 'fixed', item.price, index)}
+                              disabled={isExistingFixed}
                               className={`px-6 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
-                                isSelectedFixed
+                                isSelectedFixed || isExistingFixed
                                   ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
                                   : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
                               }`}
                             >
-                              {isSelectedFixed ? 'Added' : 'Add'}
+                              {isSelectedFixed ? 'Added' : isExistingFixed ? 'In Order' : 'Add'}
                             </button>
                           </div>
                         )}

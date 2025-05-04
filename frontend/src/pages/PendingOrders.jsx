@@ -448,7 +448,10 @@ export default function PendingOrders() {
                       )}
                     </div>
                     <button
-                      onClick={() => { setShowMenu(true); setCurrentOrderId(order.orderId); }}
+                      onClick={() => { 
+                        setShowMenu(true); 
+                        setCurrentOrderId(order.orderId); 
+                      }}
                       className="bg-[#F6BD60] hover:bg-[#F6BD60] text-white px-6 py-3 rounded-lg font-semibold shadow-md transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F6BD60]"
                     >
                       Add Items
@@ -460,7 +463,14 @@ export default function PendingOrders() {
           )}
         </div>
       )}
-      {showMenu && <MenuModal onClose={() => setShowMenu(false)} onSave={handleSaveItems} items={availableItems} orderId={currentOrderId} />}
+      {showMenu && (
+        <MenuModal 
+          onClose={() => setShowMenu(false)} 
+          onSave={handleSaveItems} 
+          orderId={currentOrderId} 
+          existingItems={pendingOrders.find(order => order.orderId === currentOrderId)?.items || []}
+        />
+      )}
       {notification && (
         <Notification 
           message={notification.message} 
