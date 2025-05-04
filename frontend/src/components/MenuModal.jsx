@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Notification from './Notification';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -8,10 +8,12 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
   const [notification, setNotification] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     async function fetchData() {
       try {
+        setLoading(true);
         const res = await fetch(`${API_URL}/api/dishes`);
         if (!res.ok) {
           throw new Error('Failed to fetch categories');
@@ -24,6 +26,8 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
       } catch (error) {
         console.error('Error fetching data:', error);
         setNotification({ message: 'Failed to load menu data', type: 'error' });
+      } finally {
+        setLoading(false);
       }
     }
     fetchData();
@@ -38,6 +42,12 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
         ...prev,
         { id: item._id, name: item.name, portion, price, index }
       ]);
+      // Show a temporary success notification
+      setNotification({ 
+        message: `Added: ${item.name} (${portion === 'half' ? 'Half' : portion === 'full' ? 'Full' : 'Regular'})`, 
+        type: 'success' 
+      });
+      setTimeout(() => setNotification(null), 1500);
     } else {
       // Remove item if it's already selected
       handleRemoveItem({ id: item._id, portion, index });
@@ -52,6 +62,8 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
 
   const handleSave = async () => {
     if (selectedItems.length === 0) return;
+    
+    setLoading(true);
 
     // Calculate the subtotal
     const subtotal = selectedItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0);
@@ -103,106 +115,151 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
       if (!response.ok) throw new Error('Failed to update order');
 
       const data = await response.json();
-      // Removed alert for save success to avoid popup after saving modifications
       onSave(data.order);  // Pass updated order object instead of just selectedItems
       setNotification({ message: 'Items added successfully!', type: 'success' });
     } catch (error) {
       console.error('Error updating order:', error);
-      alert('Failed to update order');
+      setNotification({ message: 'Failed to update order. Please try again.', type: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-md flex justify-center items-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
       aria-modal="true"
       role="dialog"
       aria-labelledby="menu-modal-title"
       aria-describedby="menu-modal-description"
+      onClick={(e) => {
+        // Close when clicking outside the modal
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-md w-[95%] p-4 mx-auto ring-1 ring-gray-200 dark:ring-gray-700 flex flex-col h-[80vh] max-h-[650px] md:max-h-[80vh]">
-        <div className="flex flex-col h-full">
+      <div 
+        className="bg-white rounded-xl shadow-xl max-w-lg w-full flex flex-col h-[90vh] max-h-[700px] overflow-hidden"
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-yellow-50">
+          <div className="flex justify-between items-center">
+            <h2 id="menu-modal-title" className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <span className="text-2xl">🍽️</span>
+              <span>Add Menu Items</span>
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+              aria-label="Close menu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          {selectedItems.length > 0 && (
+            <div className="mt-3 text-sm">
+              <span className="text-gray-600">Selected: </span>
+              <span className="font-medium text-orange-600">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col flex-grow h-full overflow-hidden">
           {/* Categories list at the top */}
-          <nav className="overflow-x-auto overflow-y-hidden whitespace-nowrap p-2 mb-4 sticky top-0 bg-white dark:bg-gray-900 z-10 rounded-t-lg">
-            <ul className="flex space-x-3">
-              {categories.map((category) => (
-                <li key={category._id} className="inline-block">
+          <nav className="px-4 py-3 sticky top-0 bg-white z-10 border-b border-gray-200">
+            <div className="overflow-x-auto pb-1">
+              <div className="flex gap-2">
+                {categories.map((category) => (
                   <button
+                    key={category._id}
                     type="button"
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-600 ${
+                    className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-200 ${
                       category.categoryName === selectedCategory
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'border-2 border-blue-600 hover:bg-blue-100 dark:hover:bg-gray-800 text-blue-600 dark:text-gray-200'
+                        ? 'bg-orange-500 text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                     onClick={() => setSelectedCategory(category.categoryName)}
                   >
                     {category.categoryName}
                   </button>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </div>
+            </div>
           </nav>
           
-          {/* Selected items preview between category and menu */}
+          {/* Selected items preview */}
           {selectedItems.length > 0 && (
-            <div className="mb-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg shadow-inner">
-              <div className="px-3">
-                <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">Selected Items:</h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  {selectedItems.map((item, idx) => (
+            <div className="bg-yellow-50 px-4 py-3 border-b border-yellow-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {selectedItems.map((item, idx) => {
+                  // Check if this is the last item and there's an odd number of items
+                  const isLastItemInOddCount = idx === selectedItems.length - 1 && selectedItems.length % 2 === 1;
+                  
+                  return (
                     <div
-                  key={`${item.id}-${item.portion}-${item.index}`}
-                      className="flex items-center bg-blue-100 dark:bg-blue-800 rounded-full px-3 py-1 shadow-sm overflow-hidden"
-                >
-                      <span className="text-blue-800 dark:text-blue-200 text-sm font-medium truncate flex-1 min-w-0">
-                        {item.name} ({item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion})
-                  </span>
-                  <button
-                        onClick={() => {
-                          setSelectedItems((prev) => prev.filter((_, i) => i !== idx));
-                        }}
-                    aria-label={`Remove ${item.name}`}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 rounded-full p-0.5 ml-2 flex-shrink-0"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
+                      key={`${item.id}-${item.portion}-${item.index}`}
+                      className={`flex items-center justify-between bg-white border border-yellow-200 rounded-lg px-3 py-2 text-sm overflow-hidden ${
+                        isLastItemInOddCount ? 'sm:col-span-2' : ''
+                      }`}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                      <div className="flex flex-col min-w-0 flex-grow">
+                        <span className="font-medium text-gray-800 truncate">
+                          {item.name}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {item.portion === 'half' ? 'Half Portion' : item.portion === 'full' ? 'Full Portion' : 'Regular'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                        <span className="text-orange-600 font-medium whitespace-nowrap">
+                          ₹{item.price}
+                        </span>
+                        <button
+                          onClick={() => handleRemoveItem(item)}
+                          aria-label={`Remove ${item.name}`}
+                          className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-              ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
           {/* Menu items container */}
-          <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
-            <section
-          id="menu-modal-description"
-              className="h-full overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-50 dark:scrollbar-thumb-blue-700 dark:scrollbar-track-blue-900 p-4"
-              aria-label="Items of the selected category"
-        >
-              <h3 className="text-xl font-semibold mb-4 text-orange-600">{selectedCategory} Menu</h3>
-              <ul>
+          <div className="flex-grow overflow-y-auto p-4 bg-gray-50">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mb-4"></div>
+                <p className="text-gray-600">Loading menu items...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {categories
                   .find(cat => cat.categoryName === selectedCategory)
                   ?.dishes.map((item, index) => {
-            const isSelectedHalf = selectedItems.some(
+                    const isSelectedHalf = selectedItems.some(
                       (i) => i.id === item._id && i.portion === 'half' && i.index === index
-            );
-            const isSelectedFull = selectedItems.some(
+                    );
+                    const isSelectedFull = selectedItems.some(
                       (i) => i.id === item._id && i.portion === 'full' && i.index === index
-            );
-            const isSelectedFixed = selectedItems.some(
+                    );
+                    const isSelectedFixed = selectedItems.some(
                       (i) => i.id === item._id && i.portion === 'fixed' && i.index === index
-            );
+                    );
                     
                     // Check if item already exists in the current order
                     const isExistingHalf = existingItems.some(
@@ -212,97 +269,123 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
                       (i) => i.name === item.name && i.type === 'F'
                     );
                     const isExistingFixed = existingItems.some(
-                      (i) => i.name === item.name && i.type === 'fixed'
+                      (i) => i.name === item.name && (i.type === 'N/A' || i.type === 'fixed')
                     );
                     
-            return (
-              <li
+                    return (
+                      <div
                         key={item._id}
-                        className="p-4 border border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-between mb-4"
-              >
-                        <p className="text-gray-900 dark:text-gray-100 font-semibold mb-2 text-center">{item.name}</p>
-                {typeof item.priceHalf === 'number' && typeof item.priceFull === 'number' ? (
-                  <div className="flex space-x-4">
-                    <div className="flex flex-col items-center">
-                      <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
-                                Half (H) - ₹{item.priceHalf.toFixed(2)}
-                      </span>
-                      <button
-                        onClick={() => handleSelectItem(item, 'half', item.priceHalf, index)}
+                        className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+                      >
+                        <h3 className="font-medium text-gray-800 mb-2 text-center">{item.name}</h3>
+                        {typeof item.priceHalf === 'number' && typeof item.priceFull === 'number' ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col items-center">
+                              <div className="text-sm text-gray-600 mb-1.5 bg-gray-100 px-2 py-1 rounded-full w-full text-center">
+                                Half • ₹{item.priceHalf}
+                              </div>
+                              <button
+                                onClick={() => handleSelectItem(item, 'half', item.priceHalf, index)}
                                 disabled={isExistingHalf}
-                                className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
-                                  isSelectedHalf || isExistingHalf
-                                    ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                        }`}
-                      >
-                                {isSelectedHalf ? 'Added' : isExistingHalf ? 'In Order' : 'Add H'}
-                      </button>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
-                                Full (F) - ₹{item.priceFull.toFixed(2)}
-                      </span>
-                      <button
-                        onClick={() => handleSelectItem(item, 'full', item.priceFull, index)}
+                                className={`w-full py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                  isSelectedHalf 
+                                    ? 'bg-green-600 text-white' 
+                                    : isExistingHalf 
+                                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                      : 'bg-orange-500 text-white hover:bg-orange-600'
+                                }`}
+                              >
+                                {isSelectedHalf ? 'Added ✓' : isExistingHalf ? 'In Order' : 'Add Half'}
+                              </button>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <div className="text-sm text-gray-600 mb-1.5 bg-gray-100 px-2 py-1 rounded-full w-full text-center">
+                                Full • ₹{item.priceFull}
+                              </div>
+                              <button
+                                onClick={() => handleSelectItem(item, 'full', item.priceFull, index)}
                                 disabled={isExistingFull}
-                                className={`px-5 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
-                                  isSelectedFull || isExistingFull
-                                    ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                        }`}
-                      >
-                                {isSelectedFull ? 'Added' : isExistingFull ? 'In Order' : 'Add F'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center">
-                    <span className="text-gray-600 dark:text-gray-400 text-sm mb-1">
-                      ₹{typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'}
-                    </span>
-                    <button
-                      onClick={() => handleSelectItem(item, 'fixed', item.price, index)}
+                                className={`w-full py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                  isSelectedFull 
+                                    ? 'bg-green-600 text-white' 
+                                    : isExistingFull 
+                                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                      : 'bg-orange-500 text-white hover:bg-orange-600'
+                                }`}
+                              >
+                                {isSelectedFull ? 'Added ✓' : isExistingFull ? 'In Order' : 'Add Full'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center">
+                            <div className="text-sm text-gray-600 mb-1.5 bg-gray-100 px-3 py-1 rounded-full">
+                              Price • ₹{typeof item.price === 'number' ? item.price : '0.00'}
+                            </div>
+                            <button
+                              onClick={() => handleSelectItem(item, 'fixed', item.price, index)}
                               disabled={isExistingFixed}
-                              className={`px-6 py-1.5 rounded-lg text-sm font-semibold focus:outline-none ${
-                                isSelectedFixed || isExistingFixed
-                                  ? 'bg-gray-400 text-white cursor-not-allowed shadow-inner'
-                          : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                      }`}
-                    >
-                              {isSelectedFixed ? 'Added' : isExistingFixed ? 'In Order' : 'Add'}
-                    </button>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-            </section>
+                              className={`w-full py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                isSelectedFixed 
+                                  ? 'bg-green-600 text-white' 
+                                  : isExistingFixed 
+                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                              }`}
+                            >
+                              {isSelectedFixed ? 'Added ✓' : isExistingFixed ? 'In Order' : 'Add to Order'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            )}
           </div>
 
-          {/* Buttons at the bottom */}
-          <div className="flex justify-center space-x-4 mt-3">
-          <button
-            onClick={handleSave}
-            disabled={selectedItems.length === 0}
-              className={`px-8 py-3 rounded-2xl font-semibold focus:outline-none ${
-              selectedItems.length === 0
-                ? 'bg-green-300 text-green-700 cursor-not-allowed shadow-inner'
-                : 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
-            }`}
-          >
-            Save
-          </button>
-          <button
-            onClick={onClose}
-              className="px-8 py-3 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-semibold focus:outline-none"
-          >
-            Close
-          </button>
+          {/* Footer with action buttons */}
+          <div className="border-t border-gray-200 p-4 bg-white">
+            <div className="flex justify-between">
+              <button
+                onClick={onClose}
+                className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+                disabled={loading}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={selectedItems.length === 0 || loading}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 ${
+                  selectedItems.length === 0 || loading
+                    ? 'bg-green-300 text-green-700 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Save Changes</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      </div>
+
       {notification && (
         <Notification
           message={notification.message}
