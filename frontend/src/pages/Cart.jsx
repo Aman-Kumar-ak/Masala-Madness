@@ -17,6 +17,7 @@ export default function Cart() {
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showPendingConfirm, setShowPendingConfirm] = useState(false);
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -196,6 +197,12 @@ export default function Cart() {
     }
   };
 
+  const handleConfirmClearCart = () => {
+    clearCart();
+    setShowClearCartConfirm(false);
+    setNotification({ message: "Cart cleared successfully", type: "info" });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <BackButton />
@@ -367,10 +374,7 @@ export default function Cart() {
               </div>
 
               <button
-                onClick={() => {
-                  clearCart();
-                  setNotification({ message: "Cart cleared successfully", type: "info" });
-                }}
+                onClick={() => setShowClearCartConfirm(true)}
                 className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-3.5 rounded-xl transition-colors duration-200 flex items-center justify-center gap-2 text-lg"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -451,6 +455,18 @@ export default function Cart() {
         confirmText="Yes, Add to Pending"
         cancelText="Cancel"
         type="warning"
+      />
+
+      {/* Clear Cart Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showClearCartConfirm}
+        onClose={() => setShowClearCartConfirm(false)}
+        onConfirm={handleConfirmClearCart}
+        title="Clear Cart"
+        message={`Are you sure you want to remove all ${cartItems.length} items from your cart?`}
+        confirmText="Yes, Clear Cart"
+        cancelText="Cancel"
+        type="danger"
       />
     </div>
   );

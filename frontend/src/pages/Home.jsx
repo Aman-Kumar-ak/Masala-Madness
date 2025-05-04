@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from 'react-router-dom';
 import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
+import ConfirmationDialog from "../components/ConfirmationDialog";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -16,6 +17,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [activeDiscount, setActiveDiscount] = useState(null);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -110,6 +112,11 @@ export default function Home() {
       window.removeEventListener('orderUpdated', handleOrderUpdate);
     };
   }, []);
+
+  const handleConfirmClearCart = () => {
+    clearCart();
+    setShowClearCartConfirm(false);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
@@ -326,11 +333,11 @@ export default function Home() {
       {cartItems.length > 0 && (
         <div className="container mx-auto px-4 mt-4 flex justify-center">
           <button
-            onClick={clearCart}
+            onClick={() => setShowClearCartConfirm(true)}
             className="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-500 font-medium px-6 py-2 rounded-full border border-red-200 transition-all duration-200 shadow-sm hover:shadow"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
             <span>Clear Cart</span>
           </button>
@@ -351,6 +358,18 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Clear Cart Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showClearCartConfirm}
+        onClose={() => setShowClearCartConfirm(false)}
+        onConfirm={handleConfirmClearCart}
+        title="Clear Cart"
+        message={`Are you sure you want to remove all ${cartItems.length} items from your cart?`}
+        confirmText="Yes, Clear Cart"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 }
