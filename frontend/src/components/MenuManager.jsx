@@ -358,22 +358,36 @@ const MenuManager = ({ categories, onUpdate }) => {
             <h3 className="text-xl font-semibold mb-4 text-blue-600">Add New Dish</h3>
             <div className="grid grid-cols-1 gap-6">
               <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  value={newDish.categoryId}
-                  onChange={(e) => setNewDish({...newDish, categoryId: e.target.value})}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((category) => (
-                    <option key={category._id} value={category._id}>{category.categoryName}</option>
-                  ))}
-                </select>
+                <label className="block text-base font-medium text-gray-700 mb-1">Category</label>
+                <div className="relative">
+                  <select
+                    value={newDish.categoryId}
+                    onChange={(e) => setNewDish({...newDish, categoryId: e.target.value})}
+                    className="w-full p-3 pr-10 border rounded-lg appearance-none bg-white focus:ring-2 focus:ring-none focus:border-transparent text-gray-700 cursor-pointer text-base"
+                    required
+                  >
+                    <option value="" disabled>Select a category</option>
+                    {categories.map((category) => (
+                      <option 
+                        key={category._id} 
+                        value={category._id}
+                        className="truncate"
+                        title={category.categoryName}
+                      >
+                        {category.categoryName}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
               </div>
               
               <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dish Name</label>
+                <label className="block text-base font-medium text-gray-700 mb-1">Dish Name</label>
                 <input
                   type="text"
                   value={newDish.name}
@@ -423,7 +437,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+                    <label className="block text-base font-medium text-gray-700 mb-1">Price (₹)</label>
                     <input
                       type="number"
                       value={newDish.price}
