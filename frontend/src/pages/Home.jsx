@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
 import ConfirmationDialog from "../components/ConfirmationDialog";
+import { useNotification } from "../components/NotificationContext";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -18,6 +19,7 @@ export default function Home() {
   const [activeDiscount, setActiveDiscount] = useState(null);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+  const { showInfo } = useNotification();
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -116,6 +118,7 @@ export default function Home() {
   const handleConfirmClearCart = () => {
     clearCart();
     setShowClearCartConfirm(false);
+    showInfo("Cart cleared successfully");
   };
 
   return (

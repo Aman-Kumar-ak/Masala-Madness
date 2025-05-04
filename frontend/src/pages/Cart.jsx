@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import Notification from "../components/Notification";
 import ConfirmationDialog from "../components/ConfirmationDialog";
+import { useNotification } from "../components/NotificationContext";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -12,12 +13,12 @@ export default function Cart() {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [activeDiscount, setActiveDiscount] = useState(null);
   const navigate = useNavigate();
-  const [notification, setNotification] = useState(null);
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showPendingConfirm, setShowPendingConfirm] = useState(false);
   const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+  const { showSuccess, showError, showWarning, showInfo } = useNotification();
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -70,10 +71,7 @@ export default function Cart() {
 
   const handleShowPaymentOptions = () => {
     if (cartItems.length === 0) {
-      setNotification({
-        message: "Your cart is empty. Add items before proceeding.",
-        type: "warning"
-      });
+      showWarning("Your cart is empty. Add items before proceeding.");
       return;
     }
     
@@ -84,10 +82,7 @@ export default function Cart() {
 
   const handleAddToPending = async () => {
     if (cartItems.length === 0) {
-      setNotification({
-        message: "Your cart is empty. Add items before proceeding.",
-        type: "warning"
-      });
+      showWarning("Your cart is empty. Add items before proceeding.");
       return;
     }
     
@@ -107,20 +102,13 @@ export default function Cart() {
     if (isProcessing) return;
     setIsProcessing(true);
     
-    // Immediately close all dialogs and show notification
+    // Immediately close all dialogs
     setShowPaymentConfirm(false);
     setShowPaymentOptions(false);
     
-    if (isPaid) {
-      setNotification({
-        message: "Processing payment...",
-        type: "info"
-      });
-    } else {
-      setNotification({
-        message: "Adding to pending orders...",
-        type: "info"
-      });
+    // Remove the processing payment notification
+    if (!isPaid) {
+      showInfo("Adding to pending orders...");
     }
 
     const payload = {
@@ -152,10 +140,7 @@ export default function Cart() {
         const data = await res.json();
         if (res.ok) {
           // Handle successful payment
-          setNotification({
-            message: `Payment successful! Order confirmed for ₹${totalAmount}`,
-            type: "success"
-          });
+          showSuccess(`Payment successful! Order confirmed for ₹${totalAmount}`);
           clearCart();
           setTimeout(() => {
             navigate("/");
@@ -174,10 +159,7 @@ export default function Cart() {
         const data = await res.json();
         if (res.ok) {
           // Handle adding to pending
-          setNotification({
-            message: `Order added to pending. Amount: ₹${totalAmount}`,
-            type: "info"
-          });
+          showInfo(`Order added to pending. Amount: ₹${totalAmount}`);
           clearCart();
           setTimeout(() => {
             navigate("/");
@@ -188,10 +170,7 @@ export default function Cart() {
       }
     } catch (error) {
       console.error("Payment error:", error);
-      setNotification({
-        message: "Failed to process order: " + error.message,
-        type: "error"
-      });
+      showError("Failed to process order: " + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -200,7 +179,7 @@ export default function Cart() {
   const handleConfirmClearCart = () => {
     clearCart();
     setShowClearCartConfirm(false);
-    setNotification({ message: "Cart cleared successfully", type: "info" });
+    showInfo("Cart cleared successfully");
   };
 
   return (
@@ -386,15 +365,6 @@ export default function Cart() {
           </div>
         )}
       </div>
-
-      {/* Notifications */}
-      {notification && (
-        <Notification
-          message={notification.message}
-          type={notification.type}
-          onClose={() => setNotification(null)}
-        />
-      )}
 
       {/* Payment Options Dialog */}
       <ConfirmationDialog
