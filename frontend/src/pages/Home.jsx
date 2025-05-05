@@ -4,8 +4,7 @@ import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
 import ConfirmationDialog from "../components/ConfirmationDialog";
 import { useNotification } from "../components/NotificationContext";
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { API_URL } from "../utils/config";
 
 export default function Home() {
   const { cartItems, clearCart } = useCart();

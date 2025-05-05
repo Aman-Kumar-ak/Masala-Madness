@@ -5,8 +5,13 @@ import { fetchCategories } from "../utils/fetchCategories";
 import BackButton from "../components/BackButton";
 import Notification from "../components/Notification";
 import ConfirmationDialog from "../components/ConfirmationDialog";
+import { useNotification } from "../components/NotificationContext";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { useRefresh } from "../contexts/RefreshContext";
+import { API_URL } from "../utils/config";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const Admin = () => {
   const [categories, setCategories] = useState([]);

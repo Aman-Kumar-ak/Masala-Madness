@@ -5,8 +5,9 @@ import { useNotification } from "../components/NotificationContext";
 import ConfirmationDialog from "../components/ConfirmationDialog";
 import PasswordVerificationDialog from "../components/PasswordVerificationDialog";
 import { useAuth } from "../contexts/AuthContext";
+import { API_URL } from "../utils/config";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Qr() {
   const [upiId, setUpiId] = useState("");

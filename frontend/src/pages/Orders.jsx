@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import BackButton from "../components/BackButton";
 import { useRefresh } from "../contexts/RefreshContext";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../utils/config";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
