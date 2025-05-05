@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { notificationAnimation } from '../utils/animations';
 
 const Notification = ({ message, type = 'info', duration = 1500, onClose, style = {} }) => {
-  const [isVisible, setIsVisible] = useState(true);
-  const [isLeaving, setIsLeaving] = useState(false);
   const [progress, setProgress] = useState(100);
 
   useEffect(() => {
     if (duration) {
-      // Start timer for auto-dismiss
-      const timer = setTimeout(() => {
-        handleClose();
-      }, duration);
-
       // Progress bar animation
       const startTime = Date.now();
       const updateInterval = Math.min(16, duration / 60);
@@ -22,23 +17,15 @@ const Notification = ({ message, type = 'info', duration = 1500, onClose, style 
         
         if (remaining <= 0) {
           clearInterval(intervalId);
+          if (onClose) setTimeout(onClose, 200);
         }
       }, updateInterval);
 
       return () => {
-        clearTimeout(timer);
         clearInterval(intervalId);
       };
     }
-  }, [duration]);
-
-  const handleClose = () => {
-    setIsLeaving(true);
-    setTimeout(() => {
-      setIsVisible(false);
-      onClose?.();
-    }, 200);
-  };
+  }, [duration, onClose]);
 
   const getTypeStyles = () => {
     switch (type) {
@@ -163,63 +150,70 @@ const Notification = ({ message, type = 'info', duration = 1500, onClose, style 
     }
   };
 
-  if (!isVisible) return null;
-
   const styles = getTypeStyles();
 
   return (
     <div className="fixed left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md px-4" style={{ top: '1rem', ...style }}>
-      <div 
+      <motion.div 
         className={`
           ${styles.background} 
           border
           ${styles.border}
           rounded-xl 
           shadow-lg 
-          transition-all 
-          duration-200 
-          ease-in-out
           overflow-hidden
-          ${isLeaving 
-            ? 'opacity-0 transform translate-y-[-1rem]' 
-            : 'opacity-100 transform translate-y-0 animate-notification-slide-down'
-          }
         `}
+        {...notificationAnimation}
       >
         <div className="flex items-center p-4">
-          {getIcon()}
-          <div className="ml-3 flex-grow">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.1, type: "spring", stiffness: 500 }}
+          >
+            {getIcon()}
+          </motion.div>
+          <motion.div 
+            className="ml-3 flex-grow"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+          >
             <h3 className={`text-sm font-semibold ${styles.text}`}>
               {styles.title}
             </h3>
             <p className={`text-sm ${styles.text}`}>
               {message}
             </p>
-          </div>
-          <button
-            onClick={handleClose}
+          </motion.div>
+          <motion.button
+            onClick={onClose}
             className="ml-4 -mr-1 bg-white/30 backdrop-blur-sm rounded-full p-1.5 inline-flex text-gray-400 hover:text-gray-700 hover:bg-white/50 transition-colors duration-200"
             aria-label="Dismiss"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
+          </motion.button>
         </div>
         
         {/* Progress bar */}
         {duration > 0 && (
           <div className="h-1 w-full bg-gray-200">
-            <div 
+            <motion.div 
               className={`h-full ${styles.progress}`}
-              style={{ 
-                width: `${progress}%`,
-                transition: `width ${Math.min(16, duration / 60)}ms linear`
+              initial={{ width: "100%" }}
+              animate={{ width: "0%" }}
+              transition={{ 
+                duration: duration / 1000, 
+                ease: "linear"
               }}
-            ></div>
+            ></motion.div>
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 };

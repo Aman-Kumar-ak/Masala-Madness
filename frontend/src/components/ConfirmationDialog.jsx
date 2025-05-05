@@ -1,4 +1,6 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { modalAnimation, buttonHoverAnimation } from '../utils/animations';
 
 const ConfirmationDialog = ({ 
   isOpen, 
@@ -74,15 +76,22 @@ const ConfirmationDialog = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+      <motion.div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         onClick={onClose}
       />
       
       {/* Dialog */}
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-xs sm:max-w-md relative animate-scale-in mx-4 overflow-hidden">
+      <motion.div 
+        className="bg-white rounded-xl shadow-2xl w-full max-w-xs sm:max-w-md relative mx-4 overflow-hidden"
+        {...modalAnimation}
+      >
         {/* Optional colored bar at top based on type */}
         <div className={`h-1.5 w-full ${
           type === 'danger' ? 'bg-red-500' : 
@@ -93,37 +102,77 @@ const ConfirmationDialog = ({
         
         <div className="p-5 sm:p-6">
           {/* Icon based on dialog type */}
-          {getIconByType()}
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 300,
+              damping: 20,
+              delay: 0.1
+            }}
+          >
+            {getIconByType()}
+          </motion.div>
 
-          <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">{title}</h3>
-          <p className="text-gray-600 mb-6 text-base text-center">{message}</p>
+          <motion.h3 
+            className="text-xl font-bold text-gray-900 mb-2 text-center"
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            {title}
+          </motion.h3>
+
+          <motion.p 
+            className="text-gray-600 mb-6 text-base text-center"
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            {message}
+          </motion.p>
           
           {/* Render custom content if provided */}
           {customContent && (
-            <div className="mb-5 sm:mb-6">
+            <motion.div 
+              className="mb-5 sm:mb-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+            >
               {customContent}
-            </div>
+            </motion.div>
           )}
           
           {/* Only render buttons if confirmText is not null */}
           {confirmText !== null && (
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
+            <motion.div 
+              className="flex flex-col sm:flex-row gap-3"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+            >
+              <motion.button
                 onClick={onConfirm}
                 className={`${getConfirmButtonStyle()} text-white px-5 py-3 rounded-xl flex-1 font-medium transition-all duration-200 text-base shadow-sm hover:shadow`}
+                whileHover={buttonHoverAnimation}
+                whileTap={{ scale: 0.95 }}
               >
                 {confirmText}
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 onClick={handleCancel}
                 className="bg-gray-100 text-gray-700 px-5 py-3 rounded-xl flex-1 font-medium hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 text-base"
+                whileHover={buttonHoverAnimation}
+                whileTap={{ scale: 0.95 }}
               >
                 {cancelText}
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
