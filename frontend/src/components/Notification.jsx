@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Notification = ({ message, type = 'info', duration = 1000, onClose, style = {} }) => {
+const Notification = ({ message, type = 'info', duration = 1500, onClose, style = {} }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false);
   const [progress, setProgress] = useState(100);
@@ -12,9 +12,9 @@ const Notification = ({ message, type = 'info', duration = 1000, onClose, style 
         handleClose();
       }, duration);
 
-      // Progress bar animation - update more frequently for shorter durations
+      // Progress bar animation
       const startTime = Date.now();
-      const updateInterval = Math.min(16, duration / 60); // More frequent updates for short durations
+      const updateInterval = Math.min(16, duration / 60);
       const intervalId = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
@@ -34,11 +34,10 @@ const Notification = ({ message, type = 'info', duration = 1000, onClose, style 
 
   const handleClose = () => {
     setIsLeaving(true);
-    // Shorter animation for quicker notifications
     setTimeout(() => {
       setIsVisible(false);
       onClose?.();
-    }, 200); // Faster exit animation
+    }, 200);
   };
 
   const getTypeStyles = () => {
@@ -49,7 +48,8 @@ const Notification = ({ message, type = 'info', duration = 1000, onClose, style 
           border: 'border-emerald-200',
           icon: 'bg-emerald-100 text-emerald-600',
           progress: 'bg-emerald-500',
-          text: 'text-emerald-800'
+          text: 'text-emerald-800',
+          title: 'Success'
         };
       case 'error':
         return {
@@ -57,7 +57,8 @@ const Notification = ({ message, type = 'info', duration = 1000, onClose, style 
           border: 'border-rose-200',
           icon: 'bg-rose-100 text-rose-600',
           progress: 'bg-rose-500',
-          text: 'text-rose-800'
+          text: 'text-rose-800',
+          title: 'Error'
         };
       case 'warning':
         return {
@@ -65,15 +66,44 @@ const Notification = ({ message, type = 'info', duration = 1000, onClose, style 
           border: 'border-amber-200',
           icon: 'bg-amber-100 text-amber-600',
           progress: 'bg-amber-500',
-          text: 'text-amber-800'
+          text: 'text-amber-800',
+          title: 'Warning'
         };
-      default:
+      case 'info':
         return {
           background: 'bg-blue-50',
           border: 'border-blue-200',
           icon: 'bg-blue-100 text-blue-600',
           progress: 'bg-blue-500',
-          text: 'text-blue-800'
+          text: 'text-blue-800',
+          title: 'Info'
+        };
+      case 'delete':
+        return {
+          background: 'bg-red-50',
+          border: 'border-red-200',
+          icon: 'bg-red-100 text-red-600',
+          progress: 'bg-red-500',
+          text: 'text-red-800',
+          title: 'Deleted'
+        };
+      case 'update':
+        return {
+          background: 'bg-indigo-50',
+          border: 'border-indigo-200',
+          icon: 'bg-indigo-100 text-indigo-600',
+          progress: 'bg-indigo-500',
+          text: 'text-indigo-800',
+          title: 'Updated'
+        };
+      default:
+        return {
+          background: 'bg-gray-50',
+          border: 'border-gray-200',
+          icon: 'bg-gray-100 text-gray-600',
+          progress: 'bg-gray-500',
+          text: 'text-gray-800',
+          title: 'Notification'
         };
     }
   };
@@ -103,6 +133,22 @@ const Notification = ({ message, type = 'info', duration = 1000, onClose, style 
           <div className={`w-10 h-10 rounded-full ${styles.icon} flex items-center justify-center flex-shrink-0`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+        );
+      case 'delete':
+        return (
+          <div className={`w-10 h-10 rounded-full ${styles.icon} flex items-center justify-center flex-shrink-0`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </div>
+        );
+      case 'update':
+        return (
+          <div className={`w-10 h-10 rounded-full ${styles.icon} flex items-center justify-center flex-shrink-0`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </div>
         );
@@ -143,7 +189,10 @@ const Notification = ({ message, type = 'info', duration = 1000, onClose, style 
         <div className="flex items-center p-4">
           {getIcon()}
           <div className="ml-3 flex-grow">
-            <p className={`text-base font-medium ${styles.text}`}>
+            <h3 className={`text-sm font-semibold ${styles.text}`}>
+              {styles.title}
+            </h3>
+            <p className={`text-sm ${styles.text}`}>
               {message}
             </p>
           </div>

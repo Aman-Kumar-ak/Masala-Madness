@@ -32,6 +32,7 @@ export default function Qr() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { isAuthenticated: isLoggedIn } = useAuth();
+  const [sessionTimeLeft, setSessionTimeLeft] = useState(null);
   
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -44,16 +45,60 @@ export default function Qr() {
   });
   
   const qrRef = useRef(null);
+  const upiFormRef = useRef(null); // Reference for UPI form section
   const { showSuccess, showError, showInfo } = useNotification();
   const navigate = useNavigate();
 
-  // Check if user is already authenticated
+  // Check authentication status on component mount and when isLoggedIn changes
   useEffect(() => {
-    if (isLoggedIn) {
-      // Don't show password dialog initially, just show the "Verify Now" button first
-      setShowPasswordDialog(false);
-    }
+    checkAuthenticationStatus();
   }, [isLoggedIn]);
+
+  // Check if verification has expired periodically
+  useEffect(() => {
+    if (isAuthenticated) {
+      const timer = setInterval(() => {
+        checkAuthenticationStatus();
+      }, 30000); // Check every 30 seconds
+      
+      return () => clearInterval(timer);
+    }
+  }, [isAuthenticated]);
+
+  // Function to check if user is authenticated or has valid verification
+  const checkAuthenticationStatus = () => {
+    // Check if there's a valid verification timestamp
+    const verificationExpiry = localStorage.getItem('qr_verification_expiry');
+    
+    if (verificationExpiry) {
+      const expiryTime = parseInt(verificationExpiry);
+      const currentTime = new Date().getTime();
+      
+      if (currentTime < expiryTime) {
+        // Still valid, calculate remaining time
+        const remainingMs = expiryTime - currentTime;
+        const remainingMinutes = Math.floor(remainingMs / 60000);
+        const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+        
+        setSessionTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
+        setIsAuthenticated(true);
+        
+        // If we just authenticated, fetch UPI addresses
+        if (!isAuthenticated) {
+          fetchUpiAddresses();
+        }
+        
+        return;
+      } else {
+        // Expired, clear it
+        localStorage.removeItem('qr_verification_expiry');
+        setSessionTimeLeft(null);
+      }
+    }
+    
+    // If we get here, either no verification or expired verification
+    setIsAuthenticated(false);
+  };
 
   // Load saved UPI ID from localStorage on component mount
   useEffect(() => {
@@ -360,6 +405,18 @@ export default function Qr() {
     showSuccess("QR code ready for sharing");
   };
 
+  // Scrolling to UPI form function
+  const scrollToUpiForm = () => {
+    if (upiFormRef.current) {
+      setTimeout(() => {
+        upiFormRef.current.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }, 100); // Small delay to ensure state updates before scrolling
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
       <BackButton />
@@ -370,7 +427,7 @@ export default function Qr() {
           <div className="max-w-4xl mx-auto">
             <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
               <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">QR Code Generator</h1>
-              
+                            
               <div className="p-6 md:p-8">
                 {/* Mode switch buttons */}
                 <div className="mb-8 flex justify-center">
@@ -396,6 +453,7 @@ export default function Qr() {
                           setIsAddingUpi(true);
                           setQrCodeUrl("");
                           setUpiLink("");
+                          scrollToUpiForm(); // Scroll to form
                         }
                       }}
                       className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
@@ -415,25 +473,28 @@ export default function Qr() {
                     <h2 className="text-lg font-semibold text-gray-800">
                       {isAddingUpi || isEditingUpi ? 'Manage UPI Addresses' : 'Saved UPI Addresses'}
                     </h2>
-                    <button
-                      onClick={() => {
-                        setIsAddingUpi(true);
-                        setIsEditingUpi(false);
-                        setNewUpiAddress({
-                          name: '',
-                          upiId: '',
-                          description: '',
-                          isDefault: savedUpiAddresses.length === 0
-                        });
-                      }}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
-                      disabled={isEditingUpi} // Disable when editing
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span>Add New</span>
-                    </button>
+                    {(isAddingUpi || isEditingUpi) && (
+                      <button
+                        onClick={() => {
+                          setIsAddingUpi(true);
+                          setIsEditingUpi(false);
+                          setNewUpiAddress({
+                            name: '',
+                            upiId: '',
+                            description: '',
+                            isDefault: savedUpiAddresses.length === 0
+                          });
+                          scrollToUpiForm(); // Scroll to form
+                        }}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1 whitespace-nowrap"
+                        disabled={isEditingUpi} // Disable when editing
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Add New</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Helper text for different modes */}
@@ -594,7 +655,7 @@ export default function Qr() {
 
                 {/* Form to Add/Edit UPI Address */}
                 {(isAddingUpi || isEditingUpi) && (
-                  <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 mb-8">
+                  <div ref={upiFormRef} className="bg-blue-50 p-5 rounded-lg border border-blue-200 mb-8 scroll-mt-8">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="text-lg font-semibold text-gray-800">
                         {isEditingUpi ? 
@@ -947,9 +1008,12 @@ export default function Qr() {
             <p className="text-gray-600 mb-6 text-lg">
               Admin verification is required to access the QR settings.
             </p>
+            <p className="text-gray-500 mb-4 text-sm">
+              Once verified, you'll have access for 10 minutes without re-entering your password.
+            </p>
             <button
               onClick={() => setShowPasswordDialog(true)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-lg"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-lg"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
