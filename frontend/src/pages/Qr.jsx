@@ -528,8 +528,8 @@ export default function Qr() {
                             }
                           }}
                         >
-                          <div className="flex flex-col md:flex-row md:justify-between gap-4">
-                            <div className="flex items-start gap-4">
+                          <div className="flex flex-col h-full">
+                            <div className="flex flex-col md:flex-row md:items-start gap-4">
                               <div 
                                 className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                                   isEditingUpi && newUpiAddress.upiId === address.upiId
@@ -567,7 +567,7 @@ export default function Qr() {
                                   </svg>
                                 )}
                               </div>
-                              <div>
+                              <div className="flex-grow min-w-0">
                                 <div className="font-medium text-gray-800 text-lg flex items-center flex-wrap gap-2">
                                   {address.name}
                                   {isEditingUpi && newUpiAddress.upiId === address.upiId ? (
@@ -604,20 +604,20 @@ export default function Qr() {
                               </div>
                             </div>
                             
-                            <div className="flex md:flex-col gap-2 ml-auto md:ml-0">
+                            <div className="flex justify-end gap-2 mt-4">
                               {!address.isDefault && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setDefaultUpiAddress(address._id);
                                   }}
-                                  className="p-2 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 flex items-center gap-1"
+                                  className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 flex items-center gap-1 min-w-[90px] justify-center"
                                   title="Set as default"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                   </svg>
-                                  <span className="hidden md:inline text-xs">Default</span>
+                                  <span className="text-xs">Default</span>
                                 </button>
                               )}
                               <button
@@ -625,26 +625,26 @@ export default function Qr() {
                                   e.stopPropagation();
                                   startEditingUpiAddress(address);
                                 }}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-1"
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-1 min-w-[70px] justify-center"
                                 title="Edit"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
-                                <span className="hidden md:inline text-xs">Edit</span>
+                                <span className="text-xs">Edit</span>
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openDeleteConfirmation(address);
                                 }}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 flex items-center gap-1"
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 flex items-center gap-1 min-w-[70px] justify-center"
                                 title="Delete"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                <span className="hidden md:inline text-xs">Delete</span>
+                                <span className="text-xs">Delete</span>
                               </button>
                             </div>
                           </div>

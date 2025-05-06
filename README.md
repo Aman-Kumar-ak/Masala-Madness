@@ -310,7 +310,24 @@ Order Number is reset on the basis of UTC timing.
 
 ## Issue 
 
-Issue Resolved
+1. After searching from the search bar, the name is written and we tries to click any category. Item not showing. It just showing the item which was being searched. It need to fix that even we search from the search bar. If admin wants to do search from the category bar they can do. The search bar operation will be stop.
+
+2. In Search bar we write the name of the items. It searching perfectly but there is a issue when we add the space. 
+      Example - search item - "Burger" --> it shows the items related burger
+            but when admin do the search - "Burger " add accidently space after or before this shows no item Which need  fix. 
+      making sure to handle the case where search name "Paneer Burger". There is space need between them. You have to make the code to handle both the cases.
+
+3. There is a issue in Qr page of Saved UPI address. The cards which is storing the names and upi details. in which if more than two upi's are added. Any of the card's edit button and Delete button overflows from the Card. Make sure the button remains in the card. This Issue is comning in Pc and phone dimensions.
+
+4. After pressing the Clear Cart in Cart page. It has to redirect to the home page.
+5. Make sure this can not be send in console for security reasons - 
+  username: 'admin',
+
+  body: { username: 'admin', password: 'Amankumar@1234' },
+
+  headers: 'application/json',
+
+  ip: '::ffff:100.64.0.5'
 
 ## Things to do now
 
