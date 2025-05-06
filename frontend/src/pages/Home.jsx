@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
 import ConfirmationDialog from "../components/ConfirmationDialog";
 import { useNotification } from "../components/NotificationContext";
 import { API_URL } from "../utils/config";
+import OptimizedImage from "../components/OptimizedImage";
 
 export default function Home() {
   const { cartItems, clearCart } = useCart();
@@ -129,10 +130,12 @@ export default function Home() {
             {/* Logo and Title */}
             <div className="flex items-center space-x-2">
               <div className="w-11 h-11 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full p-0.5 shadow-sm flex items-center justify-center">
-                <img 
+                <OptimizedImage 
                   src="/images/m_logo.png" 
                   alt="Masala Madness Logo" 
                   className="w-9 h-9 object-contain"
+                  width={36}
+                  height={36}
                 />
               </div>
               <div>
@@ -149,10 +152,12 @@ export default function Home() {
                 aria-label={`Cart with ${cartItems.reduce((total, item) => total + item.quantity, 0)} items`}
               >
                 <div className="w-11 h-11 bg-orange-100 rounded-full flex items-center justify-center transition-all duration-200 group-hover:bg-orange-200">
-                  <img
+                  <OptimizedImage
                     src="/images/receipt.png"
                     alt="Cart"
                     className="w-7 h-7 object-contain"
+                    width={28}
+                    height={28}
                   />
                 </div>
                 {cartItems.reduce((total, item) => total + item.quantity, 0) > 0 && (
@@ -168,10 +173,12 @@ export default function Home() {
                 aria-label={`Pending Orders: ${pendingOrdersCount}`}
               >
                 <div className="w-11 h-11 bg-blue-100 rounded-full flex items-center justify-center transition-all duration-200 group-hover:bg-blue-200">
-                  <img
+                  <OptimizedImage
                     src="/images/order.png"
                     alt="Pending Orders"
                     className="w-7 h-7 object-contain"
+                    width={28}
+                    height={28}
                   />
                 </div>
                 {pendingOrdersCount > 0 && (
@@ -211,7 +218,7 @@ export default function Home() {
                 </svg>
               </button>
               <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-2xl shadow-sm">
-                <img src="/images/calendar.png" alt="Calendar" className="w-8 h-8" />
+                <OptimizedImage src="/images/calendar.png" alt="Calendar" className="w-8 h-8" width={32} height={32} />
               </div>
               <div>
                 <p className="text-lg font-semibold text-gray-800">
@@ -226,10 +233,12 @@ export default function Home() {
                 className="w-10 h-10 rounded-full bg-yellow-100 hover:bg-yellow-200 transition-colors duration-200 flex items-center justify-center shadow-sm"
                 title="QR Code"
               >
-                <img
+                <OptimizedImage
                   src="/images/qr-code.png"
                   alt="QR Code"
                   className="w-10 h-10 object-contain"
+                  width={40}
+                  height={40}
                 />
               </Link>
               <Link
@@ -237,10 +246,12 @@ export default function Home() {
                 className="w-10 h-10 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors duration-200 flex items-center justify-center shadow-sm"
                 title="Settings"
               >
-                <img
+                <OptimizedImage
                   src="/images/login.png"
                   alt="Settings"
                   className="w-10 h-10 object-contain"
+                  width={40}
+                  height={40}
                 />
               </Link>
               <Link
@@ -248,10 +259,12 @@ export default function Home() {
                 className="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white px-4 py-2 rounded-full transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-yellow-300 focus:outline-none"
                 aria-label="Admin Panel"
               >
-                <img
+                <OptimizedImage
                   src="/images/admin.png"
                   alt="Admin"
                   className="w-5 h-5 object-contain"
+                  width={20}
+                  height={20}
                 />
                 <span className="font-medium">Admin Panel</span>
               </Link>

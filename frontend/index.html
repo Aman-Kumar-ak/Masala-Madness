@@ -4,7 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Masala Madness</title>
+    <!-- DNS Prefetching -->
+    <link rel="dns-prefetch" href="https://masala-madness-production.up.railway.app" />
+    
+    <!-- Favicon -->
     <link rel="icon" href="/images/logo/logo.png" />
+    
+    <!-- Preload important images -->
+    <link rel="preload" as="image" href="/images/m_logo.png" />
+    <link rel="preload" as="image" href="/images/login.png" />
+    
+    <!-- Font Display Strategy -->
+    <style>
+      /* Use font-display: swap for all font-face rules */
+      * {
+        font-display: swap;
+      }
+      
+      /* Prevent layout shifts while images load */
+      img {
+        aspect-ratio: attr(width) / attr(height);
+      }
+    </style>
   </head>
   <body class="bg-orange-50">
     <div id="root"></div>

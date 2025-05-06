@@ -6,6 +6,10 @@ import './style.css';
 
 import { CartProvider } from './components/CartContext'; // ✅ Import the CartProvider
 import { RefreshProvider } from './contexts/RefreshContext'; // ✅ Import the RefreshProvider
+import { initializeFastImageLoading } from './utils/imageOptimizations'; // Import image optimization
+
+// Initialize image optimizations
+initializeFastImageLoading();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
