@@ -10,7 +10,8 @@ const COMMON_IMAGES = [
   '/images/order.png',
   '/images/calendar.png',
   '/images/qr-code.png',
-  '/images/admin.png'
+  '/images/admin.png',
+  '/images/logo/logo.png'
 ];
 
 // Simple in-memory image cache
@@ -21,15 +22,40 @@ const imageCache = new Map();
  */
 export const preloadCommonImages = () => {
   COMMON_IMAGES.forEach(src => {
-    // Only preload if not in cache already
-    if (!imageCache.has(src)) {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        imageCache.set(src, true);
-        console.log(`Preloaded: ${src}`);
-      };
+    // Force load immediately with high priority
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      imageCache.set(src, true);
+      console.log(`Preloaded: ${src}`);
+    };
+    img.onerror = () => {
+      console.error(`Failed to preload: ${src}`);
+    };
+    
+    // Force image to be loaded with high priority
+    img.fetchPriority = "high";
+    
+    // Ensure the browser knows this is important
+    if (typeof img.importance !== 'undefined') {
+      img.importance = "high";
     }
+    
+    // Add to document for better browser prioritization
+    img.style.position = 'absolute';
+    img.style.opacity = '0';
+    img.style.width = '1px';
+    img.style.height = '1px';
+    img.style.top = '-1px';
+    img.style.left = '-1px';
+    document.body.appendChild(img);
+    
+    // Remove after a short delay
+    setTimeout(() => {
+      if (document.body.contains(img)) {
+        document.body.removeChild(img);
+      }
+    }, 3000);
   });
 };
 
@@ -90,44 +116,28 @@ export const addImageToCache = async (url) => {
 export const initImageOptimizations = () => {
   // Preload common images
   preloadCommonImages();
-  
-  // Add support for image observer
-  if ('IntersectionObserver' in window) {
-    const lazyImageObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const lazyImage = entry.target;
-          
-          // Only load if data-src is present
-          if (lazyImage.dataset.src) {
-            lazyImage.src = lazyImage.dataset.src;
-            
-            // Add to cache
-            addImageToCache(lazyImage.dataset.src).catch(console.error);
-            
-            // Remove from observer
-            lazyImageObserver.unobserve(lazyImage);
-          }
-        }
-      });
-    });
-    
-    // Find all lazy images with data-src and observe them
-    document.querySelectorAll('img[data-src]').forEach(img => {
-      lazyImageObserver.observe(img);
-    });
-  }
 };
 
 /**
  * Run image optimizations on initial load
  */
 export const initializeFastImageLoading = () => {
-  // Run on window load when other critical resources are loaded
+  // Run immediately without waiting for window load
+  initImageOptimizations();
+  
+  // Retry loading any failed images on window load
   window.addEventListener('load', () => {
-    setTimeout(() => {
-      initImageOptimizations();
-    }, 100); // Small delay to prioritize more critical tasks
+    // Check which images are not yet cached
+    COMMON_IMAGES.forEach(src => {
+      if (!imageCache.has(src)) {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          imageCache.set(src, true);
+          console.log(`Loaded on retry: ${src}`);
+        };
+      }
+    });
   });
 };
 

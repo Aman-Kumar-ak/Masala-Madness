@@ -6,9 +6,12 @@ import './style.css';
 
 import { CartProvider } from './components/CartContext'; // ✅ Import the CartProvider
 import { RefreshProvider } from './contexts/RefreshContext'; // ✅ Import the RefreshProvider
-import { initializeFastImageLoading } from './utils/imageOptimizations'; // Import image optimization
+import { initializeFastImageLoading, preloadCommonImages } from './utils/imageOptimizations'; // Import image optimization
 
-// Initialize image optimizations
+// Start preloading images immediately before any React rendering
+preloadCommonImages();
+
+// Then initialize the rest of the image optimization
 initializeFastImageLoading();
 
 ReactDOM.createRoot(document.getElementById('root')).render(

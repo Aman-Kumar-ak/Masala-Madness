@@ -20,47 +20,32 @@ const OptimizedImage = ({
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const [imgSrc, setImgSrc] = useState(placeholder);
+  const [imgSrc, setImgSrc] = useState(src); // Use actual src immediately instead of placeholder
 
   useEffect(() => {
     // Reset states when src changes
     setIsLoaded(false);
     setError(false);
+    setImgSrc(src); // Always use the actual source immediately
     
-    // Use Intersection Observer for lazy loading
-    const imgElement = document.createElement('img');
+    // Load image directly to verify it works
+    const img = new Image();
+    img.src = src;
     
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        // Start loading the actual image when it comes into view
-        imgElement.src = src;
-        imgElement.onload = () => {
-          setImgSrc(src);
-          setIsLoaded(true);
-        };
-        imgElement.onerror = () => {
-          setError(true);
-          console.error(`Failed to load image: ${src}`);
-        };
-        
-        // Disconnect observer after loading starts
-        observer.disconnect();
-      }
-    }, {
-      rootMargin: '200px', // Start loading when image is 200px from viewport
-      threshold: 0.01
-    });
+    img.onload = () => {
+      setIsLoaded(true);
+    };
     
-    // Create a temporary DOM element to observe
-    const tempElement = document.createElement('div');
-    observer.observe(tempElement);
+    img.onerror = () => {
+      setError(true);
+      console.error(`Failed to load image: ${src}`);
+    };
     
     return () => {
-      observer.disconnect();
-      imgElement.onload = null;
-      imgElement.onerror = null;
+      img.onload = null;
+      img.onerror = null;
     };
-  }, [src, placeholder]);
+  }, [src]);
 
   return (
     <div 
@@ -70,10 +55,9 @@ const OptimizedImage = ({
       <img
         src={error ? placeholder : imgSrc}
         alt={alt}
-        className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+        className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-80'}`}
         width={width}
         height={height}
-        loading="lazy"
         onError={() => setError(true)}
         {...props}
       />
@@ -81,7 +65,7 @@ const OptimizedImage = ({
       {!isLoaded && !error && (
         <div 
           className="absolute inset-0 bg-gray-200 animate-pulse rounded"
-          style={{ width, height }}
+          style={{ width, height, opacity: 0.5 }}
         />
       )}
     </div>
