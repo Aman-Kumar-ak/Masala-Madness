@@ -549,26 +549,26 @@ export default function PendingOrders() {
                       <h3 className="font-medium text-gray-700 mb-3">Order Items</h3>
                       <ul className="space-y-2 mb-4">
                         {order.items.map((item, index) => (
-                          <li key={index} className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-gray-800">{item.name}</span>
+                          <li key={index} className="bg-gray-50 rounded-lg p-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-2">
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-gray-800 truncate">{item.name}</span>
                                 {item.type !== 'Fixed' && item.type !== 'FIXED' && (
-                                  <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                                  <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
                                     {item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                ₹{item.price.toFixed(2)} × {item.quantity} = ₹{(item.price * item.quantity).toFixed(2)}
+                              <div className="text-sm text-gray-600 mt-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                                <span className="whitespace-nowrap">₹{item.price.toFixed(2)} × {item.quantity} = ₹{(item.price * item.quantity).toFixed(2)}</span>
                               </div>
                             </div>
                             
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                               <button
                                 onClick={() => handleQuantityChange(order.orderId, index, -1)}
                                 disabled={item.quantity === 1}
-                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
                                   item.quantity === 1
                                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                     : 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-200'
@@ -578,13 +578,13 @@ export default function PendingOrders() {
                                 -
                               </button>
                               
-                              <div className="inline-flex justify-center items-center bg-white border border-gray-200 rounded-md px-2 py-1 min-w-[2rem] text-center">
+                              <div className="inline-flex justify-center items-center bg-white border border-gray-200 rounded-md px-2 min-w-[1.75rem] sm:min-w-[2rem] h-7 sm:h-8 text-center">
                                 {item.quantity}
                               </div>
                               
                               <button
                                 onClick={() => handleQuantityChange(order.orderId, index, 1)}
-                                className="w-8 h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
+                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
                                 aria-label={`Increase quantity of ${item.name}`}
                               >
                                 +
@@ -592,15 +592,15 @@ export default function PendingOrders() {
                               
                               <button
                                 onClick={() => handleRemoveItemOrOrder(order, item, index)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
-                            aria-label={`Remove ${item.name}`}
-                          >
+                                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
+                                aria-label={`Remove ${item.name}`}
+                              >
                                 ×
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
 
                       {/* Action Buttons */}
                       <div className="flex gap-3 border-t border-gray-200 pt-4">

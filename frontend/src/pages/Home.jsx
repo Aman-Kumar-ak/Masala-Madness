@@ -306,32 +306,32 @@ export default function Home() {
       {/* Floating Cart */}
       {cartItems.length > 0 && (
         <div className="fixed bottom-4 right-4 left-4 z-50 flex justify-center">
-          <div className="bg-white shadow-lg rounded-full border border-orange-200 flex items-center justify-between gap-3 max-w-md w-full overflow-hidden">
+          <div className="bg-white shadow-lg rounded-full border border-orange-200 flex items-center justify-between gap-1 sm:gap-3 max-w-md w-full overflow-hidden">
             {/* Cart Info */}
-            <div className="flex items-center gap-3 flex-1 min-w-0 pl-4 py-3">
-              <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center text-xl">
+            <div className="flex items-center gap-1 sm:gap-3 flex-1 min-w-0 pl-2 sm:pl-4 py-2 sm:py-3">
+              <div className="w-7 h-7 sm:w-9 sm:h-9 bg-orange-100 rounded-full flex items-center justify-center text-base sm:text-xl flex-shrink-0">
                 🛒
               </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center space-x-1 overflow-hidden">
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-1 overflow-hidden">
                   {discountAmount > 0 ? (
-                    <div className="flex items-baseline gap-2 text-base overflow-hidden">
-                      <div className="flex items-center gap-1">
-                        <span className="font-bold text-base text-green-600">₹{totalAmount}</span>
-                        <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-xs font-medium">
+                    <div className="flex flex-col xs:flex-row xs:items-baseline gap-0 xs:gap-2 text-sm sm:text-base overflow-hidden">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="font-bold text-green-600 whitespace-nowrap">₹{totalAmount}</span>
+                        <span className="bg-green-100 text-green-600 px-1 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
                           {activeDiscount.percentage}% off
                         </span>
                       </div>
-                      <span className="text-gray-400 text-sm line-through flex-shrink-0 hidden sm:inline">₹{subtotal}</span>
+                      <span className="text-gray-400 text-xs line-through flex-shrink-0 hidden sm:inline">₹{subtotal}</span>
                     </div>
                   ) : (
-                    <span className="font-bold text-base text-gray-800">₹{totalAmount}</span>
+                    <span className="font-bold text-sm sm:text-base text-gray-800">₹{totalAmount}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500 whitespace-nowrap">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
+                <div className="flex items-center gap-1 overflow-hidden">
+                  <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
                   {activeDiscount && subtotal < activeDiscount.minOrderAmount && (
-                    <span className="text-xs text-orange-600 whitespace-nowrap overflow-hidden text-ellipsis">
+                    <span className="text-xs text-orange-600 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] sm:max-w-full">
                       ₹{activeDiscount.minOrderAmount - subtotal} more for {activeDiscount.percentage}% off
                     </span>
                   )}
@@ -342,10 +342,10 @@ export default function Home() {
             {/* View Cart Button */}
             <Link
               to="/cart"
-              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white h-full px-4 py-3 flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-200 font-medium"
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white h-full px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap transition-all duration-200 font-medium text-sm sm:text-base"
             >
               <span>Cart</span>
-              <span className="bg-orange-700/30 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+              <span className="bg-orange-700/30 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs">
                 {cartItems.length}
               </span>
             </Link>
