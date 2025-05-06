@@ -136,7 +136,7 @@ export default function Home() {
                 />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800 bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent">Masala Madness</h1>
+                <h1 className="text-2xl font-bold text-gray-800 bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent whitespace-nowrap max-[380px]:text-xl max-[320px]:text-lg">Masala Madness</h1>
                 <p className="text-xs text-gray-500 -mt-1">Authentic Indian Cuisine</p>
               </div>
             </div>

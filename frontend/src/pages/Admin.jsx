@@ -134,7 +134,7 @@ const Admin = () => {
             onClose={() => setNotification(null)}
           />
         )}
-        <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200">
+        <div className="bg-white shadow-md rounded-lg p-3 border border-orange-200">
           <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">Admin Panel</h1>
           <div className="space-y-6">
             {/* Navigation Links - Larger buttons */}
@@ -258,7 +258,7 @@ const Admin = () => {
                 <p className="mt-4 text-gray-600">Loading categories...</p>
               </div>
             ) : (
-              <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-5 rounded-lg border border-blue-200 shadow-sm">
+              <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-2 rounded-lg border border-blue-200 shadow-sm">
                 <MenuManager categories={categories} onUpdate={handleMenuUpdate} />
               </div>
             )}

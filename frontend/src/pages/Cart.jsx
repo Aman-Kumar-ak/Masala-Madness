@@ -404,26 +404,20 @@ export default function Cart() {
                 <button
                   onClick={handleShowPaymentOptions}
                   disabled={isProcessing}
-                  className={`py-4 rounded-xl font-medium transition-all duration-200 text-white shadow-md flex items-center justify-center gap-2 text-lg ${
+                  className={`py-3 px-2 rounded-xl font-medium transition-all duration-200 text-white shadow-md flex items-center justify-center text-base md:text-lg ${
                     isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
-                  }`}
+                  } max-[380px]:text-sm max-[320px]:text-xs`}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Confirm Payment</span>
+                  <span className="text-center">Confirm Payment</span>
                 </button>
                 <button
                   onClick={handleAddToPending}
                   disabled={isProcessing}
-                  className={`py-4 rounded-xl font-medium transition-all duration-200 text-white shadow-md flex items-center justify-center gap-2 text-lg ${
+                  className={`py-3 px-2 rounded-xl font-medium transition-all duration-200 text-white shadow-md flex items-center justify-center text-base md:text-lg ${
                     isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'
-                  }`}
+                  } max-[380px]:text-sm max-[320px]:text-xs`}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Add to Pending</span>
+                  <span className="text-center">Add to Pending</span>
                 </button>
               </div>
 
