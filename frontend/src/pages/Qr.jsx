@@ -508,7 +508,7 @@ export default function Qr() {
                       {savedUpiAddresses.map((address) => (
                         <div 
                           key={address._id}
-                          className={`border-2 rounded-xl p-5 shadow-sm hover:shadow-md ${
+                          className={`border-2 rounded-xl p-3 sm:p-4 md:p-5 shadow-sm hover:shadow-md ${
                             isEditingUpi && newUpiAddress.upiId === address.upiId
                               ? 'bg-yellow-50 border-yellow-300'
                             : currentUpiAddress && currentUpiAddress._id === address._id
@@ -529,9 +529,9 @@ export default function Qr() {
                           }}
                         >
                           <div className="flex flex-col h-full">
-                            <div className="flex flex-col md:flex-row md:items-start gap-4">
+                            <div className="flex flex-col md:flex-row md:items-start gap-2 sm:gap-3 md:gap-4">
                               <div 
-                                className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                                   isEditingUpi && newUpiAddress.upiId === address.upiId
                                     ? 'bg-yellow-100 text-yellow-600'
                                   : currentUpiAddress && currentUpiAddress._id === address._id
@@ -544,80 +544,80 @@ export default function Qr() {
                                 }`}
                               >
                                 {isEditingUpi && newUpiAddress.upiId === address.upiId ? (
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                   </svg>
                                 ) : currentUpiAddress && currentUpiAddress._id === address._id ? (
                                   qrCodeUrl ? (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                   ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
                                   )
                                 ) : address.isDefault ? (
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                   </svg>
                                 ) : (
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
                                 )}
                               </div>
                               <div className="flex-grow min-w-0">
-                                <div className="font-medium text-gray-800 text-lg flex items-center flex-wrap gap-2">
-                                  {address.name}
+                                <div className="font-medium text-gray-800 text-base sm:text-lg flex items-center flex-wrap gap-1 sm:gap-2">
+                                  <span className="truncate max-w-[150px] sm:max-w-full">{address.name}</span>
                                   {isEditingUpi && newUpiAddress.upiId === address.upiId ? (
-                                    <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-normal">
+                                    <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-yellow-100 text-yellow-700 font-normal">
                                       Editing
                                     </span>
                                   ) : currentUpiAddress && currentUpiAddress._id === address._id && (
-                                    <span className={`text-xs px-2 py-1 rounded-full ${qrCodeUrl ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} font-normal`}>
+                                    <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${qrCodeUrl ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} font-normal`}>
                                       {qrCodeUrl ? 'QR Active' : 'Selected'}
                                     </span>
                                   )}
                                   {address.isDefault && (
-                                    <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-normal flex items-center gap-1">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-yellow-100 text-yellow-700 font-normal flex items-center gap-1">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 sm:h-3 sm:w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                       </svg>
-                                      Default
+                                      <span className="hidden xxxs:inline">Default</span>
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-base md:text-lg text-gray-600 mt-2 font-mono">
+                                <div className="text-sm sm:text-base md:text-lg text-gray-600 mt-1 sm:mt-2 font-mono">
                                   <div className="flex flex-col">
-                                    <span className="text-xs text-gray-500">UPI ID:</span>
-                                    <div className="overflow-hidden max-w-full pr-2 bg-gray-50 p-2 rounded-md mt-1">
-                                      <span className="font-medium truncate inline-block max-w-full">{address.upiId}</span>
+                                    <span className="text-[10px] sm:text-xs text-gray-500">UPI ID:</span>
+                                    <div className="overflow-hidden max-w-full pr-1 sm:pr-2 bg-gray-50 p-1 sm:p-2 rounded-md mt-0.5 sm:mt-1">
+                                      <span className="font-medium text-xs sm:text-sm md:text-base truncate inline-block max-w-full">{address.upiId}</span>
                                     </div>
                                   </div>
                                 </div>
                                 {address.description && (
-                                  <div className="text-sm text-gray-500 mt-2">
+                                  <div className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2 line-clamp-1 sm:line-clamp-2">
                                     {address.description}
                                   </div>
                                 )}
                               </div>
                             </div>
                             
-                            <div className="flex justify-end gap-2 mt-4">
+                            <div className="flex flex-wrap justify-end gap-1 sm:gap-2 mt-2 sm:mt-3 md:mt-4">
                               {!address.isDefault && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setDefaultUpiAddress(address._id);
                                   }}
-                                  className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 flex items-center gap-1 min-w-[90px] justify-center"
+                                  className="p-1 sm:p-1.5 text-green-600 hover:bg-green-50 rounded-lg border border-green-200 flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs justify-center min-w-[60px] xs:min-w-[70px] sm:min-w-[90px]"
                                   title="Set as default"
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                   </svg>
-                                  <span className="text-xs">Default</span>
+                                  <span>Default</span>
                                 </button>
                               )}
                               <button
@@ -625,26 +625,26 @@ export default function Qr() {
                                   e.stopPropagation();
                                   startEditingUpiAddress(address);
                                 }}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-1 min-w-[70px] justify-center"
+                                className="p-1 sm:p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs justify-center min-w-[50px] xs:min-w-[60px] sm:min-w-[70px]"
                                 title="Edit"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
-                                <span className="text-xs">Edit</span>
+                                <span>Edit</span>
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openDeleteConfirmation(address);
                                 }}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 flex items-center gap-1 min-w-[70px] justify-center"
+                                className="p-1 sm:p-1.5 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs justify-center min-w-[50px] xs:min-w-[60px] sm:min-w-[70px]"
                                 title="Delete"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                <span className="text-xs">Delete</span>
+                                <span>Delete</span>
                               </button>
                             </div>
                           </div>
@@ -892,21 +892,16 @@ export default function Qr() {
 
                     <button
                       type="submit"
-                      className="w-full md:w-auto md:px-8 md:ml-auto md:flex md:items-center bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                      className="w-full md:w-auto md:px-8 md:ml-auto md:flex md:items-center bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center"
                       disabled={isLoading}
                     >
                       {isLoading ? (
                         <>
-                          <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-                          <span>Generating...</span>
+                          <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                          <span className="whitespace-nowrap text-sm sm:text-base">Generating...</span>
                         </>
                       ) : (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                          <span>Generate QR Code</span>
-                        </>
+                        <span className="whitespace-nowrap text-sm sm:text-base">Generate QR Code</span>
                       )}
                     </button>
                   </form>
@@ -1017,7 +1012,7 @@ export default function Qr() {
               className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-lg"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
               Verify Now
             </button>
