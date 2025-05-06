@@ -5,13 +5,18 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: 'dist', // Default: where built files go
+    outDir: 'dist',
   },
   server: {
-    open: true, // Only affects local dev
+    open: true,
   },
   preview: {
-    port: 8080, // Optional: specify preview port if needed
+    port: 4173,        // <-- important!
+    host: true,        // <-- important!
+    allowedHosts: [
+      'masala-madness-main-production.up.railway.app',
+      '.up.railway.app'
+    ],
   },
-  base: './', // <--- IMPORTANT for Render or any static hosting
+  base: './',
 });
