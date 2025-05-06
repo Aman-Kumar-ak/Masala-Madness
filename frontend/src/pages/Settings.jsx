@@ -44,7 +44,7 @@ const Settings = () => {
     try {
       // Use fetch directly instead of api utility to avoid automatic redirect on 401
       const token = sessionStorage.getItem('token');
-      const response = await fetch('https://masala-madness-logn.onrender.com/api/auth/verify-password', {
+      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,7 +98,7 @@ const Settings = () => {
     try {
       // Use fetch directly instead of api utility to avoid automatic redirect on 401
       const token = sessionStorage.getItem('token');
-      const response = await fetch('https://masala-madness-logn.onrender.com/api/auth/change-password', {
+      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

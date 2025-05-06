@@ -127,7 +127,7 @@ export const AuthProvider = ({ children }) => {
     
     try {
       // Use direct fetch for troubleshooting
-      const response = await fetch('https://masala-madness-logn.onrender.com/api/auth/login', {
+      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

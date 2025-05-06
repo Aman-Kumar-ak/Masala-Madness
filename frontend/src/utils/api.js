@@ -1,5 +1,5 @@
 // src/utils/api.js
-const API_BASE_URL = "https://masala-madness-logn.onrender.com/api"; // Backend base URL
+const API_BASE_URL = "https://masala-madness-production.up.railway.app/api"; // Backend base URL
 
 // Get auth token from sessionStorage
 const getToken = () => sessionStorage.getItem('token');
