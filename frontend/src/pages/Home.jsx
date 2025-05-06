@@ -211,7 +211,7 @@ export default function Home() {
                 </svg>
               </button>
               <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-2xl shadow-sm">
-                <img src="/images/calendar.png" alt="Calendar" className="w-10 h-10" />
+                <img src="/images/calendar.png" alt="Calendar" className="w-8 h-8" />
               </div>
               <div>
                 <p className="text-lg font-semibold text-gray-800">
