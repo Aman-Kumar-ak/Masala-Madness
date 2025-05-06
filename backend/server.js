@@ -11,16 +11,19 @@ const pendingOrderRoutes = require('./routes/pendingOrderRoutes');
 const upiRoutes = require('./routes/upiRoutes');
 const authRoutes = require('./routes/authRoutes');
 const { restoreAdminIfMissing, backupAdminCredentials } = require('./scripts/admin-recovery-service');
+const Admin = require('./models/Admin');
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Setup Socket.IO with CORS
 const io = new Server(server, {
   cors: {
     origin: [
-      'https://vivacious-radiance-production.up.railway.app',
-      process.env.FRONTEND_URL || 'http://localhost:3000', 
+      'https://masala-madness-main-production.up.railway.app',
+      process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:5173'
     ],
     methods: ['GET', 'POST'],
@@ -28,19 +31,21 @@ const io = new Server(server, {
   }
 });
 
-// Make io available to our routes
+// Make io available in routes
 app.set('io', io);
 
+// Middleware
 app.use(cors({
   origin: [
-    'https://vivacious-radiance-production.up.railway.app', 
-    process.env.FRONTEND_URL || 'http://localhost:3000', 
+    'https://masala-madness-main-production.up.railway.app',
+    process.env.FRONTEND_URL || 'http://localhost:3000',
     'http://localhost:5173'
   ],
   credentials: true
 }));
 app.use(express.json());
 
+// Routes
 app.use('/api/dishes', dishRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/discounts', discountRoutes);
@@ -52,33 +57,28 @@ app.get('/', (req, res) => {
   res.send('Masala Madness API is running.');
 });
 
-// Socket.IO connection handling
+// Socket.IO events
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
-  
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
 });
 
-// Enhanced admin recovery mechanism
-const Admin = require('./models/Admin');
-
-// Function to check and recover admin collection
+// Admin Recovery Functions
 async function checkAndRecoverAdminCollection() {
   try {
-    // Check if admin collection exists and has admin users
     const adminCount = await Admin.countDocuments().catch(err => {
       console.warn('Error checking admin count:', err.message);
       return 0;
     });
-    
+
     if (adminCount === 0) {
       console.log('No admin users found. Restoring admin account...');
       await restoreAdminIfMissing();
     } else {
       console.log(`Found ${adminCount} admin users.`);
-      // Backup existing admins
       await backupAdminCredentials();
     }
   } catch (error) {
@@ -86,32 +86,25 @@ async function checkAndRecoverAdminCollection() {
   }
 }
 
-// Setup database watchdog to monitor admin collection
-// This helps prevent issues when the collection is accidentally deleted
 function setupCollectionWatchdog() {
-  // Check admin collection every hour
   const interval = 1000 * 60 * 60; // 1 hour
   setInterval(checkAndRecoverAdminCollection, interval);
-  
-  // Also register watchdog for MongoDB events
+
   mongoose.connection.on('reconnected', () => {
     console.log('MongoDB reconnected. Checking admin collection...');
     checkAndRecoverAdminCollection();
   });
 }
 
+// Database Connection and Server Start
 mongoose
   .connect(process.env.MONGO_URI)
   .then(async () => {
     console.log('MongoDB connected.');
-    
-    // First run the admin recovery to ensure admin exists
     await checkAndRecoverAdminCollection();
-    
-    // Setup watchdog timer
     setupCollectionWatchdog();
-    
-    // Start the server
-    server.listen(5000, () => console.log('Server running on port 5000'));
+
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .catch((err) => console.error(err));
+  .catch((err) => console.error('MongoDB connection error:', err));
