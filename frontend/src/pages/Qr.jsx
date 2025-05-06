@@ -426,10 +426,10 @@ export default function Qr() {
       <div className={!isAuthenticated ? 'filter blur-md pointer-events-none' : ''}>
         <div className="container mx-auto px-4 py-4 pt-16">
           <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+            <div className="bg-white rounded-lg shadow-md p-3 border border-gray-200">
               <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">QR Code Generator</h1>
                             
-              <div className="p-6 md:p-8">
+              <div className="p-3 md:p-8">
                 {/* Mode switch buttons */}
                 <div className="mb-8 flex justify-center">
                   <div className="inline-flex bg-gray-100 p-1 rounded-lg">

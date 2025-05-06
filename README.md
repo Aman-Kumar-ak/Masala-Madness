@@ -317,9 +317,7 @@ Order Number is reset on the basis of UTC timing.
             but when admin do the search - "Burger " add accidently space after or before this shows no item Which need  fix. 
       making sure to handle the case where search name "Paneer Burger". There is space need between them. You have to make the code to handle both the cases.
 
-3. There is a issue in Qr page of Saved UPI address. The cards which is storing the names and upi details. in which if more than two upi's are added. Any of the card's edit button and Delete button overflows from the Card. Make sure the button remains in the card. This Issue is comning in Pc and phone dimensions.
 
-4. After pressing the Clear Cart in Cart page. It has to redirect to the home page.
 5. Make sure this can not be send in console for security reasons - 
   username: 'admin',
 

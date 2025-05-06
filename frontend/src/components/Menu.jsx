@@ -77,9 +77,17 @@ const Menu = () => {
     // When search term exists, search across ALL dishes regardless of selected category
     const dishesToSearch = searchTerm ? allDishes : filteredDishes;
     
-    return dishesToSearch.filter(dish => 
-      dish?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Trim and normalize search term - remove extra spaces and convert multiple spaces to single space
+    const normalizedSearchTerm = searchTerm.trim().replace(/\s+/g, ' ').toLowerCase();
+    
+    if (!normalizedSearchTerm) return filteredDishes;
+    
+    return dishesToSearch.filter(dish => {
+      if (!dish?.name) return false;
+      // Normalize dish name the same way to ensure consistent matching
+      const normalizedDishName = dish.name.toLowerCase().trim().replace(/\s+/g, ' ');
+      return normalizedDishName.includes(normalizedSearchTerm);
+    });
   }, [filteredDishes, searchTerm, allDishes]);
 
   if (loading) {
@@ -136,26 +144,44 @@ const Menu = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full px-4 py-4 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
         />
-        <span className="absolute right-4 top-3.5 text-gray-400 text-xl">🔍</span>
+        {searchTerm ? (
+          <button 
+            onClick={() => setSearchTerm('')}
+            className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Clear search"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        ) : (
+          <span className="absolute right-4 top-3.5 text-gray-400 text-xl">🔍</span>
+        )}
       </div>
 
       {/* Category Tabs */}
       <div className="relative">
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
           <button
-            onClick={() => setSelectedCategory('All')}
+            onClick={() => {
+              setSelectedCategory('All');
+              setSearchTerm(''); // Clear search when selecting category
+            }}
             className={`flex items-center space-x-2 px-6 py-2.5 rounded-full whitespace-nowrap transition-all duration-200 border ${
               selectedCategory === 'All' && !searchTerm
                 ? 'bg-orange-500 text-white border-orange-500 shadow-md'
                 : 'bg-white text-gray-700 hover:bg-orange-100 border-gray-200'
             }`}
           >
-          <span className="text-lg">All Items</span>
+            <span className="text-lg">All Items</span>
           </button>
           {categories.map((category) => (
             <button
               key={category._id}
-              onClick={() => setSelectedCategory(category.categoryName)}
+              onClick={() => {
+                setSelectedCategory(category.categoryName);
+                setSearchTerm(''); // Clear search when selecting category
+              }}
               className={`flex items-center space-x-2 px-6 py-2.5 rounded-full whitespace-nowrap transition-all duration-200 border ${
                 selectedCategory === category.categoryName && !searchTerm
                   ? 'bg-orange-500 text-white border-orange-500 shadow-md'

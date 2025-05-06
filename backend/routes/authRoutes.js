@@ -6,12 +6,7 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 
 // Admin login
 router.post('/login', async (req, res) => {
-  console.log('Login attempt:', { 
-    username: req.body.username,
-    body: req.body,
-    headers: req.headers['content-type'],
-    ip: req.ip 
-  });
+  console.log('Login attempt received');
   
   try {
     const { username, password } = req.body;
@@ -30,7 +25,7 @@ router.post('/login', async (req, res) => {
     
     // If admin not found
     if (!admin) {
-      console.log(`Login failed: User not found - ${username}`);
+      console.log('Login failed: Invalid credentials');
       return res.status(401).json({ 
         status: 'error', 
         message: 'Invalid credentials' 
@@ -42,7 +37,7 @@ router.post('/login', async (req, res) => {
     
     // If password doesn't match
     if (!passwordMatches) {
-      console.log(`Login failed: Invalid password for user - ${username}`);
+      console.log('Login failed: Invalid credentials');
       return res.status(401).json({ 
         status: 'error', 
         message: 'Invalid credentials' 
@@ -51,7 +46,7 @@ router.post('/login', async (req, res) => {
     
     // If admin account is not active
     if (!admin.isActive) {
-      console.log(`Login failed: Account disabled - ${username}`);
+      console.log('Login failed: Account disabled');
       return res.status(403).json({ 
         status: 'error', 
         message: 'Account is disabled. Please contact support.' 
@@ -59,7 +54,7 @@ router.post('/login', async (req, res) => {
     }
     
     // Create JWT token
-    console.log(`Creating JWT token for user ${username}`);
+    console.log('Authentication successful, creating token');
     const token = jwt.sign(
       { id: admin._id, username: admin.username },
       process.env.JWT_SECRET,
@@ -69,7 +64,7 @@ router.post('/login', async (req, res) => {
     // Update last login timestamp
     admin.lastLogin = new Date();
     await admin.save();
-    console.log(`Login successful for user ${username}`);
+    console.log('Login successful');
     
     return res.status(200).json({ 
       status: 'success', 
@@ -90,7 +85,7 @@ router.post('/login', async (req, res) => {
 
 // Verify token is valid (used for auth persistence)
 router.get('/verify', authenticateToken, (req, res) => {
-  console.log('Token verification successful for user:', req.user.username);
+  console.log('Token verification successful');
   return res.status(200).json({ 
     status: 'success',
     user: {
@@ -111,7 +106,7 @@ router.post('/logout', (req, res) => {
 
 // Change password route
 router.post('/change-password', authenticateToken, async (req, res) => {
-  console.log('Password change attempt for user:', req.user.username);
+  console.log('Password change attempt');
   
   try {
     const { currentPassword, newPassword } = req.body;
@@ -148,7 +143,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     admin.password = newPassword;
     await admin.save();
     
-    console.log('Password changed successfully for user:', req.user.username);
+    console.log('Password changed successfully');
     
     return res.status(200).json({
       status: 'success',
@@ -165,7 +160,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
 
 // Verify current password route
 router.post('/verify-password', authenticateToken, async (req, res) => {
-  console.log('Password verification attempt for user:', req.user.username);
+  console.log('Password verification attempt');
   
   try {
     const { password } = req.body;
@@ -192,13 +187,13 @@ router.post('/verify-password', authenticateToken, async (req, res) => {
     const isMatch = await admin.comparePassword(password);
     
     if (isMatch) {
-      console.log('Password verified successfully for user:', req.user.username);
+      console.log('Password verified successfully');
       return res.status(200).json({
         status: 'success',
         message: 'Password is correct'
       });
     } else {
-      console.log('Password verification failed for user:', req.user.username);
+      console.log('Password verification failed');
       return res.status(401).json({
         status: 'error',
         message: 'Password is incorrect'

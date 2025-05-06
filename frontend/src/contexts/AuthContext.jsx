@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }) => {
   
   // Login function
   const login = async (username, password) => {
-    console.log('Attempting login with:', { username });
+    console.log('Attempting login...');
     
     try {
       // Use direct fetch for troubleshooting
@@ -139,14 +139,13 @@ export const AuthProvider = ({ children }) => {
       
       // Get response body as text first to inspect
       const responseText = await response.text();
-      console.log('Login response body:', responseText);
       
       // Parse the JSON if it's a valid JSON string
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (e) {
-        console.error('Failed to parse response as JSON:', e);
+        console.error('Failed to parse response as JSON');
         return { 
           success: false, 
           message: 'Invalid response from server. Please try again.' 
@@ -170,14 +169,14 @@ export const AuthProvider = ({ children }) => {
         
         return { success: true };
       } else {
-        console.log('Login failed with response:', data);
+        console.log('Login failed');
         return { 
           success: false, 
           message: data.message || 'Login failed. Please check your credentials.' 
         };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error occurred');
       return { 
         success: false, 
         message: 'Login failed. Please try again later.' 
