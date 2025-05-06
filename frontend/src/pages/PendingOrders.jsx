@@ -552,14 +552,14 @@ export default function PendingOrders() {
                           <li key={index} className="bg-gray-50 rounded-lg p-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-2">
                             <div className="flex flex-col min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium text-gray-800 truncate">{item.name}</span>
+                                <span className="font-medium text-gray-800 break-words line-clamp-2 w-full sm:w-auto">{item.name}</span>
                                 {item.type !== 'Fixed' && item.type !== 'FIXED' && (
                                   <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
                                     {item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-sm text-gray-600 mt-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                              <div className="text-[11px] xxs:text-xs sm:text-sm text-gray-600 mt-1 overflow-hidden text-ellipsis">
                                 <span className="whitespace-nowrap">₹{item.price.toFixed(2)} × {item.quantity} = ₹{(item.price * item.quantity).toFixed(2)}</span>
                               </div>
                             </div>
