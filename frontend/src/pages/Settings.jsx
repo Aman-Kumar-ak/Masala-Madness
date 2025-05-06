@@ -227,9 +227,9 @@ const Settings = () => {
                       className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
                         ${isCurrentPasswordValid 
                           ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
-                          : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'}`}
+                          : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'}`}
                     >
-                      {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified ✓' : 'Verify'}
+                      {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified' : 'Verify'}
                     </button>
                   </div>
                   {isCurrentPasswordValid && (
@@ -283,7 +283,7 @@ const Settings = () => {
                   disabled={!isFormValid()}
                   className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
                     ${isFormValid() 
-                      ? 'bg-orange-600 hover:bg-orange-700 focus:ring-orange-500' 
+                      ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
                       : 'bg-gray-400 cursor-not-allowed'} 
                     focus:outline-none focus:ring-2 focus:ring-offset-2`}
                 >

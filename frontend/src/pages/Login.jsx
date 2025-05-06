@@ -557,14 +557,9 @@ const Login = () => {
                         </svg>
                       </div>
                       <div className="ml-3">
-                        <h3 className="text-sm font-medium text-blue-800">Account Recovery Instructions</h3>
-                        <div className="mt-2 text-sm text-blue-700 space-y-1">
-                          <p>The admin collection might have been deleted. Run the admin recovery script:</p>
-                          <p className="bg-blue-100/50 p-2 rounded font-mono text-xs mt-1 border border-blue-200">
-                            cd backend && node scripts/reset-admin-password.js
-                          </p>
-                          <p className="mt-1">Default username: <span className="font-semibold">admin</span></p>
-                          <p>Default password: <span className="font-semibold">MasalaMadness2024!</span></p>
+                        <h3 className="text-sm font-medium text-blue-800">Account Access Issue</h3>
+                        <div className="mt-2 text-sm text-blue-700">
+                          <p>Unable to access your account? Please contact your system administrator for assistance.</p>
                         </div>
                       </div>
                     </div>
