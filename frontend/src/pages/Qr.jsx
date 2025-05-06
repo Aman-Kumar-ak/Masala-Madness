@@ -734,21 +734,16 @@ export default function Qr() {
                         <button
                           type="button"
                           onClick={isEditingUpi ? updateUpiAddress : createUpiAddress}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex-1 flex items-center justify-center gap-2"
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg flex-1 text-xs sm:text-sm font-medium whitespace-nowrap flex items-center justify-center"
                           disabled={isLoading}
                         >
                           {isLoading ? (
                             <>
-                              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                              <div className="animate-spin h-3 w-3 sm:h-4 sm:w-4 border-2 border-white border-t-transparent rounded-full mr-1 sm:mr-2"></div>
                               <span>Processing...</span>
                             </>
                           ) : (
-                            <>
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              <span>{isEditingUpi ? 'Update UPI' : 'Save New UPI'}</span>
-                            </>
+                            "Save"
                           )}
                         </button>
                         <button
@@ -757,7 +752,7 @@ export default function Qr() {
                             setIsAddingUpi(false);
                             setIsEditingUpi(false);
                           }}
-                          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex-1"
+                          className="bg-gray-500 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg flex-1 text-xs sm:text-sm font-medium whitespace-nowrap"
                         >
                           Cancel
                         </button>
