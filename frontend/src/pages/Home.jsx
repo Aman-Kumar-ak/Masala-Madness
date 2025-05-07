@@ -69,13 +69,27 @@ export default function Home() {
   }, []);
 
   const getCurrentDate = () => {
-    const options = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric',
-      timeZone: 'Asia/Kolkata'
-    };
+    const width = window.innerWidth;
+    let options;
+    if (width < 380) {
+      // Short format for very small screens
+      options = {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: '2-digit',
+        timeZone: 'Asia/Kolkata',
+      };
+    } else {
+      // Full format for normal screens
+      options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'Asia/Kolkata',
+      };
+    }
     return new Date().toLocaleString('en-IN', options);
   };
 

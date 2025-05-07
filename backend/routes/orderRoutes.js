@@ -287,7 +287,8 @@ router.get("/excel/:date", async (req, res) => {
             hour12: false,
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit'
+            second: '2-digit',
+            timeZone: 'Asia/Kolkata'
           }),
           dishes: order.items.map(i => `${i.name} x${i.quantity}`).join(", "),
           types: order.items.map(i => i.type).join(", "),

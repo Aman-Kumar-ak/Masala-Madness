@@ -310,7 +310,7 @@ Order Number is reset on the basis of UTC timing.
 
 ## Issue 
 
-Issues Resolved
+1. Date size for very small width dimensions 
 
 ## Things to do now
 
