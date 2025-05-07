@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getCookie, setCookie, imageToBase64 } from '../utils/cookieUtils';
 
 /**
  * OptimizedImage component for better image loading performance
@@ -9,8 +8,10 @@ import { getCookie, setCookie, imageToBase64 } from '../utils/cookieUtils';
  * - Placeholder while loading
  * - Error fallback
  * - Size attributes to prevent layout shifts
- * - Image caching using cookies
+ * - Image caching using Cache API
  */
+const CACHE_NAME = 'image-cache-v1';
+
 const OptimizedImage = ({ 
   src, 
   alt, 
@@ -18,49 +19,51 @@ const OptimizedImage = ({
   width, 
   height,
   placeholder = "/images/logo/logo.png",
-  cacheDuration = 7, // Cache duration in days
   ...props 
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const [imgSrc, setImgSrc] = useState(src);
+  const [imgSrc, setImgSrc] = useState(placeholder);
 
   useEffect(() => {
+    let isMounted = true;
+    setIsLoaded(false);
+    setError(false);
+    setImgSrc(placeholder);
+
     const loadImage = async () => {
       try {
-        // Reset states
-        setIsLoaded(false);
-        setError(false);
-
-        // Generate a unique cookie name for this image
-        const cookieName = `img_cache_${btoa(src)}`;
-
-        // Check if image is cached
-        const cachedImage = getCookie(cookieName);
-        if (cachedImage) {
-          setImgSrc(cachedImage);
-          setIsLoaded(true);
-          return;
+        // Open the cache
+        const cache = await window.caches.open(CACHE_NAME);
+        // Try to match the image in the cache
+        let response = await cache.match(src);
+        if (!response) {
+          // If not cached, fetch from network
+          response = await fetch(src, { mode: 'cors' });
+          if (!response.ok) throw new Error('Network response was not ok');
+          // Put the response clone in the cache
+          await cache.put(src, response.clone());
         }
-
-        // If not cached, load the image and cache it
-        const base64Image = await imageToBase64(src);
-        if (base64Image) {
-          setCookie(cookieName, base64Image, cacheDuration);
-          setImgSrc(base64Image);
+        // Convert response to blob and then to object URL
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        if (isMounted) {
+          setImgSrc(objectUrl);
           setIsLoaded(true);
-        } else {
-          throw new Error('Failed to convert image to base64');
         }
-      } catch (error) {
-        console.error(`Error loading image: ${src}`, error);
-        setError(true);
-        setImgSrc(placeholder);
+      } catch (err) {
+        if (isMounted) {
+          setError(true);
+          setImgSrc(placeholder);
+        }
       }
     };
 
     loadImage();
-  }, [src, placeholder, cacheDuration]);
+    return () => {
+      isMounted = false;
+    };
+  }, [src, placeholder]);
 
   return (
     <div 
@@ -68,15 +71,17 @@ const OptimizedImage = ({
       style={{ width, height }}
     >
       <img
-        src={error ? placeholder : imgSrc}
+        src={imgSrc}
         alt={alt}
         className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-80'}`}
         width={width}
         height={height}
-        onError={() => setError(true)}
+        onError={() => {
+          setError(true);
+          setImgSrc(placeholder);
+        }}
         {...props}
       />
-      
       {!isLoaded && !error && (
         <div 
           className="absolute inset-0 bg-gray-200 animate-pulse rounded"
