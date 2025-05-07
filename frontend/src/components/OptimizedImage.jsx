@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getCookie, setCookie, imageToBase64 } from '../utils/cookieUtils';
 
 /**
  * OptimizedImage component for better image loading performance
@@ -8,6 +9,7 @@ import React, { useState, useEffect } from 'react';
  * - Placeholder while loading
  * - Error fallback
  * - Size attributes to prevent layout shifts
+ * - Image caching using cookies
  */
 const OptimizedImage = ({ 
   src, 
@@ -16,36 +18,49 @@ const OptimizedImage = ({
   width, 
   height,
   placeholder = "/images/logo/logo.png",
+  cacheDuration = 7, // Cache duration in days
   ...props 
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const [imgSrc, setImgSrc] = useState(src); // Use actual src immediately instead of placeholder
+  const [imgSrc, setImgSrc] = useState(src);
 
   useEffect(() => {
-    // Reset states when src changes
-    setIsLoaded(false);
-    setError(false);
-    setImgSrc(src); // Always use the actual source immediately
-    
-    // Load image directly to verify it works
-    const img = new Image();
-    img.src = src;
-    
-    img.onload = () => {
-      setIsLoaded(true);
+    const loadImage = async () => {
+      try {
+        // Reset states
+        setIsLoaded(false);
+        setError(false);
+
+        // Generate a unique cookie name for this image
+        const cookieName = `img_cache_${btoa(src)}`;
+
+        // Check if image is cached
+        const cachedImage = getCookie(cookieName);
+        if (cachedImage) {
+          setImgSrc(cachedImage);
+          setIsLoaded(true);
+          return;
+        }
+
+        // If not cached, load the image and cache it
+        const base64Image = await imageToBase64(src);
+        if (base64Image) {
+          setCookie(cookieName, base64Image, cacheDuration);
+          setImgSrc(base64Image);
+          setIsLoaded(true);
+        } else {
+          throw new Error('Failed to convert image to base64');
+        }
+      } catch (error) {
+        console.error(`Error loading image: ${src}`, error);
+        setError(true);
+        setImgSrc(placeholder);
+      }
     };
-    
-    img.onerror = () => {
-      setError(true);
-      console.error(`Failed to load image: ${src}`);
-    };
-    
-    return () => {
-      img.onload = null;
-      img.onerror = null;
-    };
-  }, [src]);
+
+    loadImage();
+  }, [src, placeholder, cacheDuration]);
 
   return (
     <div 
