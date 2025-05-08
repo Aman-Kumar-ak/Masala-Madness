@@ -3,6 +3,7 @@ import BackButton from "../components/BackButton";
 import { useRefresh } from "../contexts/RefreshContext";
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../utils/config";
+import DeleteOrderConfirmation from "../components/DeleteOrderConfirmation";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -17,6 +18,9 @@ const Orders = () => {
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date();
     return now.toISOString().split('T')[0];
@@ -129,6 +133,43 @@ const Orders = () => {
   const resetToCurrentDate = () => {
     const today = getCurrentDate();
     setSelectedDate(today);
+  };
+
+  const handleDeleteClick = (order) => {
+    setOrderToDelete(order);
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!orderToDelete) return;
+    
+    try {
+      setDeleteLoading(true);
+      
+      const response = await fetch(`${API_URL}/api/orders/${orderToDelete.orderId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // Don't manually update stats, just reload orders to get the fresh data
+      loadOrders();
+      
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      alert('Failed to delete order. Please try again.');
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteConfirmation(false);
+      setOrderToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirmation(false);
+    setOrderToDelete(null);
   };
 
   if (loading) {
@@ -274,8 +315,36 @@ const Orders = () => {
                 <div key={order.orderId} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h3 className="text-lg font-semibold">Order #{order.orderNumber}</h3>
-                      <p className="text-sm text-gray-600">{formatDateIST(order.updatedAt)}</p>
+                      <div className="flex items-center">
+                        <h3 className="text-lg font-semibold mr-2">Order #{order.orderNumber}</h3>
+                        <button 
+                          onClick={() => handleDeleteClick(order)} 
+                          disabled={deleteLoading}
+                          className="group p-1.5 rounded-full hover:bg-red-100 focus:bg-red-100 focus:outline-none transition-colors duration-200"
+                          aria-label="Delete order"
+                          title="Delete order"
+                        >
+                          {deleteLoading && orderToDelete?.orderId === order.orderId ? (
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-red-500 border-t-transparent"></div>
+                          ) : (
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              className="h-5 w-5 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
+                              fill="none" 
+                              viewBox="0 0 24 24" 
+                              stroke="currentColor"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{formatDateIST(order.updatedAt)}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">
@@ -316,6 +385,14 @@ const Orders = () => {
           </div>
         </div>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <DeleteOrderConfirmation
+        isOpen={showDeleteConfirmation}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        orderNumber={orderToDelete?.orderNumber}
+      />
     </div>
   );
 };

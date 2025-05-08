@@ -345,4 +345,42 @@ router.get("/excel/:date", async (req, res) => {
   }
 });
 
+// @route   DELETE /api/orders/:orderId
+// Delete a specific order by ID
+router.delete("/:orderId", async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    // Find the order to get its creation date for cache invalidation
+    const order = await Order.findOne({ orderId }).lean();
+    
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+    
+    // Delete the order
+    await Order.deleteOne({ orderId });
+    
+    // Invalidate cache for the order's date
+    const orderDate = new Date(order.createdAt);
+    const dateCacheKey = orderDate.toISOString().split('T')[0];
+    ordersCache.delete(dateCacheKey);
+    
+    // Also invalidate revenue cache if exists
+    const revenueCacheKey = `revenue_${dateCacheKey}`;
+    ordersCache.delete(revenueCacheKey);
+    
+    res.status(200).json({ 
+      message: "Order deleted successfully",
+      deletedOrder: {
+        orderId: order.orderId,
+        orderNumber: order.orderNumber
+      }
+    });
+  } catch (error) {
+    console.error('Delete order error:', error);
+    res.status(500).json({ message: "Failed to delete order", error: error.message });
+  }
+});
+
 module.exports = router;
