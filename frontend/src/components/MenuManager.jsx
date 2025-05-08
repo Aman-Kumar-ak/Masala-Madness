@@ -363,20 +363,20 @@ const MenuManager = ({ categories, onUpdate }) => {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col gap-3">
                   <input
                     type="text"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     placeholder="New Category Name"
-                    className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     required
                     autoFocus
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-row gap-2">
                     <motion.button 
                       type="submit" 
-                      className="w-full sm:w-auto bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 whitespace-nowrap transition-all duration-200 flex items-center justify-center gap-1"
+                      className="flex-1 bg-green-500 text-white px-3 sm:px-6 py-3 rounded-lg hover:bg-green-600 transition-all duration-200 flex items-center justify-center gap-1 text-sm sm:text-base"
                       disabled={isLoading}
                       whileHover={buttonHoverAnimation}
                       whileTap={{ scale: 0.95 }}
@@ -388,10 +388,10 @@ const MenuManager = ({ categories, onUpdate }) => {
                         </>
                       ) : (
                         <>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                           </svg>
-                          Add Category
+                          <span>Add</span>
                         </>
                       )}
                     </motion.button>
@@ -401,14 +401,14 @@ const MenuManager = ({ categories, onUpdate }) => {
                         setShowCategoryInput(false);
                         setNewCategory('');
                       }}
-                      className="w-full sm:w-auto bg-gray-400 text-white px-6 py-3 rounded-lg hover:bg-gray-500 whitespace-nowrap transition-all duration-200 flex items-center justify-center"
+                      className="flex-1 bg-gray-400 text-white px-3 sm:px-6 py-3 rounded-lg hover:bg-gray-500 transition-all duration-200 flex items-center justify-center text-sm sm:text-base"
                       whileHover={buttonHoverAnimation}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
-                      Cancel
+                      <span>Cancel</span>
                     </motion.button>
                   </div>
                 </div>
