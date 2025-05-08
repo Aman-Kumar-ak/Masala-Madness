@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import MenuManager from "../components/MenuManager";
 import { fetchCategories } from "../utils/fetchCategories";
@@ -25,6 +25,8 @@ const Admin = () => {
   });
   const [notification, setNotification] = useState(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  
+  const discountFormRef = useRef(null);
 
   const loadCategories = async () => {
     try {
@@ -56,6 +58,23 @@ const Admin = () => {
     loadCategories();
     loadActiveDiscount();
   }, []);
+
+  useEffect(() => {
+    // Handle clicks outside the discount form
+    const handleClickOutside = (event) => {
+      if (discountFormRef.current && !discountFormRef.current.contains(event.target) && showDiscountForm) {
+        setShowDiscountForm(false);
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDiscountForm]);
 
   const handleDiscountSubmit = async (e) => {
     e.preventDefault();
@@ -152,10 +171,7 @@ const Admin = () => {
                 onClick={() => setShowDiscountForm(!showDiscountForm)}
                 className={`inline-flex items-center justify-center ${showDiscountForm ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'} text-white px-3 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base sm:text-lg font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-green-300 focus:outline-none whitespace-nowrap min-w-[110px] sm:min-w-[130px]`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span>{showDiscountForm ? 'Cancel' : 'Discount'}</span>
+              <span>{showDiscountForm ? 'Cancel' : 'Discount'}</span>
               </button>
             </div>
 
@@ -200,7 +216,10 @@ const Admin = () => {
 
             {/* Discount Form */}
             {showDiscountForm && (
-              <div className="bg-gradient-to-r from-green-50 to-blue-50 p-5 rounded-lg border border-green-200 shadow-sm">
+              <div 
+                ref={discountFormRef}
+                className="bg-gradient-to-r from-green-50 to-blue-50 p-5 rounded-lg border border-green-200 shadow-sm"
+              >
                 <h3 className="text-lg font-semibold mb-4 text-gray-800">Add New Discount</h3>
                 <form onSubmit={handleDiscountSubmit} className="space-y-4">
                   <div>
@@ -238,15 +257,24 @@ const Admin = () => {
                       placeholder="Enter minimum amount"
                     />
                   </div>
-                  <button
-                    type="submit"
-                    className="w-full bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-lg font-medium transition-all duration-200 focus:ring-2 focus:ring-green-300 focus:outline-none shadow-sm flex items-center justify-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Save Discount
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-lg font-medium transition-all duration-200 focus:ring-2 focus:ring-green-300 focus:outline-none shadow-sm flex items-center justify-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Save Discount
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscountForm(false)}
+                      className="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-2.5 px-4 rounded-lg font-medium transition-all duration-200 focus:ring-2 focus:ring-gray-300 focus:outline-none shadow-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </form>
               </div>
             )}

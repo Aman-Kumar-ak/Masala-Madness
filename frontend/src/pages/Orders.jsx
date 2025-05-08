@@ -160,7 +160,7 @@ const Orders = () => {
       
       // Show success notification
       setNotification({
-        message: `Order #${orderToDelete.orderNumber} has been deleted successfully${result.ordersResequenced > 0 ? '. Order numbers have been updated.' : ''}`,
+        message: `Order #${orderToDelete.orderNumber} has been deleted successfully`,
         type: 'delete',
         duration: 2000
       });

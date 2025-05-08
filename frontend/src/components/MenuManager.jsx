@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api, { API_BASE_URL } from '../utils/api';
 import Notification from './Notification';
@@ -23,6 +23,26 @@ const MenuManager = ({ categories, onUpdate }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  
+  const categoryFormRef = useRef(null);
+
+  useEffect(() => {
+    // Handle clicks outside the category form
+    const handleClickOutside = (event) => {
+      if (categoryFormRef.current && !categoryFormRef.current.contains(event.target) && showCategoryInput) {
+        setShowCategoryInput(false);
+        setNewCategory('');
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCategoryInput]);
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
@@ -335,6 +355,7 @@ const MenuManager = ({ categories, onUpdate }) => {
             {showCategoryInput ? (
               <motion.form 
                 key="category-form"
+                ref={categoryFormRef}
                 onSubmit={handleAddCategory} 
                 className="w-full"
                 initial={{ opacity: 0, height: 0 }}
@@ -360,7 +381,19 @@ const MenuManager = ({ categories, onUpdate }) => {
                       whileHover={buttonHoverAnimation}
                       whileTap={{ scale: 0.95 }}
                     >
-                      {isLoading ? 'Adding...' : 'Add Category'}
+                      {isLoading ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent"></div>
+                          <span className="ml-1">Adding...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Add Category
+                        </>
+                      )}
                     </motion.button>
                     <motion.button 
                       type="button" 
@@ -368,10 +401,13 @@ const MenuManager = ({ categories, onUpdate }) => {
                         setShowCategoryInput(false);
                         setNewCategory('');
                       }}
-                      className="w-full sm:w-auto bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 whitespace-nowrap transition-all duration-200"
+                      className="w-full sm:w-auto bg-gray-400 text-white px-6 py-3 rounded-lg hover:bg-gray-500 whitespace-nowrap transition-all duration-200 flex items-center justify-center"
                       whileHover={buttonHoverAnimation}
                       whileTap={{ scale: 0.95 }}
                     >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                       Cancel
                     </motion.button>
                   </div>
