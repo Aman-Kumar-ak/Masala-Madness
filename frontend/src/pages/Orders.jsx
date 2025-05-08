@@ -230,8 +230,8 @@ const Orders = () => {
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Select Date:
             </label>
-            <div className="flex gap-3 flex-wrap md:flex-nowrap">
-              <div className="relative w-full">
+            <div className="flex flex-wrap gap-2">
+              <div className="relative flex-1 min-w-[180px]">
                 <input
                   type="date"
                   value={selectedDate}
@@ -244,31 +244,30 @@ const Orders = () => {
                   }}
                 />
               </div>
-              <div className="flex w-full md:w-auto shrink-0">
+              <div className="flex gap-2 flex-shrink-0">
                 <button
                   onClick={resetToCurrentDate}
-                  className="bg-orange-100 hover:bg-orange-200 text-orange-800 font-medium py-2.5 px-2 min-w-[46px] rounded-l-lg focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-200 flex items-center justify-center"
+                  className="bg-orange-100 hover:bg-orange-200 text-orange-800 font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-200 flex-shrink-0 flex items-center whitespace-nowrap text-xs sm:text-sm"
                   title="Reset to today"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span className="hidden sm:inline ml-1">Today</span>
+                  <span>Today</span>
                 </button>
                 <button
                   onClick={handleDownloadExcel}
                   disabled={orders.length === 0}
-                  className={`relative group flex items-center ${
+                  className={`relative group flex items-center flex-shrink-0 whitespace-nowrap text-xs sm:text-sm ${
                     orders.length === 0
                       ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                       : 'bg-green-500 hover:bg-green-600 text-white'
-                  } font-medium py-2.5 px-2 min-w-[46px] rounded-r-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200`}
-                  title="Download Excel"
+                  } font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200`}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <span className="hidden sm:inline ml-1">Excel</span>
+                  <span>Download Excel</span>
                 </button>
               </div>
             </div>
