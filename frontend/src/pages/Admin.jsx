@@ -11,8 +11,6 @@ import { useNavigate } from "react-router-dom";
 import { useRefresh } from "../contexts/RefreshContext";
 import { API_URL } from "../utils/config";
 
-// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
 const Admin = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -158,21 +156,37 @@ const Admin = () => {
           <div className="space-y-6">
             {/* Navigation Links - Larger buttons */}
             <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-3 sm:p-5 rounded-lg border border-orange-200 shadow-sm text-center">
-              <Link
-                to="/orders"
-                className="inline-flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-blue-300 focus:outline-none whitespace-nowrap mr-6 sm:mr-8 min-w-[100px] sm:min-w-[120px]"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <span>Orders</span>
-              </Link>
-              <button
-                onClick={() => setShowDiscountForm(!showDiscountForm)}
-                className={`inline-flex items-center justify-center ${showDiscountForm ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'} text-white px-3 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base sm:text-lg font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-green-300 focus:outline-none whitespace-nowrap min-w-[110px] sm:min-w-[130px]`}
-              >
-              <span>{showDiscountForm ? 'Cancel' : 'Discount'}</span>
-              </button>
+              <div className="flex flex-wrap justify-center items-center gap-4">
+                <Link
+                  to="/orders"
+                  className="inline-flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-blue-300 focus:outline-none whitespace-nowrap min-w-[120px]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <span>Orders</span>
+                </Link>
+                <button
+                  onClick={() => setShowDiscountForm(!showDiscountForm)}
+                  className={`inline-flex items-center justify-center ${showDiscountForm ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'} text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-green-300 focus:outline-none whitespace-nowrap min-w-[120px]`}
+                >
+                  {showDiscountForm ? (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span>Cancel</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Discount</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Active Discount Display */}

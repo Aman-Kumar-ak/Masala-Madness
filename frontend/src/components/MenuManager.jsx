@@ -347,7 +347,7 @@ const MenuManager = ({ categories, onUpdate }) => {
         </motion.h2>
 
         <motion.div 
-          className="flex flex-col sm:flex-row gap-4 mb-6"
+          className="flex flex-col gap-4 mb-6"
           {...fadeInUp}
           transition={{ delay: 0.1 }}
         >
@@ -434,7 +434,7 @@ const MenuManager = ({ categories, onUpdate }) => {
 
           <motion.button
             onClick={openAddDishModal}
-            className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+            className={`w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${showCategoryInput ? 'mt-2' : ''}`}
             whileHover={buttonHoverAnimation}
             whileTap={{ scale: 0.95 }}
             initial={{ opacity: 0 }}
