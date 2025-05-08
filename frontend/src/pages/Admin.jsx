@@ -61,7 +61,12 @@ const Admin = () => {
     // Handle clicks outside the discount form
     const handleClickOutside = (event) => {
       if (discountFormRef.current && !discountFormRef.current.contains(event.target) && showDiscountForm) {
-        setShowDiscountForm(false);
+        // Check if the click was on the discount toggle button
+        const isDiscountButton = event.target.closest('button')?.getAttribute('data-discount-toggle') === 'true';
+        
+        if (!isDiscountButton) {
+          setShowDiscountForm(false);
+        }
       }
     };
 
@@ -73,6 +78,14 @@ const Admin = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showDiscountForm]);
+
+  const toggleDiscountForm = () => {
+    setShowDiscountForm(!showDiscountForm);
+  };
+
+  const closeDiscountForm = () => {
+    setShowDiscountForm(false);
+  };
 
   const handleDiscountSubmit = async (e) => {
     e.preventDefault();
@@ -166,26 +179,29 @@ const Admin = () => {
                   </svg>
                   <span>Orders</span>
                 </Link>
-                <button
-                  onClick={() => setShowDiscountForm(!showDiscountForm)}
-                  className={`inline-flex items-center justify-center ${showDiscountForm ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'} text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-green-300 focus:outline-none whitespace-nowrap min-w-[120px]`}
-                >
-                  {showDiscountForm ? (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      <span>Cancel</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>Discount</span>
-                    </>
-                  )}
-                </button>
+                {showDiscountForm ? (
+                  <button
+                    data-discount-toggle="true"
+                    onClick={closeDiscountForm}
+                    className="inline-flex items-center justify-center bg-gray-500 hover:bg-gray-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-gray-300 focus:outline-none whitespace-nowrap min-w-[120px]"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span>Cancel</span>
+                  </button>
+                ) : (
+                  <button
+                    data-discount-toggle="true"
+                    onClick={toggleDiscountForm}
+                    className="inline-flex items-center justify-center bg-green-500 hover:bg-green-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg text-base font-medium transition-all duration-200 shadow-md focus:ring-2 focus:ring-green-300 focus:outline-none whitespace-nowrap min-w-[120px]"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5 sm:mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Discount</span>
+                  </button>
+                )}
               </div>
             </div>
 
