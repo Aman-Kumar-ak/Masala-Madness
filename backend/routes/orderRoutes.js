@@ -351,18 +351,43 @@ router.delete("/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
     
-    // Find the order to get its creation date for cache invalidation
+    // Find the order to get its details before deletion
     const order = await Order.findOne({ orderId }).lean();
     
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
     
+    // Get the date of the order
+    const orderDate = new Date(order.createdAt);
+    const startOfDay = new Date(orderDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(orderDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
     // Delete the order
     await Order.deleteOne({ orderId });
     
+    // Get all remaining orders for that day to renumber them
+    const remainingOrders = await Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      orderNumber: { $gt: order.orderNumber }
+    }).sort({ orderNumber: 1 });
+    
+    // Update order numbers for all subsequent orders
+    const updatePromises = remainingOrders.map((remainingOrder, index) => {
+      return Order.updateOne(
+        { _id: remainingOrder._id },
+        { $set: { orderNumber: order.orderNumber + index } }
+      );
+    });
+    
+    // Execute all updates
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
+    }
+    
     // Invalidate cache for the order's date
-    const orderDate = new Date(order.createdAt);
     const dateCacheKey = orderDate.toISOString().split('T')[0];
     ordersCache.delete(dateCacheKey);
     
@@ -375,7 +400,8 @@ router.delete("/:orderId", async (req, res) => {
       deletedOrder: {
         orderId: order.orderId,
         orderNumber: order.orderNumber
-      }
+      },
+      ordersResequenced: updatePromises.length
     });
   } catch (error) {
     console.error('Delete order error:', error);

@@ -4,6 +4,7 @@ import { useRefresh } from "../contexts/RefreshContext";
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../utils/config";
 import DeleteOrderConfirmation from "../components/DeleteOrderConfirmation";
+import Notification from "../components/Notification";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -21,6 +22,7 @@ const Orders = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
+  const [notification, setNotification] = useState(null);
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date();
     return now.toISOString().split('T')[0];
@@ -154,12 +156,25 @@ const Orders = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
+      const result = await response.json();
+      
+      // Show success notification
+      setNotification({
+        message: `Order #${orderToDelete.orderNumber} has been deleted successfully${result.ordersResequenced > 0 ? '. Order numbers have been updated.' : ''}`,
+        type: 'delete',
+        duration: 2000
+      });
+      
       // Don't manually update stats, just reload orders to get the fresh data
       loadOrders();
       
     } catch (error) {
       console.error('Error deleting order:', error);
-      alert('Failed to delete order. Please try again.');
+      setNotification({
+        message: `Failed to delete order: ${error.message}`,
+        type: 'error',
+        duration: 2000
+      });
     } finally {
       setDeleteLoading(false);
       setShowDeleteConfirmation(false);
@@ -393,6 +408,16 @@ const Orders = () => {
         onConfirm={handleConfirmDelete}
         orderNumber={orderToDelete?.orderNumber}
       />
+
+      {/* Notification */}
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={notification.duration}
+          onClose={() => setNotification(null)}
+        />
+      )}
     </div>
   );
 };
