@@ -1,5 +1,5 @@
 // Change this version number whenever you make updates to force cache refresh
-const VERSION = '3';  // Increment this with each deployment
+const VERSION = '6';  // Increment this with each deployment
 const STATIC_CACHE = `static-cache-v${VERSION}`;
 const DYNAMIC_CACHE = `dynamic-cache-v${VERSION}`;
 
@@ -16,17 +16,13 @@ const PRECACHE_URLS = [
   '/images/order.png',
   '/images/receipt.png',
   '/images/admin.png',
-  '/images/m_logo.png',
-  // PWA Icons - all sizes
-  '/images/icons/icon-72X72.png',
-  '/images/icons/icon-96X96.png',
-  '/images/icons/icon-128X128.png',
-  '/images/icons/icon-144X144.png',
-  '/images/icons/icon-152X152.png',
-  '/images/icons/icon-192X192.png',
-  '/images/icons/icon-384X384.png',
-  '/images/icons/icon-512X512.png',
-  // Fallback images for error states
+  '/images/m_logo.svg',  // SVG logo
+  
+  // Only essential PWA icons (SVG versions)
+  '/images/icons/icon-192X192.svg',
+  '/images/icons/icon-512X512.svg',
+  
+  // Essential fallback images
   '/images/fallbacks/image-placeholder.svg',
   '/images/fallbacks/logo-placeholder.svg',
   '/images/fallbacks/calendar-placeholder.svg',
@@ -35,25 +31,20 @@ const PRECACHE_URLS = [
   '/images/fallbacks/order-placeholder.svg',
   '/images/fallbacks/receipt-placeholder.svg',
   '/images/fallbacks/admin-placeholder.svg',
-  '/images/fallbacks/icon-placeholder-72X72.svg',
-  '/images/fallbacks/icon-placeholder-96X96.svg',
-  '/images/fallbacks/icon-placeholder-128X128.svg',
-  '/images/fallbacks/icon-placeholder-144X144.svg',
-  '/images/fallbacks/icon-placeholder-152X152.svg',
-  '/images/fallbacks/icon-placeholder-192X192.svg',
-  '/images/fallbacks/icon-placeholder-384X384.svg',
-  '/images/fallbacks/icon-placeholder-512X512.svg',
+  '/images/fallbacks/icon-placeholder-192X192.svg'
   // Add more static assets if needed
 ];
 
 // Utility function to ensure icons are fetched and cached
 const precacheIcons = async () => {
-  const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
+  // We only need to precache the essential icon sizes that are still used
+  const iconSizes = [192, 512];
   const cache = await caches.open(STATIC_CACHE);
   
-  // Fetch all icon sizes and add them to cache
+  // Fetch essential icon sizes and add them to cache
   const iconPromises = iconSizes.map(size => {
-    const iconUrl = `/images/icons/icon-${size}X${size}.png`;
+    // Use SVG icons instead of PNG
+    const iconUrl = `/images/icons/icon-${size}X${size}.svg`;
     return fetch(iconUrl)
       .then(response => {
         if (response.ok) {
@@ -105,6 +96,21 @@ self.addEventListener('fetch', (event) => {
             // Return cached response without triggering network request
             return cachedResponse;
           }
+          
+          // If requesting a PNG icon, try to serve the SVG version instead
+          if (url.pathname.endsWith('.png')) {
+            const svgUrl = url.pathname.replace('.png', '.svg');
+            return caches.match(new Request(svgUrl))
+              .then(svgResponse => {
+                if (svgResponse) {
+                  return svgResponse;
+                }
+                
+                // If SVG not found, try network for original request
+                return fetch(request);
+              });
+          }
+          
           return fetch(request)
             .then((networkResponse) => {
               // Cache the icon for future use
@@ -117,7 +123,7 @@ self.addEventListener('fetch', (event) => {
               // If the specific icon isn't available, use the corresponding fallback
               if (url.pathname.includes('icon-')) {
                 // Extract the size and find the appropriate fallback
-                const sizeMatch = url.pathname.match(/icon-(\d+X\d+)\.png/);
+                const sizeMatch = url.pathname.match(/icon-(\d+X\d+)\.(png|svg)/);
                 if (sizeMatch && sizeMatch[1]) {
                   const size = sizeMatch[1];
                   const fallbackUrl = `/images/fallbacks/icon-placeholder-${size}.svg`;

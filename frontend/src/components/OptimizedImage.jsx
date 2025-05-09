@@ -1,15 +1,4 @@
 import React, { useState, useEffect } from 'react';
-
-/**
- * OptimizedImage component for better image loading performance
- * 
- * Features:
- * - Lazy loading using Intersection Observer
- * - Placeholder while loading
- * - Error fallback
- * - Size attributes to prevent layout shifts
- * - Image caching using Cache API
- */
 const CACHE_NAME = 'image-cache-v1';
 
 // Type-specific fallback images based on path patterns
@@ -20,9 +9,14 @@ const getFallbackImage = (originalSrc) => {
   if (path.includes('/icons/icon-')) {
     const defaultIconSize = '192X192';
     // If we can extract the size from the path, use a more appropriate fallback
-    const sizeMatch = path.match(/icon-(\d+X\d+)\.png/);
+    const sizeMatch = path.match(/icon-(\d+X\d+)\.(png|svg)/);
     const size = sizeMatch ? sizeMatch[1] : defaultIconSize;
     return `/images/fallbacks/icon-placeholder-${size}.svg`;
+  }
+  
+  // For m_logo - use SVG version
+  if (path.includes('m_logo')) {
+    return '/images/fallbacks/logo-placeholder.svg';
   }
   
   // For specific image types

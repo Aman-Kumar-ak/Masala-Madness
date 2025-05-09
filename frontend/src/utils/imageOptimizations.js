@@ -4,7 +4,7 @@
 
 // Common images that appear across the app
 const COMMON_IMAGES = [
-  '/images/m_logo.png',
+  '/images/m_logo.svg',  // Use SVG version
   '/images/login.png',
   '/images/receipt.png',
   '/images/order.png',
@@ -14,30 +14,6 @@ const COMMON_IMAGES = [
   '/images/logo/logo.png'
 ];
 
-// These are the images needed for each route
-const ROUTE_IMAGES = {
-  '/login': [
-    '/images/m_logo.png'
-  ],
-  '/home': [
-    '/images/m_logo.png',
-    '/images/qr-code.png',
-    '/images/login.png',
-    '/images/admin.png'
-  ],
-  '/admin': [
-    '/images/admin.png',
-    '/images/receipt.png'
-  ],
-  '/orders': [
-    '/images/receipt.png',
-    '/images/order.png'
-  ],
-  '/qr': [
-    '/images/qr-code.png'
-  ]
-};
-
 // Simple in-memory image cache
 const imageCache = new Map();
 
@@ -45,27 +21,22 @@ const imageCache = new Map();
  * Preload common images to improve perceived performance
  */
 export const preloadCommonImages = async () => {
-  // Get current path to determine which images to preload
-  const currentPath = window.location.pathname;
-  
-  // Default to preloading just the logo if on login page or path not found
-  let imagesToPreload = ['/images/m_logo.png'];
-  
-  // For matched routes, preload route-specific images
-  Object.keys(ROUTE_IMAGES).forEach(route => {
-    if (currentPath.includes(route)) {
-      imagesToPreload = ROUTE_IMAGES[route];
-    }
-  });
-  
-  // Add PWA icons for all routes (only critical ones)
-  imagesToPreload.push('/images/icons/icon-192X192.png');
-  
-  // Remove duplicates
-  imagesToPreload = [...new Set(imagesToPreload)];
+  // Existing preloaded images (if any)
+  const commonImages = [
+    '/images/m_logo.svg',  // Use SVG version
+    '/images/login.png',
+    '/images/receipt.png',
+    '/images/order.png',
+    '/images/calendar.png',
+    '/images/qr-code.png',
+    '/images/admin.png',
+    // Add PWA icons (using SVG version)
+    '/images/icons/icon-192X192.svg',
+    '/images/icons/icon-512X512.svg'
+  ];
 
   // First check if each image is already in cache
-  for (const src of imagesToPreload) {
+  for (const src of commonImages) {
     try {
       // Check if image is already in cache
       const isCached = await checkImageInCache(src);
@@ -234,14 +205,11 @@ export const initializeFastImageLoading = () => {
 
 // Preload all PWA icons for better offline experience
 export const preloadPwaIcons = async () => {
-  // Only preload the most important icon sizes that would be shown immediately
-  // Other sizes will be loaded by the service worker in the background
-  const criticalIconSizes = [192]; // For most displays and PWA manifests
-  const nonCriticalIconSizes = [72, 96, 128, 144, 152, 384, 512]; // Load these with lower priority
+  const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
   
-  // Load critical icons with high priority
-  for (const size of criticalIconSizes) {
-    const iconUrl = `/images/icons/icon-${size}X${size}.png`;
+  for (const size of iconSizes) {
+    // Use SVG icons instead of PNG files (much smaller)
+    const iconUrl = `/images/icons/icon-${size}X${size}.svg`;
     
     try {
       // Check if icon is already in cache
@@ -254,53 +222,17 @@ export const preloadPwaIcons = async () => {
         continue;
       }
       
-      // If not in cache, load it with high priority
+      // If not in cache, load it
       const img = new Image();
-      img.fetchPriority = "high";
       img.src = iconUrl;
       img.onload = () => {
         imageCache.set(iconUrl, true);
-        console.log(`Preloaded critical icon: ${iconUrl}`);
+        console.log(`Preloaded icon: ${iconUrl}`);
       };
     } catch (error) {
-      console.error(`Error preloading critical icon ${iconUrl}:`, error);
+      console.error(`Error preloading icon ${iconUrl}:`, error);
     }
   }
-  
-  // For non-critical icons, use setTimeout to delay loading
-  // This prevents them from competing with critical resources
-  setTimeout(async () => {
-    for (const size of nonCriticalIconSizes) {
-      const iconUrl = `/images/icons/icon-${size}X${size}.png`;
-      
-      try {
-        // Check if already cached before fetching
-        const isCached = await checkImageInCache(iconUrl);
-        
-        if (isCached) {
-          imageCache.set(iconUrl, true);
-          console.log(`Non-critical icon already cached: ${iconUrl}`);
-          continue;
-        }
-        
-        // Use low priority for non-critical icons
-        const img = new Image();
-        img.fetchPriority = "low";
-        if (typeof img.importance !== 'undefined') {
-          img.importance = "low";
-        }
-        img.loading = "lazy"; // Use browser's lazy loading
-        
-        img.src = iconUrl;
-        img.onload = () => {
-          imageCache.set(iconUrl, true);
-          console.log(`Loaded non-critical icon: ${iconUrl}`);
-        };
-      } catch (error) {
-        console.error(`Error loading non-critical icon ${iconUrl}:`, error);
-      }
-    }
-  }, 2000); // Delay non-critical icons by 2 seconds
 };
 
 export default {
