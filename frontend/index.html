@@ -4,8 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Masala Madness</title>
-    <!-- DNS Prefetching -->
+    
+    <!-- Performance optimizations -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="Masala Madness - An Indian cuisine food ordering app">
+    
+    <!-- DNS Prefetching and resource hints -->
     <link rel="dns-prefetch" href="https://masala-madness-production.up.railway.app" />
+    <link rel="preconnect" href="https://masala-madness-production.up.railway.app" crossorigin />
     
     <!-- Favicon -->
     <link rel="icon" href="/images/logo/logo.png" />
@@ -19,33 +25,68 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Masala Madness" />
     
-    <!-- Preload PWA icons -->
-    <link rel="preload" as="image" href="/images/icons/icon-192X192.png" />
-    <link rel="preload" as="image" href="/images/icons/icon-512X512.png" />
+    <!-- Preload only critical resources -->
+    <link rel="preload" as="image" href="/images/icons/icon-192X192.png" fetchpriority="high" />
+    <link rel="preload" as="image" href="/images/logo/logo.png" fetchpriority="high" />
     
-    <!-- Preload important images -->
-    <link rel="preload" as="image" href="/images/m_logo.png" />
-    <link rel="preload" as="image" href="/images/login.png" />
-    <link rel="preload" as="image" href="/images/receipt.png" />
-    <link rel="preload" as="image" href="/images/order.png" />
-    <link rel="preload" as="image" href="/images/calendar.png" />
-    <link rel="preload" as="image" href="/images/qr-code.png" />
-    <link rel="preload" as="image" href="/images/admin.png" />
-    
-    <!-- Font Display Strategy -->
+    <!-- Critical CSS inline to avoid render blocking -->
     <style>
-      /* Use font-display: swap for all font-face rules */
+      /* Initial render styles - rest will load later */
+      body {
+        background-color: #fff7ed;
+        margin: 0;
+        padding: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      
+      #root {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      /* Font display strategy */
       * {
         font-display: swap;
       }
       
-      /* Prevent layout shifts while images load */
+      /* Prevent layout shifts with images */
       img {
-        aspect-ratio: attr(width) / attr(height);
+        max-width: 100%;
+        height: auto;
+      }
+      
+      /* Add placeholders for images */
+      img:not([src]) {
+        background-color: #f0f0f0;
+      }
+      
+      /* Loading indicator for app */
+      .app-loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100vw;
+        background-color: #fff7ed;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 9999;
+      }
+      
+      .app-loading img {
+        width: 120px;
+        height: auto;
       }
     </style>
   </head>
   <body class="bg-orange-50">
+    <!-- Initial loading state - will be removed once app loads -->
+    <div class="app-loading" id="initial-loader">
+      <img src="/images/logo/logo.png" alt="Loading Masala Madness" width="120" height="120" />
+    </div>
+    
     <!-- No-JS fallback -->
     <noscript>
       <div style="padding: 20px; text-align: center;">
@@ -54,6 +95,27 @@
     </noscript>
     
     <div id="root"></div>
+    
+    <!-- Script to hide loader once app is ready -->
+    <script>
+      window.addEventListener('load', function() {
+        // Wait a bit to ensure app has started rendering
+        setTimeout(function() {
+          const loader = document.getElementById('initial-loader');
+          if (loader) {
+            loader.style.opacity = '0';
+            loader.style.transition = 'opacity 0.3s ease';
+            setTimeout(function() {
+              if (loader.parentNode) {
+                loader.parentNode.removeChild(loader);
+              }
+            }, 300);
+          }
+        }, 300);
+      });
+    </script>
+    
+    <!-- Main app script -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
