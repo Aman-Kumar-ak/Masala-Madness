@@ -11,6 +11,7 @@ import Settings from './pages/Settings';  // Import Settings page
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './components/NotificationContext';
+import OfflineDetector from './components/OfflineDetector';  // Import the OfflineDetector component
 
 // Component to redirect based on authentication
 const RedirectBasedOnAuth = () => {
@@ -85,6 +86,9 @@ const App = () => {
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </div>
+          
+          {/* Offline detector will show a notification when user is offline */}
+          <OfflineDetector />
         </div>
       </NotificationProvider>
     </AuthProvider>

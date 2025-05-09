@@ -10,6 +10,18 @@
     <!-- Favicon -->
     <link rel="icon" href="/images/logo/logo.png" />
     
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#ea580c" />
+    <link rel="apple-touch-icon" href="/images/icons/icon-192X192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Masala Madness" />
+    
+    <!-- Preload PWA icons -->
+    <link rel="preload" as="image" href="/images/icons/icon-192X192.png" />
+    <link rel="preload" as="image" href="/images/icons/icon-512X512.png" />
+    
     <!-- Preload important images -->
     <link rel="preload" as="image" href="/images/m_logo.png" />
     <link rel="preload" as="image" href="/images/login.png" />
@@ -31,6 +43,13 @@
         aspect-ratio: attr(width) / attr(height);
       }
     </style>
+    
+    <!-- Add a no-JS fallback -->
+    <noscript>
+      <div style="padding: 20px; text-align: center;">
+        Please enable JavaScript to use this application.
+      </div>
+    </noscript>
   </head>
   <body class="bg-orange-50">
     <div id="root"></div>

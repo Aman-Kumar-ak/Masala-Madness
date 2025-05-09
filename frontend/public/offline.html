@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline - Masala Madness</title>
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#ea580c" />
+  <link rel="apple-touch-icon" href="/images/icons/icon-192X192.png" />
+  
+  <!-- Preload critical icons -->
+  <link rel="preload" as="image" href="/images/logo/logo.png" />
+  <link rel="preload" as="image" href="/images/icons/icon-192X192.png" />
+  
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #fff7ed;
+      color: #1e293b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    .logo {
+      width: 100px;
+      height: auto;
+      margin-bottom: 30px;
+    }
+    h1 {
+      color: #ea580c;
+      margin-bottom: 10px;
+    }
+    p {
+      margin-bottom: 20px;
+      max-width: 600px;
+    }
+    button {
+      background-color: #ea580c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <img src="/images/logo/logo.png" alt="Masala Madness Logo" class="logo" />
+  <h1>You're offline</h1>
+  <p>Sorry, you're currently offline and this page isn't available. Please check your internet connection and try again.</p>
+  <button onclick="window.location.reload()">Try Again</button>
+  
+  <script>
+    // Attempt to preload PWA icons for faster loading when back online
+    if ('serviceWorker' in navigator) {
+      // Check if we're back online
+      window.addEventListener('online', () => {
+        window.location.reload();
+      });
+    }
+  </script>
+</body>
+</html> 

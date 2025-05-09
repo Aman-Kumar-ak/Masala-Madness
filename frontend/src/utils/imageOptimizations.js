@@ -21,7 +21,21 @@ const imageCache = new Map();
  * Preload common images to improve perceived performance
  */
 export const preloadCommonImages = () => {
-  COMMON_IMAGES.forEach(src => {
+  // Existing preloaded images (if any)
+  const commonImages = [
+    '/images/m_logo.png',
+    '/images/login.png',
+    '/images/receipt.png',
+    '/images/order.png',
+    '/images/calendar.png',
+    '/images/qr-code.png',
+    '/images/admin.png',
+    // Add PWA icons
+    '/images/icons/icon-192X192.png',
+    '/images/icons/icon-512X512.png'
+  ];
+
+  commonImages.forEach(src => {
     // Force load immediately with high priority
     const img = new Image();
     img.src = src;
@@ -122,22 +136,28 @@ export const initImageOptimizations = () => {
  * Run image optimizations on initial load
  */
 export const initializeFastImageLoading = () => {
-  // Run immediately without waiting for window load
-  initImageOptimizations();
-  
-  // Retry loading any failed images on window load
-  window.addEventListener('load', () => {
-    // Check which images are not yet cached
-    COMMON_IMAGES.forEach(src => {
-      if (!imageCache.has(src)) {
-        const img = new Image();
-        img.src = src;
-        img.onload = () => {
-          imageCache.set(src, true);
-          console.log(`Loaded on retry: ${src}`);
-        };
-      }
+  // Lazy load images that are not in the viewport
+  if ('loading' in HTMLImageElement.prototype) {
+    // Native lazy loading supported
+    document.querySelectorAll('img[loading="lazy"]').forEach(img => {
+      img.src = img.dataset.src;
     });
+  } else {
+    // Fallback for browsers that don't support native lazy loading
+    // Could implement a JS-based lazy loading solution here
+  }
+  
+  // Preload PWA icons for offline use
+  preloadPwaIcons();
+};
+
+// Preload all PWA icons for better offline experience
+export const preloadPwaIcons = () => {
+  const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
+  
+  iconSizes.forEach(size => {
+    const img = new Image();
+    img.src = `/images/icons/icon-${size}X${size}.png`;
   });
 };
 
