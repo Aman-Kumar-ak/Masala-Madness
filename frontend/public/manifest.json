@@ -4,8 +4,8 @@
   "description": "Authentic Indian cuisine delivery service",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#fff7ed",
+  "theme_color": "#ea580c",
   "icons": [
     {
       "src": "/images/icons/icon-72X72.png",
