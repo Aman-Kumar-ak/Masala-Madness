@@ -1,219 +1,170 @@
 /**
- * Image optimization utilities for PWA performance
+ * Image optimization utilities
  */
 
-// Use a limited-size LRU cache to avoid memory issues
-// This will store references to the most recently accessed images
-const IMAGE_CACHE_SIZE = 50;
-const inMemoryCache = new Map();
-
-// Track which routes need which images for intelligent preloading
-const ROUTE_IMAGE_MAP = {
-  '/': [
-    '/images/m_logo.png',
-    '/images/logo/logo.png'
-  ],
-  '/login': [
-    '/images/login.png'
-  ],
-  '/orders': [
-    '/images/order.png',
-    '/images/receipt.png'
-  ],
-  '/admin': [
-    '/images/admin.png',
-    '/images/calendar.png'
-  ],
-  '/scan': [
-    '/images/qr-code.png'
-  ]
-};
-
-// Small images that should always be preloaded (icons, UI elements)
-const CRITICAL_IMAGES = [
-  '/images/logo/logo.png',
-  '/images/icons/icon-192X192.png'
+// Common images that appear across the app
+const COMMON_IMAGES = [
+  '/images/m_logo.png',
+  '/images/login.png',
+  '/images/receipt.png',
+  '/images/order.png',
+  '/images/calendar.png',
+  '/images/qr-code.png',
+  '/images/admin.png',
+  '/images/logo/logo.png'
 ];
 
+// Simple in-memory image cache
+const imageCache = new Map();
+
 /**
- * Preload images based on current route and upcoming likely routes
+ * Preload common images to improve perceived performance
  */
-export const preloadImagesForRoute = (currentRoute) => {
-  if (!currentRoute) return;
-  
-  // Get images for current route
-  const imagesToPreload = [...(ROUTE_IMAGE_MAP[currentRoute] || [])];
-  
-  // Always preload critical images
-  imagesToPreload.push(...CRITICAL_IMAGES);
-  
-  // Remove duplicates
-  const uniqueImages = [...new Set(imagesToPreload)];
-  
-  // Preload with decreasing priority
-  uniqueImages.forEach((src, index) => {
-    // Skip if already cached
-    if (inMemoryCache.has(src)) return;
-    
-    // Create new image and set priority
+export const preloadCommonImages = () => {
+  // Existing preloaded images (if any)
+  const commonImages = [
+    '/images/m_logo.png',
+    '/images/login.png',
+    '/images/receipt.png',
+    '/images/order.png',
+    '/images/calendar.png',
+    '/images/qr-code.png',
+    '/images/admin.png',
+    // Add PWA icons
+    '/images/icons/icon-192X192.png',
+    '/images/icons/icon-512X512.png'
+  ];
+
+  commonImages.forEach(src => {
+    // Force load immediately with high priority
     const img = new Image();
-    
-    // Set priority based on index (first items are highest priority)
-    if (index < 2) {
-      img.fetchPriority = "high";
-      img.loading = "eager";
-    } else {
-      img.fetchPriority = "low";
-      img.loading = "lazy";
-    }
-    
+    img.src = src;
     img.onload = () => {
-      // Add to in-memory cache and maintain max size
-      inMemoryCache.set(src, true);
-      if (inMemoryCache.size > IMAGE_CACHE_SIZE) {
-        // Remove oldest entry if cache exceeds max size
-        const firstKey = inMemoryCache.keys().next().value;
-        inMemoryCache.delete(firstKey);
-      }
+      imageCache.set(src, true);
+      console.log(`Preloaded: ${src}`);
+    };
+    img.onerror = () => {
+      console.error(`Failed to preload: ${src}`);
     };
     
-    // Start loading
-    img.src = src;
+    // Force image to be loaded with high priority
+    img.fetchPriority = "high";
+    
+    // Ensure the browser knows this is important
+    if (typeof img.importance !== 'undefined') {
+      img.importance = "high";
+    }
+    
+    // Add to document for better browser prioritization
+    img.style.position = 'absolute';
+    img.style.opacity = '0';
+    img.style.width = '1px';
+    img.style.height = '1px';
+    img.style.top = '-1px';
+    img.style.left = '-1px';
+    document.body.appendChild(img);
+    
+    // Remove after a short delay
+    setTimeout(() => {
+      if (document.body.contains(img)) {
+        document.body.removeChild(img);
+      }
+    }, 3000);
   });
 };
 
 /**
- * Check if browser supports various features
+ * Get browser storage availability
  */
-const checkBrowserSupport = () => {
-  const support = {
-    intersectionObserver: 'IntersectionObserver' in window,
-    serviceWorker: 'serviceWorker' in navigator,
-    caches: 'caches' in window,
-    fetchPriority: 'fetchPriority' in HTMLImageElement.prototype,
-    lazyLoading: 'loading' in HTMLImageElement.prototype
-  };
-  
-  return support;
+const storageAvailable = (type) => {
+  let storage;
+  try {
+    storage = window[type];
+    const x = '__storage_test__';
+    storage.setItem(x, x);
+    storage.removeItem(x);
+    return true;
+  } catch (e) {
+    return false;
+  }
 };
 
 /**
- * Initialize image optimizations based on browser support
+ * Check if an image exists in the browser cache
+ */
+export const isImageCached = async (url) => {
+  // First check our own cache
+  if (imageCache.has(url)) {
+    return true;
+  }
+  
+  // Check if the browser cache has it
+  try {
+    const cache = await caches.open('image-cache');
+    const response = await cache.match(url);
+    return !!response;
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
+ * Add image URL to browser cache
+ */
+export const addImageToCache = async (url) => {
+  try {
+    const cache = await caches.open('image-cache');
+    const response = await fetch(url, { cache: 'force-cache' });
+    await cache.put(url, response);
+    imageCache.set(url, true);
+    return true;
+  } catch (error) {
+    console.error('Failed to cache image:', error);
+    return false;
+  }
+};
+
+/**
+ * Initialize image optimizations
+ */
+export const initImageOptimizations = () => {
+  // Preload common images
+  preloadCommonImages();
+};
+
+/**
+ * Run image optimizations on initial load
  */
 export const initializeFastImageLoading = () => {
-  const support = checkBrowserSupport();
-  
-  // Setup intersection observer for images if supported
-  if (support.intersectionObserver) {
-    setupLazyLoading();
+  // Lazy load images that are not in the viewport
+  if ('loading' in HTMLImageElement.prototype) {
+    // Native lazy loading supported
+    document.querySelectorAll('img[loading="lazy"]').forEach(img => {
+      img.src = img.dataset.src;
+    });
+  } else {
+    // Fallback for browsers that don't support native lazy loading
+    // Could implement a JS-based lazy loading solution here
   }
   
-  // Preload PWA icons for offline use (only the essential ones)
-  preloadEssentialPwaIcons();
-  
-  // Start preloading for current route
-  const currentPath = window.location.pathname;
-  preloadImagesForRoute(currentPath);
-  
-  // Listen for route changes to preload route-specific images
-  window.addEventListener('popstate', () => {
-    const newPath = window.location.pathname;
-    preloadImagesForRoute(newPath);
-  });
+  // Preload PWA icons for offline use
+  preloadPwaIcons();
 };
 
-/**
- * Set up lazy loading for images using Intersection Observer
- */
-const setupLazyLoading = () => {
-  const imageObserver = new IntersectionObserver((entries, observer) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const img = entry.target;
-        if (img.dataset.src) {
-          // Only load if image has a src to load
-          img.src = img.dataset.src;
-          
-          // Store in cache for faster reloads
-          if ('caches' in window) {
-            caches.open('image-cache').then(cache => {
-              cache.add(img.dataset.src).catch(() => {
-                // Silently fail if image can't be cached
-              });
-            });
-          }
-          
-          // Stop observing once loaded
-          observer.unobserve(img);
-        }
-      }
-    });
-  }, {
-    rootMargin: '200px', // Start loading when image is 200px from viewport
-    threshold: 0.01 // Trigger when just 1% of the image is visible
-  });
+// Preload all PWA icons for better offline experience
+export const preloadPwaIcons = () => {
+  const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
   
-  // Observe all images with data-src attribute
-  document.querySelectorAll('img[data-src]').forEach(img => {
-    imageObserver.observe(img);
-  });
-};
-
-/**
- * Preload only essential PWA icons for faster initial load
- */
-export const preloadEssentialPwaIcons = () => {
-  // Only preload the most common sizes
-  const essentialSizes = [192, 512];
-  
-  essentialSizes.forEach(size => {
+  iconSizes.forEach(size => {
     const img = new Image();
     img.src = `/images/icons/icon-${size}X${size}.png`;
-    img.fetchPriority = size === 192 ? "high" : "low";
   });
-};
-
-/**
- * Preload all PWA icons (should be called only when network is idle)
- */
-export const preloadAllPwaIcons = () => {
-  // When network is idle, load all remaining icons
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => {
-      const allSizes = [72, 96, 128, 144, 152, 192, 384, 512];
-      const essentialSizes = [192, 512]; // Skip these as they're loaded already
-      
-      allSizes
-        .filter(size => !essentialSizes.includes(size))
-        .forEach(size => {
-          const iconUrl = `/images/icons/icon-${size}X${size}.png`;
-          fetch(iconUrl, { cache: 'force-cache' })
-            .catch(() => { /* Silently fail */ });
-        });
-    });
-  }
-};
-
-/**
- * Generate appropriate srcset for responsive images
- */
-export const generateSrcSet = (imagePath) => {
-  // Extract base path and extension
-  const lastDot = imagePath.lastIndexOf('.');
-  const basePath = imagePath.substring(0, lastDot);
-  const extension = imagePath.substring(lastDot);
-  
-  // Generate srcset for different viewport sizes
-  return {
-    srcset: `${basePath}-small${extension} 400w, ${imagePath} 800w, ${basePath}-large${extension} 1200w`,
-    sizes: '(max-width: 600px) 400px, (max-width: 1200px) 800px, 1200px'
-  };
 };
 
 export default {
-  preloadImagesForRoute,
-  initializeFastImageLoading,
-  preloadEssentialPwaIcons,
-  preloadAllPwaIcons,
-  generateSrcSet
+  preloadCommonImages,
+  isImageCached,
+  addImageToCache,
+  initImageOptimizations,
+  initializeFastImageLoading
 }; 

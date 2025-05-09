@@ -4,37 +4,28 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './style.css';
 
-import { CartProvider } from './components/CartContext';
-import { RefreshProvider } from './contexts/RefreshContext';
-import { initializeFastImageLoading, preloadEssentialPwaIcons } from './utils/imageOptimizations';
+import { CartProvider } from './components/CartContext'; // ✅ Import the CartProvider
+import { RefreshProvider } from './contexts/RefreshContext'; // ✅ Import the RefreshProvider
+import { initializeFastImageLoading, preloadCommonImages, preloadPwaIcons } from './utils/imageOptimizations'; // Import image optimization
 
-// Initialize only essential image optimizations before React rendering
-preloadEssentialPwaIcons();
+// Start preloading images immediately before any React rendering
+preloadCommonImages();
 
-// Then mount the React app
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
+// Preload PWA icons for better offline experience
+preloadPwaIcons();
+
+// Then initialize the rest of the image optimization
+initializeFastImageLoading();
+
+ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
-    <RefreshProvider>
-      <CartProvider>
+    <RefreshProvider> {/* ✅ Wrap your entire app inside RefreshProvider */}
+      <CartProvider> {/* ✅ Wrap your entire app inside CartProvider */}
         <App />
       </CartProvider>
     </RefreshProvider>
   </BrowserRouter>
 );
-
-// Once the app is mounted, initialize full image optimization
-// This ensures the critical UI is rendered before handling non-critical assets
-if ('requestIdleCallback' in window) {
-  requestIdleCallback(() => {
-    initializeFastImageLoading();
-  });
-} else {
-  // Fallback for browsers without requestIdleCallback
-  setTimeout(() => {
-    initializeFastImageLoading();
-  }, 200);
-}
 
 // Register the service worker for caching and offline support
 if ('serviceWorker' in navigator) {
@@ -43,10 +34,13 @@ if ('serviceWorker' in navigator) {
       .then(registration => {
         console.log('Service Worker registered with scope:', registration.scope);
         
-        // Check for updates less frequently to reduce network calls
+        // Check for updates periodically
         setInterval(() => {
           registration.update();
-        }, 3 * 60 * 60 * 1000); // Check for updates every 3 hours instead of 1
+        }, 60 * 60 * 1000); // Check for updates every hour
+        
+        // Check for updates when page loads
+        registration.update();
         
         // Handle service worker updates
         registration.addEventListener('updatefound', () => {

@@ -1,151 +1,91 @@
 import React, { useState, useEffect } from 'react';
-import { generateSrcSet } from '../utils/imageOptimizations';
 
 /**
- * OptimizedImage - A component for optimized image loading
+ * OptimizedImage component for better image loading performance
  * 
  * Features:
- * - Lazy loading with IntersectionObserver
- * - Responsive images with srcset
- * - Placeholder during loading
+ * - Lazy loading using Intersection Observer
+ * - Placeholder while loading
  * - Error fallback
- * - Blur-up loading effect
- * - Size-appropriate loading
- * 
- * @param {Object} props
- * @param {string} props.src - The image source URL
- * @param {string} props.alt - Alt text for the image
- * @param {number} props.width - Width of the image (optional)
- * @param {number} props.height - Height of the image (optional)
- * @param {string} props.className - CSS class for the image (optional)
- * @param {boolean} props.critical - Whether this image is critical and should load eagerly (optional)
- * @param {string} props.fallbackSrc - Fallback image to use if main image fails to load (optional)
+ * - Size attributes to prevent layout shifts
+ * - Image caching using Cache API
  */
+const CACHE_NAME = 'image-cache-v1';
+
 const OptimizedImage = ({ 
   src, 
   alt, 
+  className = "", 
   width, 
-  height, 
-  className = '', 
-  critical = false,
-  fallbackSrc = '/images/logo/logo.png',
-  ...rest 
+  height,
+  placeholder = "/images/logo/logo.png",
+  ...props 
 }) => {
-  const [loaded, setLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
-  
-  // Generate responsive sizes if available
-  const hasSrcSet = src && !src.includes('data:');
-  const srcSetData = hasSrcSet ? generateSrcSet(src) : {};
-  
-  // Determine if image should be lazily loaded
-  const loadingStrategy = critical ? 'eager' : 'lazy';
-  const priority = critical ? 'high' : 'auto';
-  
-  // Force image dimensions if provided to prevent layout shifts
-  const dimensions = {};
-  if (width) dimensions.width = width;
-  if (height) dimensions.height = height;
-  
-  // Handle image load success
-  const handleLoad = () => {
-    setLoaded(true);
-  };
-  
-  // Handle image load failure
-  const handleError = () => {
-    console.warn(`Failed to load image: ${src}`);
-    setError(true);
-  };
-  
-  // Try to preload critical images
+  const [imgSrc, setImgSrc] = useState(placeholder);
+
   useEffect(() => {
-    if (critical && src) {
-      const img = new Image();
-      img.src = src;
-    }
-  }, [critical, src]);
-  
-  // Add image to browser cache when it's viewed
-  useEffect(() => {
-    if (loaded && 'caches' in window && hasSrcSet) {
-      caches.open('image-cache').then(cache => {
-        cache.add(src).catch(() => {
-          // Silently fail if image can't be cached
-        });
-      });
-    }
-  }, [loaded, src, hasSrcSet]);
-  
-  // Send image URLs to service worker for background caching if needed
-  const preloadForOffline = () => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'PRELOAD_IMAGES',
-        urls: [src]
-      });
-    }
-  };
-  
+    let isMounted = true;
+    setIsLoaded(false);
+    setError(false);
+    setImgSrc(placeholder);
+
+    const loadImage = async () => {
+      try {
+        // Open the cache
+        const cache = await window.caches.open(CACHE_NAME);
+        // Try to match the image in the cache
+        let response = await cache.match(src);
+        if (!response) {
+          // If not cached, fetch from network
+          response = await fetch(src, { mode: 'cors' });
+          if (!response.ok) throw new Error('Network response was not ok');
+          // Put the response clone in the cache
+          await cache.put(src, response.clone());
+        }
+        // Convert response to blob and then to object URL
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        if (isMounted) {
+          setImgSrc(objectUrl);
+          setIsLoaded(true);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(true);
+          setImgSrc(placeholder);
+        }
+      }
+    };
+
+    loadImage();
+    return () => {
+      isMounted = false;
+    };
+  }, [src, placeholder]);
+
   return (
     <div 
-      className={`optimized-image-container ${className}`} 
-      style={{ 
-        position: 'relative',
-        overflow: 'hidden',
-        backgroundColor: '#f0f0f0',
-        width: width ? `${width}px` : '100%',
-        height: height ? `${height}px` : 'auto',
-      }}
+      className={`relative ${className}`} 
+      style={{ width, height }}
     >
-      {/* Low quality placeholder or blur effect while loading */}
-      {!loaded && !error && (
+      <img
+        src={imgSrc}
+        alt={alt}
+        className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-80'}`}
+        width={width}
+        height={height}
+        onError={() => {
+          setError(true);
+          setImgSrc(placeholder);
+        }}
+        {...props}
+      />
+      {!isLoaded && !error && (
         <div 
-          className="image-placeholder"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: '#f0f0f0',
-          }}
-        />
-      )}
-      
-      {/* Main image */}
-      {!error ? (
-        <img
-          src={src}
-          alt={alt}
-          loading={loadingStrategy}
-          fetchpriority={priority}
-          onLoad={handleLoad}
-          onError={handleError}
-          onClick={preloadForOffline}
-          className={`optimized-image ${loaded ? 'loaded' : 'loading'}`}
-          style={{
-            opacity: loaded ? 1 : 0,
-            transition: 'opacity 0.3s ease',
-            ...dimensions
-          }}
-          {...(hasSrcSet && { 
-            srcSet: srcSetData.srcset,
-            sizes: srcSetData.sizes
-          })}
-          {...rest}
-        />
-      ) : (
-        // Fallback image if main image fails to load
-        <img
-          src={fallbackSrc}
-          alt={alt}
-          className="optimized-image fallback"
-          style={{
-            opacity: 1,
-            ...dimensions
-          }}
-          {...rest}
+          className="absolute inset-0 bg-gray-200 animate-pulse rounded"
+          style={{ width, height, opacity: 0.5 }}
         />
       )}
     </div>
