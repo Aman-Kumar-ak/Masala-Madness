@@ -20,8 +20,8 @@ const PRECACHE_URLS = [
   '/images/m_logo.svg',  // SVG logo
   
   // Only essential PWA icons (SVG versions)
-  '/images/icons/icon-192X192.svg',
-  '/images/icons/icon-512X512.svg',
+  '/images/icons/icon-192X192.png',
+  '/images/icons/icon-512X512.png',
   
   // Essential fallback images
   '/images/fallbacks/image-placeholder.svg',
