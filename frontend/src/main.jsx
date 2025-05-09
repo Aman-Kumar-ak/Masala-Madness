@@ -37,16 +37,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 // Register the service worker for caching and offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
+    navigator.serviceWorker.register('/service-worker.js', {
+      // Use updateViaCache: 'none' to ensure the browser always goes to the network for the service worker
+      updateViaCache: 'none'
+    })
       .then(registration => {
         console.log('Service Worker registered with scope:', registration.scope);
         
-        // Check for updates periodically
-        setInterval(() => {
-          registration.update();
-        }, 60 * 60 * 1000); // Check for updates every hour
+        // Remove interval checking - only check for updates when page loads/refreshes
         
-        // Check for updates when page loads
+        // Always update on page refresh
         registration.update();
         
         // Handle service worker updates
@@ -56,14 +56,13 @@ if ('serviceWorker' in navigator) {
           newWorker.addEventListener('statechange', () => {
             // When the service worker is installed
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New content is available, automatically apply the update
               console.log('New content is available; automatically updating...');
-              // Skip waiting and reload to apply updates immediately
+              // Skip waiting to apply updates immediately
               if (registration.waiting) {
                 registration.waiting.postMessage({ type: 'CHECK_UPDATE' });
               }
-              // Reload the page to activate the new service worker
-              window.location.reload();
+              // If page was just loaded, no need to reload again
+              // Update will be reflected on next refresh
             }
           });
         });
@@ -74,13 +73,22 @@ if ('serviceWorker' in navigator) {
     
     // Listen for messages from the service worker
     navigator.serviceWorker.addEventListener('message', event => {
-      if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-        // Automatically reload the page to apply the update
-        window.location.reload();
+      if (event.data) {
+        // Handle UPDATE_AVAILABLE message (for backward compatibility)
+        if (event.data.type === 'UPDATE_AVAILABLE') {
+          console.log('Update available and will be used on next page load');
+          // No automatic reload - updates will be active on next refresh
+        }
+        
+        // Handle new CACHE_UPDATED message
+        if (event.data.type === 'CACHE_UPDATED') {
+          console.log('Cache updated:', event.data.message);
+          // No automatic reload - updates will be active on next refresh
+        }
       }
     });
   });
 }
 
 // Function to show update notification
-// Removed in favor of automatic updates
+// Removed in favor of updates on refresh

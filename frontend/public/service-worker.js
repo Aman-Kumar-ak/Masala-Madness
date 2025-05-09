@@ -1,7 +1,8 @@
 // Change this version number whenever you make updates to force cache refresh
-const VERSION = '6';  // Increment this with each deployment
-const STATIC_CACHE = `static-cache-v${VERSION}`;
-const DYNAMIC_CACHE = `dynamic-cache-v${VERSION}`;
+const VERSION = '7';  // Increment this with each deployment
+const DEPLOYMENT_ID = Date.now().toString(36); // Unique ID for this deployment
+const STATIC_CACHE = `static-cache-v${VERSION}-${DEPLOYMENT_ID}`;
+const DYNAMIC_CACHE = `dynamic-cache-v${VERSION}-${DEPLOYMENT_ID}`;
 
 // List of files to precache (add more as needed)
 const PRECACHE_URLS = [
@@ -65,22 +66,38 @@ self.addEventListener('install', (event) => {
       })
       .then(() => precacheIcons())
   );
+  // Force immediate activation
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+  // Delete old caches immediately
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (![STATIC_CACHE, DYNAMIC_CACHE].includes(cacheName)) {
+          // Delete any cache that isn't the current version
+          if (!cacheName.includes(`-${DEPLOYMENT_ID}`)) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      // Ensure new service worker takes control immediately
+      self.clients.claim();
+      
+      // Notify clients about the update
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ 
+            type: 'CACHE_UPDATED',
+            message: 'New version available and active!'
+          });
+        });
+      });
     })
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -115,7 +132,10 @@ self.addEventListener('fetch', (event) => {
             .then((networkResponse) => {
               // Cache the icon for future use
               return caches.open(STATIC_CACHE).then((cache) => {
-                cache.put(request, networkResponse.clone());
+                // Only cache GET requests, not HEAD requests
+                if (request.method === 'GET') {
+                  cache.put(request, networkResponse.clone());
+                }
                 return networkResponse;
               });
             })
@@ -174,7 +194,7 @@ self.addEventListener('fetch', (event) => {
             // Start a background fetch to update the cache, but return cached immediately
             const updateCachePromise = fetch(request)
               .then(networkResponse => {
-                if (networkResponse.ok) {
+                if (networkResponse.ok && request.method === 'GET') {
                   caches.open(STATIC_CACHE)
                     .then(cache => cache.put(request, networkResponse));
                 }
@@ -194,7 +214,10 @@ self.addEventListener('fetch', (event) => {
               }
               
               return caches.open(STATIC_CACHE).then((cache) => {
-                cache.put(request, networkResponse.clone());
+                // Only cache GET requests, not HEAD requests
+                if (request.method === 'GET') {
+                  cache.put(request, networkResponse.clone());
+                }
                 return networkResponse;
               });
             });
@@ -203,13 +226,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for HTML pages
+  // HTML pages should always go to network first to ensure fresh content
   if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
       fetch(request)
         .then((networkResponse) => {
+          // Cache the network response for offline use
           return caches.open(DYNAMIC_CACHE).then((cache) => {
-            cache.put(request, networkResponse.clone());
+            // Only cache GET requests, not HEAD requests
+            if (request.method === 'GET') {
+              cache.put(request, networkResponse.clone());
+            }
             return networkResponse;
           });
         })
