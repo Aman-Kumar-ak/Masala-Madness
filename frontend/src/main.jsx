@@ -54,10 +54,16 @@ if ('serviceWorker' in navigator) {
           const newWorker = registration.installing;
           
           newWorker.addEventListener('statechange', () => {
-            // When the service worker is installed and waiting
+            // When the service worker is installed
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New content is available, show update UI
-              showUpdateNotification();
+              // New content is available, automatically apply the update
+              console.log('New content is available; automatically updating...');
+              // Skip waiting and reload to apply updates immediately
+              if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'CHECK_UPDATE' });
+              }
+              // Reload the page to activate the new service worker
+              window.location.reload();
             }
           });
         });
@@ -69,45 +75,12 @@ if ('serviceWorker' in navigator) {
     // Listen for messages from the service worker
     navigator.serviceWorker.addEventListener('message', event => {
       if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-        showUpdateNotification();
+        // Automatically reload the page to apply the update
+        window.location.reload();
       }
     });
   });
 }
 
 // Function to show update notification
-function showUpdateNotification() {
-  // Create and add update notification to the DOM
-  const updateBanner = document.createElement('div');
-  updateBanner.style.position = 'fixed';
-  updateBanner.style.bottom = '0';
-  updateBanner.style.left = '0';
-  updateBanner.style.right = '0';
-  updateBanner.style.backgroundColor = '#ea580c';
-  updateBanner.style.color = 'white';
-  updateBanner.style.padding = '12px';
-  updateBanner.style.textAlign = 'center';
-  updateBanner.style.zIndex = '9999';
-  updateBanner.style.boxShadow = '0 -2px 10px rgba(0, 0, 0, 0.1)';
-  
-  updateBanner.innerHTML = `
-    <p style="margin: 0; font-weight: bold;">A new version is available!</p>
-    <button 
-      style="background: white; color: #ea580c; border: none; padding: 8px 16px; margin-top: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;"
-      id="update-button"
-    >
-      Update Now
-    </button>
-  `;
-  
-  document.body.appendChild(updateBanner);
-  
-  // Add event listener to the update button
-  document.getElementById('update-button').addEventListener('click', () => {
-    // Tell the service worker to skipWaiting through the message channel
-    navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
-    
-    // Reload the page to activate the new service worker
-    window.location.reload();
-  });
-}
+// Removed in favor of automatic updates
