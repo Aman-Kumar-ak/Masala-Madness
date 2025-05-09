@@ -4,7 +4,7 @@ import api, { API_BASE_URL } from '../utils/api';
 import Notification from './Notification';
 import ConfirmationDialog from './ConfirmationDialog';
 import DishModal from './DishModal';
-import { fadeIn, fadeInUp, staggerChildren, listItem, buttonHoverAnimation } from '../utils/animations';
+import { fadeIn, fadeInUp, staggerChildren, listItem } from '../utils/animations';
 
 const MenuManager = ({ categories, onUpdate }) => {
   const [newCategory, setNewCategory] = useState('');
@@ -376,9 +376,8 @@ const MenuManager = ({ categories, onUpdate }) => {
                   <div className="flex flex-row gap-2">
                     <motion.button 
                       type="submit" 
-                      className="flex-1 bg-green-500 text-white px-3 sm:px-6 py-3 rounded-lg hover:bg-green-600 transition-all duration-200 flex items-center justify-center gap-1 text-sm sm:text-base"
+                      className="flex-1 bg-green-500 text-white px-3 sm:px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 text-sm sm:text-base"
                       disabled={isLoading}
-                      whileHover={buttonHoverAnimation}
                       whileTap={{ scale: 0.95 }}
                     >
                       {isLoading ? (
@@ -401,8 +400,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                         setShowCategoryInput(false);
                         setNewCategory('');
                       }}
-                      className="flex-1 bg-gray-400 text-white px-3 sm:px-6 py-3 rounded-lg hover:bg-gray-500 transition-all duration-200 flex items-center justify-center text-sm sm:text-base"
-                      whileHover={buttonHoverAnimation}
+                      className="flex-1 bg-gray-400 text-white px-3 sm:px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center text-sm sm:text-base"
                       whileTap={{ scale: 0.95 }}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -417,8 +415,7 @@ const MenuManager = ({ categories, onUpdate }) => {
               <motion.button
                 key="add-category-button"
                 onClick={() => setShowCategoryInput(true)}
-                className="w-full sm:w-auto bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all duration-200 flex items-center justify-center gap-2"
-                whileHover={buttonHoverAnimation}
+                className="w-full sm:w-auto bg-green-500 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
                 whileTap={{ scale: 0.95 }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -434,8 +431,7 @@ const MenuManager = ({ categories, onUpdate }) => {
 
           <motion.button
             onClick={openAddDishModal}
-            className={`w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${showCategoryInput ? 'mt-2' : ''}`}
-            whileHover={buttonHoverAnimation}
+            className="w-full sm:w-auto bg-blue-500 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
             whileTap={{ scale: 0.95 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -466,8 +462,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                 <h3 className="text-2xl font-bold text-orange-700">{category.categoryName}</h3>
                 <motion.button
                   onClick={() => handleDeleteCategory(category._id)}
-                  className="text-sm px-4 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-all duration-200 flex items-center gap-2"
-                  whileHover={buttonHoverAnimation}
+                  className="text-sm px-4 py-2 bg-rose-500 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
                   whileTap={{ scale: 0.95 }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -497,10 +492,9 @@ const MenuManager = ({ categories, onUpdate }) => {
                     {category.dishes.map((dish, dishIndex) => (
                       <motion.div 
                         key={dish._id} 
-                        className="py-4 px-2 border-b last:border-b-0 hover:bg-gray-100 transition-colors duration-150 rounded"
+                        className="py-4 px-2 border-b last:border-b-0 transition-colors duration-150 rounded"
                         variants={listItem}
                         custom={dishIndex}
-                        whileHover={{ scale: 1.01, x: 5 }}
                         transition={{ delay: dishIndex * 0.05, duration: 0.2 }}
                       >
                         <div className="flex flex-col gap-3">
@@ -520,8 +514,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                           <div className="flex flex-row gap-2">
                             <motion.button
                               onClick={() => startEditingDish(category._id, dish)}
-                              className="w-1/2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 flex items-center justify-center gap-1 whitespace-nowrap text-sm"
-                              whileHover={buttonHoverAnimation}
+                              className="w-1/2 px-3 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 flex items-center justify-center gap-1 whitespace-nowrap text-sm"
                               whileTap={{ scale: 0.95 }}
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -531,8 +524,7 @@ const MenuManager = ({ categories, onUpdate }) => {
                             </motion.button>
                             <motion.button
                               onClick={() => handleDeleteDish(category._id, dish._id)}
-                              className="w-1/2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-200 flex items-center justify-center gap-1 whitespace-nowrap text-sm"
-                              whileHover={buttonHoverAnimation}
+                              className="w-1/2 px-3 py-2 bg-red-500 text-white rounded-lg transition-all duration-200 flex items-center justify-center gap-1 whitespace-nowrap text-sm"
                               whileTap={{ scale: 0.95 }}
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
