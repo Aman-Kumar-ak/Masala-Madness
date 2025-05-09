@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalAnimation, buttonHoverAnimation } from '../utils/animations';
 
-const ConfirmationDialog = ({ 
+// Use React.memo to prevent unnecessary re-renders
+const ConfirmationDialog = memo(({ 
   isOpen, 
   onClose, 
   onConfirm,
@@ -29,6 +30,7 @@ const ConfirmationDialog = ({
     }
   };
 
+  // Pre-compute icon to avoid complex rendering during animation
   const getIconByType = () => {
     switch (type) {
       case 'danger':
@@ -75,71 +77,71 @@ const ConfirmationDialog = ({
     }
   };
 
+  const dialogIcon = getIconByType();
+  const confirmButtonStyle = getConfirmButtonStyle();
+  const colorBarClass = `h-1.5 w-full ${
+    type === 'danger' ? 'bg-red-500' : 
+    type === 'warning' ? 'bg-orange-500' : 
+    type === 'info' ? 'bg-blue-500' : 
+    'bg-green-500'
+  }`;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <motion.div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 will-change-transform">
+      {/* Backdrop - optimized with CSS transitions instead of framer-motion for backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ease-out"
         onClick={onClose}
+        style={{ opacity: isOpen ? 1 : 0 }}
       />
       
       {/* Dialog */}
       <motion.div 
-        className="bg-white rounded-xl shadow-2xl w-full max-w-xs sm:max-w-md relative mx-4 overflow-hidden"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-xs sm:max-w-md relative mx-4 overflow-hidden will-change-transform"
         {...modalAnimation}
+        style={{ 
+          translateZ: 0, // Force GPU rendering 
+          willChange: 'transform, opacity'
+        }}
       >
         {/* Optional colored bar at top based on type */}
-        <div className={`h-1.5 w-full ${
-          type === 'danger' ? 'bg-red-500' : 
-          type === 'warning' ? 'bg-orange-500' : 
-          type === 'info' ? 'bg-blue-500' : 
-          'bg-green-500'
-        }`}></div>
+        <div className={colorBarClass}></div>
         
         <div className="p-5 sm:p-6">
-          {/* Icon based on dialog type */}
+          {/* Icon based on dialog type - simplified animation */}
           <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
+            initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ 
-              type: "spring",
-              stiffness: 300,
-              damping: 20,
-              delay: 0.1
-            }}
+            transition={{ duration: 0.15 }}
           >
-            {getIconByType()}
+            {dialogIcon}
           </motion.div>
 
           <motion.h3 
             className="text-xl font-bold text-gray-900 mb-2 text-center"
-            initial={{ y: 10, opacity: 0 }}
+            initial={{ y: 5, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
+            transition={{ duration: 0.15 }}
           >
             {title}
           </motion.h3>
 
-          <motion.p 
+          <motion.div
             className="text-gray-600 mb-6 text-base text-center"
-            initial={{ y: 10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15 }}
           >
             {message}
-          </motion.p>
+          </motion.div>
           
-          {/* Render custom content if provided */}
+          {/* Render custom content if provided - with simpler animation */}
           {customContent && (
             <motion.div 
               className="mb-5 sm:mb-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
+              transition={{ duration: 0.15 }}
             >
               {customContent}
             </motion.div>
@@ -149,23 +151,23 @@ const ConfirmationDialog = ({
           {confirmText !== null && (
             <motion.div 
               className="flex flex-col sm:flex-row gap-3"
-              initial={{ y: 20, opacity: 0 }}
+              initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
+              transition={{ duration: 0.15 }}
             >
               <motion.button
                 onClick={onConfirm}
-                className={`${getConfirmButtonStyle()} text-white px-5 py-3 rounded-xl flex-1 font-medium transition-all duration-200 text-base shadow-sm hover:shadow`}
+                className={`${confirmButtonStyle} text-white px-5 py-3 rounded-xl flex-1 font-medium transition-all duration-150 text-base shadow-sm hover:shadow`}
                 whileHover={buttonHoverAnimation}
-                whileTap={{ scale: 0.95 }}
+                whileTap={{ scale: 0.97 }}
               >
                 {confirmText}
               </motion.button>
               <motion.button
                 onClick={handleCancel}
-                className="bg-gray-100 text-gray-700 px-5 py-3 rounded-xl flex-1 font-medium hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 text-base"
+                className="bg-gray-100 text-gray-700 px-5 py-3 rounded-xl flex-1 font-medium hover:bg-gray-200 active:bg-gray-300 transition-colors duration-150 text-base"
                 whileHover={buttonHoverAnimation}
-                whileTap={{ scale: 0.95 }}
+                whileTap={{ scale: 0.97 }}
               >
                 {cancelText}
               </motion.button>
@@ -175,6 +177,6 @@ const ConfirmationDialog = ({
       </motion.div>
     </div>
   );
-};
+});
 
 export default ConfirmationDialog;

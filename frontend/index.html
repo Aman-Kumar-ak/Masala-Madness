@@ -4,8 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Masala Madness</title>
+    
+    <!-- Performance optimization - load early -->
+    <script src="/browser-config.js"></script>
+    
     <!-- DNS Prefetching -->
     <link rel="dns-prefetch" href="https://masala-madness-production.up.railway.app" />
+    <link rel="preconnect" href="https://masala-madness-production.up.railway.app" crossorigin="anonymous" />
     
     <!-- Favicon -->
     <link rel="icon" href="/images/logo/logo.png" />
@@ -25,6 +30,10 @@
     <!-- Preload PWA icons - for manifest and homescreen -->
     <link rel="preload" as="image" href="/images/icons/icon-192X192.png" />
     
+    <!-- Performance optimizations -->
+    <link rel="modulepreload" href="/src/main.jsx" />
+    <link rel="preload" href="/calculation-worker.js" as="worker" />
+    
     <!-- Font Display Strategy -->
     <style>
       /* Use font-display: swap for all font-face rules */
@@ -35,6 +44,26 @@
       /* Prevent layout shifts while images load */
       img {
         aspect-ratio: attr(width) / attr(height);
+      }
+      
+      /* Add content-visibility to improve rendering performance */
+      .optimize-rendering {
+        content-visibility: auto;
+        contain-intrinsic-size: 0 500px; /* Estimated size */
+      }
+      
+      /* Add contain property for better performance with animations */
+      .dialog-animation,
+      .modal-container {
+        contain: layout style paint;
+        will-change: transform, opacity;
+      }
+      
+      /* Optimize layer promotion for animations */
+      .hardware-accelerated {
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        perspective: 1000px;
       }
     </style>
   </head>

@@ -1,6 +1,7 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
+import { throttle } from '../utils/performance';
 
 const AuthContext = createContext();
 
@@ -31,9 +32,9 @@ export const AuthProvider = ({ children }) => {
   };
   
   // Update the last activity time
-  const updateLastActivityTime = () => {
+  const updateLastActivityTime = useCallback(() => {
     sessionStorage.setItem('lastActivityTime', new Date().getTime().toString());
-  };
+  }, []);
   
   // Function to handle logout
   const logoutUser = () => {
@@ -47,28 +48,35 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
   
-  // Update activity time on any user interaction
+  // Update activity time on any user interaction - optimized with throttle
   useEffect(() => {
-    const handleUserActivity = () => {
+    if (!isAuthenticated) return;
+    
+    // Throttle the update function to improve performance
+    // Only update once every 30 seconds at most, which is reasonable for session tracking
+    const throttledUpdateActivity = throttle(() => {
       if (isAuthenticated) {
         updateLastActivityTime();
       }
-    };
+    }, 30000);
+    
+    // Use passive event listeners where possible for better performance
+    const options = { passive: true };
     
     // Listen for user activity events
-    window.addEventListener('mousemove', handleUserActivity);
-    window.addEventListener('keydown', handleUserActivity);
-    window.addEventListener('click', handleUserActivity);
-    window.addEventListener('scroll', handleUserActivity);
+    window.addEventListener('mousemove', throttledUpdateActivity, options);
+    window.addEventListener('keydown', throttledUpdateActivity, options);
+    window.addEventListener('click', throttledUpdateActivity, options);
+    window.addEventListener('scroll', throttledUpdateActivity, options);
     
     return () => {
       // Cleanup event listeners
-      window.removeEventListener('mousemove', handleUserActivity);
-      window.removeEventListener('keydown', handleUserActivity);
-      window.removeEventListener('click', handleUserActivity);
-      window.removeEventListener('scroll', handleUserActivity);
+      window.removeEventListener('mousemove', throttledUpdateActivity);
+      window.removeEventListener('keydown', throttledUpdateActivity);
+      window.removeEventListener('click', throttledUpdateActivity);
+      window.removeEventListener('scroll', throttledUpdateActivity);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, updateLastActivityTime]);
   
   // Check if user is already logged in (via token in sessionStorage)
   useEffect(() => {
@@ -108,78 +116,50 @@ export const AuthProvider = ({ children }) => {
     
     verifyUser();
     
-    // Set up periodic checks for session expiry
+    // Set up periodic checks for session expiry - reduced frequency for better performance
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
         // Force navigation to login if session expired
         navigate('/login');
       }
-    }, 60000); // Check every minute
+    }, 120000); // Check every 2 minutes instead of every minute
     
     return () => {
       clearInterval(sessionCheckInterval);
     };
-  }, [navigate, isAuthenticated]);
+  }, [navigate, isAuthenticated, updateLastActivityTime]);
   
   // Login function
   const login = async (username, password) => {
-    console.log('Attempting login...');
-    
     try {
-      // Use direct fetch for troubleshooting
-      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username, password })
-      });
+      const data = await api.post('/auth/login', { username, password });
       
-      console.log('Login response status:', response.status);
-      
-      // Get response body as text first to inspect
-      const responseText = await response.text();
-      
-      // Parse the JSON if it's a valid JSON string
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse response as JSON');
-        return { 
-          success: false, 
-          message: 'Invalid response from server. Please try again.' 
-        };
-      }
-      
-      if (response.ok && data.status === 'success') {
-        console.log('Login successful');
-        // Store token in sessionStorage
+      if (data.status === 'success' && data.token) {
+        // Store token
         sessionStorage.setItem('token', data.token);
         
-        // Also store user data in sessionStorage
-        sessionStorage.setItem('user', JSON.stringify(data.user));
+        // Store user data
+        if (data.user) {
+          sessionStorage.setItem('user', JSON.stringify(data.user));
+          setUser(data.user);
+        }
         
-        // Set last activity time
-        updateLastActivityTime();
-        
-        // Update state
-        setUser(data.user);
+        // Set authenticated and update last activity time
         setIsAuthenticated(true);
+        updateLastActivityTime();
         
         return { success: true };
       } else {
-        console.log('Login failed');
         return { 
           success: false, 
-          message: data.message || 'Login failed. Please check your credentials.' 
+          message: data.message || 'Authentication failed' 
         };
       }
     } catch (error) {
-      console.error('Login error occurred');
+      console.error('Login error:', error);
       return { 
         success: false, 
-        message: 'Login failed. Please try again later.' 
+        message: error.message || 'An unexpected error occurred' 
       };
     }
   };
