@@ -20,7 +20,7 @@ const imageCache = new Map();
 /**
  * Preload common images to improve perceived performance
  */
-export const preloadCommonImages = () => {
+export const preloadCommonImages = async () => {
   // Existing preloaded images (if any)
   const commonImages = [
     '/images/m_logo.png',
@@ -35,42 +35,94 @@ export const preloadCommonImages = () => {
     '/images/icons/icon-512X512.png'
   ];
 
-  commonImages.forEach(src => {
-    // Force load immediately with high priority
-    const img = new Image();
-    img.src = src;
-    img.onload = () => {
-      imageCache.set(src, true);
-      console.log(`Preloaded: ${src}`);
-    };
-    img.onerror = () => {
-      console.error(`Failed to preload: ${src}`);
-    };
-    
-    // Force image to be loaded with high priority
-    img.fetchPriority = "high";
-    
-    // Ensure the browser knows this is important
-    if (typeof img.importance !== 'undefined') {
-      img.importance = "high";
-    }
-    
-    // Add to document for better browser prioritization
-    img.style.position = 'absolute';
-    img.style.opacity = '0';
-    img.style.width = '1px';
-    img.style.height = '1px';
-    img.style.top = '-1px';
-    img.style.left = '-1px';
-    document.body.appendChild(img);
-    
-    // Remove after a short delay
-    setTimeout(() => {
-      if (document.body.contains(img)) {
-        document.body.removeChild(img);
+  // First check if each image is already in cache
+  for (const src of commonImages) {
+    try {
+      // Check if image is already in cache
+      const isCached = await checkImageInCache(src);
+      
+      if (isCached) {
+        // Image already in cache, no need to download again
+        imageCache.set(src, true);
+        console.log(`Image already cached: ${src}`);
+        continue;
       }
-    }, 3000);
-  });
+      
+      // If not cached, load it
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        imageCache.set(src, true);
+        console.log(`Preloaded: ${src}`);
+      };
+      img.onerror = () => {
+        console.error(`Failed to preload: ${src}`);
+      };
+      
+      // Force image to be loaded with high priority
+      img.fetchPriority = "high";
+      
+      // Ensure the browser knows this is important
+      if (typeof img.importance !== 'undefined') {
+        img.importance = "high";
+      }
+      
+      // Add to document for better browser prioritization
+      img.style.position = 'absolute';
+      img.style.opacity = '0';
+      img.style.width = '1px';
+      img.style.height = '1px';
+      img.style.top = '-1px';
+      img.style.left = '-1px';
+      document.body.appendChild(img);
+      
+      // Remove after a short delay
+      setTimeout(() => {
+        if (document.body.contains(img)) {
+          document.body.removeChild(img);
+        }
+      }, 3000);
+    } catch (error) {
+      console.error(`Error preloading image ${src}:`, error);
+    }
+  }
+};
+
+/**
+ * Check if an image is already in any cache (memory, browser, or service worker)
+ */
+const checkImageInCache = async (url) => {
+  // Check in-memory cache first
+  if (imageCache.has(url)) {
+    return true;
+  }
+  
+  // Then check service worker cache
+  if ('caches' in window) {
+    try {
+      // Try all caches
+      const cachesKeys = await caches.keys();
+      for (const cacheName of cachesKeys) {
+        const cache = await caches.open(cacheName);
+        const cachedResponse = await cache.match(url);
+        if (cachedResponse) {
+          return true;
+        }
+      }
+    } catch (error) {
+      console.warn(`Cache check failed for ${url}:`, error);
+    }
+  }
+  
+  // Finally, check if browser has it cached using a HEAD request
+  try {
+    const headers = { method: 'HEAD', cache: 'only-if-cached', mode: 'same-origin' };
+    const response = await fetch(url, headers);
+    return response.ok;
+  } catch (error) {
+    // This may fail in Chrome when offline
+    return false;
+  }
 };
 
 /**
@@ -152,13 +204,34 @@ export const initializeFastImageLoading = () => {
 };
 
 // Preload all PWA icons for better offline experience
-export const preloadPwaIcons = () => {
+export const preloadPwaIcons = async () => {
   const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
   
-  iconSizes.forEach(size => {
-    const img = new Image();
-    img.src = `/images/icons/icon-${size}X${size}.png`;
-  });
+  for (const size of iconSizes) {
+    const iconUrl = `/images/icons/icon-${size}X${size}.png`;
+    
+    try {
+      // Check if icon is already in cache
+      const isCached = await checkImageInCache(iconUrl);
+      
+      if (isCached) {
+        // Icon already in cache, no need to download again
+        imageCache.set(iconUrl, true);
+        console.log(`Icon already cached: ${iconUrl}`);
+        continue;
+      }
+      
+      // If not in cache, load it
+      const img = new Image();
+      img.src = iconUrl;
+      img.onload = () => {
+        imageCache.set(iconUrl, true);
+        console.log(`Preloaded icon: ${iconUrl}`);
+      };
+    } catch (error) {
+      console.error(`Error preloading icon ${iconUrl}:`, error);
+    }
+  }
 };
 
 export default {

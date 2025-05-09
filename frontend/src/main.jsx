@@ -8,14 +8,21 @@ import { CartProvider } from './components/CartContext'; // ✅ Import the CartP
 import { RefreshProvider } from './contexts/RefreshContext'; // ✅ Import the RefreshProvider
 import { initializeFastImageLoading, preloadCommonImages, preloadPwaIcons } from './utils/imageOptimizations'; // Import image optimization
 
-// Start preloading images immediately before any React rendering
-preloadCommonImages();
-
-// Preload PWA icons for better offline experience
-preloadPwaIcons();
-
-// Then initialize the rest of the image optimization
-initializeFastImageLoading();
+// Initialize image loading with async functions
+(async () => {
+  try {
+    // Start preloading images immediately before any React rendering
+    await preloadCommonImages();
+    
+    // Preload PWA icons for better offline experience
+    await preloadPwaIcons();
+    
+    // Then initialize the rest of the image optimization
+    initializeFastImageLoading();
+  } catch (error) {
+    console.error('Error during image preloading:', error);
+  }
+})();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
