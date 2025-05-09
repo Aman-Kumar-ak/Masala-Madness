@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Icon Editor</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #ea580c;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .settings {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 6px;
+        }
+        .settings label {
+            display: inline-block;
+            width: 180px;
+            font-weight: bold;
+        }
+        .settings input {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background-color: #ea580c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #c2410c;
+        }
+        .icons-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .icon-preview {
+            text-align: center;
+            background-color: #fff7ed;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .icon-preview img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .icon-preview p {
+            margin: 5px 0 0 0;
+            font-size: 12px;
+        }
+        .download-all {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .progress {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e6f7ff;
+            border-left: 4px solid #1890ff;
+            display: none;
+        }
+        .complete {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f6ffed;
+            border-left: 4px solid #52c41a;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PWA Icon Editor</h1>
+        <p>This tool will update all your PWA icons with a white background instead of black.</p>
+        
+        <div class="settings">
+            <div>
+                <label for="backgroundColor">Background Color:</label>
+                <input type="color" id="backgroundColor" value="#FFFFFF">
+            </div>
+            <div style="margin-top: 10px;">
+                <label for="borderRadius">Border Radius (%):</label>
+                <input type="range" id="borderRadius" min="0" max="50" value="15">
+                <span id="radiusValue">15%</span>
+            </div>
+        </div>
+        
+        <div>
+            <button id="loadLogo">Load Logo Image</button>
+            <input type="file" id="logoInput" accept="image/*" style="display:none">
+            <button id="processIcons" disabled>Process All Icons</button>
+        </div>
+        
+        <div id="progress" class="progress">Processing icons... <span id="progressStatus">0/8</span></div>
+        <div id="complete" class="complete">✅ All icons processed successfully! Download them individually below.</div>
+        
+        <div id="iconsContainer" class="icons-container"></div>
+        
+        <div class="download-all">
+            <p>After downloading, replace the files in <code>/frontend/public/images/icons/</code></p>
+        </div>
+    </div>
+    
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        const backgroundColor = document.getElementById('backgroundColor');
+        const borderRadius = document.getElementById('borderRadius');
+        const radiusValue = document.getElementById('radiusValue');
+        const loadLogoBtn = document.getElementById('loadLogo');
+        const logoInput = document.getElementById('logoInput');
+        const processIconsBtn = document.getElementById('processIcons');
+        const progress = document.getElementById('progress');
+        const progressStatus = document.getElementById('progressStatus');
+        const complete = document.getElementById('complete');
+        const iconsContainer = document.getElementById('iconsContainer');
+        
+        let logoImage = null;
+        
+        // Update radius display
+        borderRadius.addEventListener('input', () => {
+            radiusValue.textContent = borderRadius.value + '%';
+        });
+        
+        // Load logo
+        loadLogoBtn.addEventListener('click', () => {
+            logoInput.click();
+        });
+        
+        logoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        logoImage = img;
+                        processIconsBtn.disabled = false;
+                        
+                        // Show preview of source logo
+                        showIconPreview(img.src, 'Source Logo');
+                    };
+                    img.src = event.target.result;
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Process icons
+        processIconsBtn.addEventListener('click', async () => {
+            if (!logoImage) {
+                alert('Please load a logo image first');
+                return;
+            }
+            
+            iconsContainer.innerHTML = '';
+            progress.style.display = 'block';
+            complete.style.display = 'none';
+            
+            let processed = 0;
+            for (const size of sizes) {
+                await processIcon(size);
+                processed++;
+                progressStatus.textContent = `${processed}/${sizes.length}`;
+            }
+            
+            progress.style.display = 'none';
+            complete.style.display = 'block';
+        });
+        
+        // Process a single icon
+        async function processIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Calculate border radius based on percentage
+            const radius = (parseInt(borderRadius.value) / 100) * (size / 2);
+            
+            // Draw rounded rectangle background
+            ctx.beginPath();
+            ctx.moveTo(radius, 0);
+            ctx.lineTo(size - radius, 0);
+            ctx.quadraticCurveTo(size, 0, size, radius);
+            ctx.lineTo(size, size - radius);
+            ctx.quadraticCurveTo(size, size, size - radius, size);
+            ctx.lineTo(radius, size);
+            ctx.quadraticCurveTo(0, size, 0, size - radius);
+            ctx.lineTo(0, radius);
+            ctx.quadraticCurveTo(0, 0, radius, 0);
+            ctx.closePath();
+            
+            // Fill with background color
+            ctx.fillStyle = backgroundColor.value;
+            ctx.fill();
+            
+            // Draw logo (scaled to 80% of the icon size)
+            const logoSize = size * 0.8;
+            const offset = (size - logoSize) / 2;
+            ctx.drawImage(logoImage, offset, offset, logoSize, logoSize);
+            
+            // Get image data
+            const imageData = canvas.toDataURL('image/png');
+            
+            // Display preview
+            showIconPreview(imageData, `${size}x${size}`);
+            
+            // Simulate processing delay
+            return new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Show icon preview with download link
+        function showIconPreview(src, label) {
+            const container = document.createElement('div');
+            container.className = 'icon-preview';
+            
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = label;
+            
+            const p = document.createElement('p');
+            p.textContent = label;
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = src;
+            downloadLink.download = `icon-${label.replace('x', 'X')}.png`;
+            downloadLink.textContent = 'Download';
+            downloadLink.style.fontSize = '12px';
+            downloadLink.style.display = 'inline-block';
+            downloadLink.style.marginTop = '5px';
+            
+            container.appendChild(img);
+            container.appendChild(p);
+            container.appendChild(downloadLink);
+            
+            iconsContainer.appendChild(container);
+        }
+    </script>
+</body>
+</html> 

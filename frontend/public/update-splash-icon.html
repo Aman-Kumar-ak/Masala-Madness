@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update PWA Splash Screen Icon</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            color: #ea580c;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            margin-bottom: 15px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            max-width: 300px;
+        }
+        button {
+            background-color: #ea580c;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #c2410c;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .preview {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            max-width: 100%;
+        }
+        .download-btn {
+            margin-top: 10px;
+        }
+        .status {
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .error {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        .instructions {
+            background-color: #fff7ed;
+            border-left: 4px solid #ea580c;
+            padding: 12px 15px;
+            margin-top: 20px;
+        }
+        .instructions ol {
+            margin-top: 5px;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Update PWA Splash Screen Icon</h1>
+        <p>This tool will help you update the PWA splash screen icon to have a white background instead of black.</p>
+        
+        <div class="controls">
+            <label for="bgColor">Background Color:</label>
+            <input type="color" id="bgColor" value="#FFFFFF">
+            
+            <label for="borderRadius">Border Radius (%):</label>
+            <input type="range" id="borderRadius" min="0" max="50" value="15">
+            <span id="radiusValue">15%</span>
+            
+            <div>
+                <button id="loadLogo">Select Logo</button>
+                <input type="file" id="logoInput" accept="image/*" style="display:none">
+            </div>
+        </div>
+        
+        <div class="preview">
+            <h2>Preview</h2>
+            <canvas id="previewCanvas" width="512" height="512"></canvas>
+            <div>
+                <button id="generateBtn" disabled>Generate All Icon Sizes</button>
+            </div>
+        </div>
+        
+        <div id="status" class="status" style="display:none;"></div>
+        
+        <div id="downloads"></div>
+        
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>Use this tool to create new icon files with a white background</li>
+                <li>Download each icon size</li>
+                <li>Replace the existing icons in <code>/frontend/public/images/icons/</code></li>
+                <li>Clear your browser cache</li>
+                <li>Restart your PWA</li>
+            </ol>
+        </div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('previewCanvas');
+        const ctx = canvas.getContext('2d');
+        const bgColorInput = document.getElementById('bgColor');
+        const borderRadiusInput = document.getElementById('borderRadius');
+        const radiusValue = document.getElementById('radiusValue');
+        const loadLogoBtn = document.getElementById('loadLogo');
+        const logoInput = document.getElementById('logoInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const statusEl = document.getElementById('status');
+        const downloadsEl = document.getElementById('downloads');
+        
+        let logoImage = null;
+        
+        // Update radius display
+        borderRadiusInput.addEventListener('input', () => {
+            radiusValue.textContent = borderRadiusInput.value + '%';
+            updatePreview();
+        });
+        
+        // Update on background color change
+        bgColorInput.addEventListener('input', updatePreview);
+        
+        // Load logo button
+        loadLogoBtn.addEventListener('click', () => {
+            logoInput.click();
+        });
+        
+        // Handle file selection
+        logoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        logoImage = img;
+                        updatePreview();
+                        generateBtn.disabled = false;
+                    };
+                    img.src = event.target.result;
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Update preview
+        function updatePreview() {
+            if (!logoImage) return;
+            
+            const size = canvas.width;
+            const bgcolor = bgColorInput.value;
+            const radius = (parseInt(borderRadiusInput.value) / 100) * (size / 2);
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+            
+            // Draw rounded rectangle background
+            ctx.beginPath();
+            ctx.moveTo(radius, 0);
+            ctx.lineTo(size - radius, 0);
+            ctx.quadraticCurveTo(size, 0, size, radius);
+            ctx.lineTo(size, size - radius);
+            ctx.quadraticCurveTo(size, size, size - radius, size);
+            ctx.lineTo(radius, size);
+            ctx.quadraticCurveTo(0, size, 0, size - radius);
+            ctx.lineTo(0, radius);
+            ctx.quadraticCurveTo(0, 0, radius, 0);
+            ctx.closePath();
+            
+            ctx.fillStyle = bgcolor;
+            ctx.fill();
+            
+            // Draw logo centered and scaled
+            const logoSize = size * 0.8;
+            const offset = (size - logoSize) / 2;
+            ctx.drawImage(logoImage, offset, offset, logoSize, logoSize);
+        }
+        
+        // Generate icon
+        function generateIcon(size) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            const radius = (parseInt(borderRadiusInput.value) / 100) * (size / 2);
+            
+            // Draw rounded rectangle background
+            tempCtx.beginPath();
+            tempCtx.moveTo(radius, 0);
+            tempCtx.lineTo(size - radius, 0);
+            tempCtx.quadraticCurveTo(size, 0, size, radius);
+            tempCtx.lineTo(size, size - radius);
+            tempCtx.quadraticCurveTo(size, size, size - radius, size);
+            tempCtx.lineTo(radius, size);
+            tempCtx.quadraticCurveTo(0, size, 0, size - radius);
+            tempCtx.lineTo(0, radius);
+            tempCtx.quadraticCurveTo(0, 0, radius, 0);
+            tempCtx.closePath();
+            
+            tempCtx.fillStyle = bgColorInput.value;
+            tempCtx.fill();
+            
+            // Draw logo centered and scaled
+            const logoSize = size * 0.8;
+            const offset = (size - logoSize) / 2;
+            tempCtx.drawImage(logoImage, offset, offset, logoSize, logoSize);
+            
+            return tempCanvas.toDataURL('image/png');
+        }
+        
+        // Generate all icon sizes
+        generateBtn.addEventListener('click', () => {
+            if (!logoImage) {
+                showStatus('Please select a logo image first', 'error');
+                return;
+            }
+            
+            const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+            downloadsEl.innerHTML = '<h3>Download Icons:</h3>';
+            
+            const downloadList = document.createElement('div');
+            downloadList.style.display = 'grid';
+            downloadList.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
+            downloadList.style.gap = '10px';
+            downloadsEl.appendChild(downloadList);
+            
+            sizes.forEach(size => {
+                const dataUrl = generateIcon(size);
+                
+                const container = document.createElement('div');
+                container.style.textAlign = 'center';
+                container.style.padding = '10px';
+                container.style.backgroundColor = '#f5f5f5';
+                container.style.borderRadius = '4px';
+                
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.alt = `Icon ${size}x${size}`;
+                img.style.width = '100px';
+                img.style.height = '100px';
+                
+                const downloadLink = document.createElement('a');
+                downloadLink.href = dataUrl;
+                downloadLink.download = `icon-${size}X${size}.png`;
+                downloadLink.textContent = `Download ${size}×${size}`;
+                downloadLink.className = 'download-btn';
+                downloadLink.style.display = 'inline-block';
+                downloadLink.style.marginTop = '10px';
+                downloadLink.style.textDecoration = 'none';
+                downloadLink.style.color = '#ea580c';
+                downloadLink.style.fontWeight = 'bold';
+                
+                container.appendChild(img);
+                container.appendChild(document.createElement('br'));
+                container.appendChild(downloadLink);
+                
+                downloadList.appendChild(container);
+            });
+            
+            showStatus('All icons generated! Download each one and replace the existing icons.', 'success');
+        });
+        
+        // Show status message
+        function showStatus(message, type) {
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+    </script>
+</body>
+</html> 
