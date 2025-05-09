@@ -145,7 +145,7 @@ export default function Home() {
             <div className="flex items-center space-x-2">
               <div className="w-11 h-11 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full p-0.5 shadow-sm flex items-center justify-center">
                 <OptimizedImage 
-                  src="/images/m_logo.svg" 
+                  src="/images/m_logo.png" 
                   alt="Masala Madness Logo" 
                   className="w-9 h-9 object-contain"
                   width={36}
