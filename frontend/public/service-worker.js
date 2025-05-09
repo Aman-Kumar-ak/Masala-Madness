@@ -1,5 +1,7 @@
-const STATIC_CACHE = 'static-cache-v1';
-const DYNAMIC_CACHE = 'dynamic-cache-v1';
+// Change this version number whenever you make updates to force cache refresh
+const VERSION = '2';  // Increment this with each deployment
+const STATIC_CACHE = `static-cache-v${VERSION}`;
+const DYNAMIC_CACHE = `dynamic-cache-v${VERSION}`;
 
 // List of files to precache (add more as needed)
 const PRECACHE_URLS = [
@@ -159,4 +161,17 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request).catch(() => caches.match(request))
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'CHECK_UPDATE') {
+    self.skipWaiting();
+    self.clients.claim();
+    // Notify all clients that we've updated
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => client.postMessage({ 
+        type: 'UPDATE_AVAILABLE' 
+      }));
+    });
+  }
 }); 
