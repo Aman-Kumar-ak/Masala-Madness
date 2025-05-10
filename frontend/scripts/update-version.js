@@ -1,5 +1,10 @@
-const fs = require('fs');
-const path = require('path');
+import { readFileSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory name in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Get the current date in IST
 const getISTDate = () => {
@@ -11,11 +16,11 @@ const getISTDate = () => {
 };
 
 // Read the current version.json
-const versionPath = path.join(__dirname, '..', 'public', 'version.json');
+const versionPath = join(__dirname, '..', 'public', 'version.json');
 let versionInfo;
 
 try {
-  const currentVersion = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+  const currentVersion = JSON.parse(readFileSync(versionPath, 'utf8'));
   // Increment the patch version
   const [major, minor, patch] = currentVersion.version.split('.');
   const newVersion = `${major}.${minor}.${parseInt(patch) + 1}`;
@@ -35,7 +40,7 @@ try {
 }
 
 // Write the updated version.json
-fs.writeFileSync(versionPath, JSON.stringify(versionInfo, null, 2));
+writeFileSync(versionPath, JSON.stringify(versionInfo, null, 2));
 
 console.log('Version updated successfully:');
 console.log('Version:', versionInfo.version);

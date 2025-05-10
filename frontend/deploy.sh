@@ -36,16 +36,20 @@ node scripts/update-version.js || handle_error "Failed to update version"
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm install || handle_error "Failed to install dependencies"
+npm install --omit=dev || handle_error "Failed to install dependencies"
 
 # Build the project
 echo "🔨 Building project..."
-npm run build || handle_error "Failed to build project"
+NODE_ENV=production npm run build || handle_error "Failed to build project"
 
 # Print deployment completion message
 echo "✅ Deployment completed successfully!"
 echo "📊 Version information:"
 cat public/version.json
+
+# Start the preview server
+echo "🚀 Starting preview server..."
+npm run preview -- --port 4173 --host
 
 # Optional: Add your deployment commands here
 # For example:
