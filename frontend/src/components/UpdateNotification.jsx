@@ -7,7 +7,28 @@ const UpdateNotification = () => {
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const [currentVersion, setCurrentVersion] = useState(null);
   const [newVersion, setNewVersion] = useState(null);
+  const [buildDate, setBuildDate] = useState(null);
   const [isUpdateRequired, setIsUpdateRequired] = useState(false);
+
+  // Format date to IST
+  const formatISTDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }).format(date);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
 
   // Check for pending updates on component mount
   useEffect(() => {
@@ -15,8 +36,9 @@ const UpdateNotification = () => {
       try {
         const pendingUpdate = localStorage.getItem('pendingUpdate');
         if (pendingUpdate) {
-          const { version, timestamp } = JSON.parse(pendingUpdate);
+          const { version, timestamp, buildDate } = JSON.parse(pendingUpdate);
           setNewVersion(version);
+          setBuildDate(buildDate);
           setIsUpdateRequired(true);
           setShowUpdateNotification(true);
         }
@@ -35,6 +57,7 @@ const UpdateNotification = () => {
         if (event.data.type === 'CACHE_UPDATED') {
           setShowUpdateNotification(true);
           setNewVersion(event.data.version);
+          setBuildDate(event.data.buildDate);
           
           // If user is admin, make update mandatory and store in localStorage
           if (user?.role === 'admin') {
@@ -42,7 +65,8 @@ const UpdateNotification = () => {
             // Store update requirement in localStorage
             localStorage.setItem('pendingUpdate', JSON.stringify({
               version: event.data.version,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              buildDate: event.data.buildDate
             }));
           }
         }
@@ -59,6 +83,7 @@ const UpdateNotification = () => {
             const response = await fetch('/version.json');
             const data = await response.json();
             setCurrentVersion(data.version);
+            setBuildDate(data.buildDate);
 
             // Check for updates
             await registration.update();
@@ -108,6 +133,11 @@ const UpdateNotification = () => {
             <p className="text-orange-700 text-sm mt-2">
               This update prompt will persist until you complete the update, even if you close and reopen the application.
             </p>
+            {buildDate && (
+              <p className="text-orange-700 text-sm mt-2">
+                Build Date: {formatISTDate(buildDate)} (IST)
+              </p>
+            )}
           </div>
         }
       />
@@ -135,6 +165,11 @@ const UpdateNotification = () => {
           <p className="text-blue-700 text-sm">
             This update includes new features and improvements. Updating now will ensure you have the best experience.
           </p>
+          {buildDate && (
+            <p className="text-blue-700 text-sm mt-2">
+              Build Date: {formatISTDate(buildDate)} (IST)
+            </p>
+          )}
         </div>
       }
     />
