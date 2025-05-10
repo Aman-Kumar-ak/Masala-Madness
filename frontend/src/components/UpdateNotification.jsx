@@ -1,9 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import ConfirmationDialog from './ConfirmationDialog';
+import { useAuth } from '../contexts/AuthContext';
 
 const UpdateNotification = () => {
+  const { user } = useAuth();
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const [currentVersion, setCurrentVersion] = useState(null);
   const [newVersion, setNewVersion] = useState(null);
+  const [isUpdateRequired, setIsUpdateRequired] = useState(false);
+
+  // Check for pending updates on component mount
+  useEffect(() => {
+    const checkPendingUpdates = async () => {
+      try {
+        const pendingUpdate = localStorage.getItem('pendingUpdate');
+        if (pendingUpdate) {
+          const { version, timestamp } = JSON.parse(pendingUpdate);
+          setNewVersion(version);
+          setIsUpdateRequired(true);
+          setShowUpdateNotification(true);
+        }
+      } catch (error) {
+        console.error('Error checking pending updates:', error);
+      }
+    };
+
+    checkPendingUpdates();
+  }, []);
 
   useEffect(() => {
     // Listen for service worker messages
@@ -12,6 +35,16 @@ const UpdateNotification = () => {
         if (event.data.type === 'CACHE_UPDATED') {
           setShowUpdateNotification(true);
           setNewVersion(event.data.version);
+          
+          // If user is admin, make update mandatory and store in localStorage
+          if (user?.role === 'admin') {
+            setIsUpdateRequired(true);
+            // Store update requirement in localStorage
+            localStorage.setItem('pendingUpdate', JSON.stringify({
+              version: event.data.version,
+              timestamp: new Date().toISOString()
+            }));
+          }
         }
       }
     };
@@ -44,33 +77,67 @@ const UpdateNotification = () => {
     return () => {
       navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
     };
-  }, []);
+  }, [user]);
 
   const handleUpdate = () => {
+    // Clear pending update from localStorage
+    localStorage.removeItem('pendingUpdate');
     // Reload the page to apply updates
     window.location.reload();
   };
 
+  // If update is required for admin, prevent app usage
+  if (isUpdateRequired) {
+    return (
+      <ConfirmationDialog
+        isOpen={true}
+        onClose={() => {}} // Prevent closing
+        onConfirm={handleUpdate}
+        title="Update Required"
+        message={`A new version (${newVersion}) is available and must be installed to continue using the application.`}
+        confirmText="Update Now"
+        cancelText={null} // Remove cancel button
+        type="warning"
+        customContent={
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+            <h4 className="font-semibold text-orange-800 mb-2">Important Notice</h4>
+            <p className="text-orange-700 text-sm">
+              As an administrator, you must update to the latest version to ensure system security and functionality.
+              The application will be unavailable until the update is completed.
+            </p>
+            <p className="text-orange-700 text-sm mt-2">
+              This update prompt will persist until you complete the update, even if you close and reopen the application.
+            </p>
+          </div>
+        }
+      />
+    );
+  }
+
+  // For non-admin users, show regular update notification
   if (!showUpdateNotification) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-orange-500 text-white px-4 py-3 text-center font-medium z-50 flex items-center justify-center gap-4">
-      <div>
-        {newVersion ? (
-          <p>A new version ({newVersion}) is available!</p>
-        ) : (
-          <p>A new version is available!</p>
-        )}
-      </div>
-      <button
-        onClick={handleUpdate}
-        className="bg-white text-orange-500 px-4 py-1 rounded-md font-semibold hover:bg-orange-50 transition-colors"
-      >
-        Update Now
-      </button>
-    </div>
+    <ConfirmationDialog
+      isOpen={showUpdateNotification}
+      onClose={() => setShowUpdateNotification(false)}
+      onConfirm={handleUpdate}
+      title="Update Available"
+      message={`A new version (${newVersion}) is available. Would you like to update now?`}
+      confirmText="Update Now"
+      cancelText="Later"
+      type="info"
+      customContent={
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold text-blue-800 mb-2">What's New?</h4>
+          <p className="text-blue-700 text-sm">
+            This update includes new features and improvements. Updating now will ensure you have the best experience.
+          </p>
+        </div>
+      }
+    />
   );
 };
 

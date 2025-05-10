@@ -11,6 +11,13 @@ const Settings = () => {
   const navigate = useNavigate();
   const { showSuccess } = useNotification();
   
+  // Add version state
+  const [versionInfo, setVersionInfo] = useState({
+    version: 'Loading...',
+    buildDate: 'Loading...',
+    environment: process.env.NODE_ENV || 'development'
+  });
+  
   // State for password change
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -30,6 +37,29 @@ const Settings = () => {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
+  
+  // Fetch version information
+  useEffect(() => {
+    const fetchVersionInfo = async () => {
+      try {
+        const response = await fetch('/version.json');
+        const data = await response.json();
+        setVersionInfo({
+          ...data,
+          environment: process.env.NODE_ENV || 'development'
+        });
+      } catch (error) {
+        console.error('Error fetching version info:', error);
+        setVersionInfo({
+          version: 'Unknown',
+          buildDate: 'Unknown',
+          environment: process.env.NODE_ENV || 'development'
+        });
+      }
+    };
+
+    fetchVersionInfo();
+  }, []);
   
   // Verify current password
   const verifyCurrentPassword = async () => {
@@ -170,7 +200,7 @@ const Settings = () => {
                 className="w-8 h-8 object-contain"
               />
             </div>
-            <h1 className="text-2xl font-bold text-gray-800">Masala Madness Settings</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
           </div>
           
           {user && (
@@ -309,6 +339,32 @@ const Settings = () => {
                 </svg>
                 Logout
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Version Information Section */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600">
+            <div className="flex items-center gap-4 mb-2 sm:mb-0">
+              <span className="font-medium">Version:</span>
+              <span>{versionInfo.version}</span>
+            </div>
+            <div className="flex items-center gap-4 mb-2 sm:mb-0">
+              <span className="font-medium">Build Date:</span>
+              <span>{new Date(versionInfo.buildDate).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-medium">Environment:</span>
+              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                versionInfo.environment === 'production' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {versionInfo.environment}
+              </span>
             </div>
           </div>
         </div>
