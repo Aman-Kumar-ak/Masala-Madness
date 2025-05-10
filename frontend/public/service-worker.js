@@ -1,291 +1,233 @@
 // Change this version number whenever you make updates to force cache refresh
-const VERSION = '7';  // Increment this with each deployment
-const DEPLOYMENT_ID = Date.now().toString(36); // Unique ID for this deployment
+const VERSION = '7';
+const DEPLOYMENT_ID = Date.now().toString(36);
 const STATIC_CACHE = `static-cache-v${VERSION}-${DEPLOYMENT_ID}`;
 const DYNAMIC_CACHE = `dynamic-cache-v${VERSION}-${DEPLOYMENT_ID}`;
 
-// List of files to precache (add more as needed)
-const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/manifest.json',
-  '/version.json', // Add version.json to precache
-  '/images/logo/logo.png',
-  '/images/calendar.png',
-  '/images/login.png',
-  '/images/qr-code.png',
-  '/images/order.png',
-  '/images/receipt.png',
-  '/images/admin.png',
-  '/images/m_logo.svg',  // SVG logo
-  
-  // Only essential PWA icons (SVG versions)
-  '/images/icons/icon-192X192.png',
-  '/images/icons/icon-512X512.png',
-  
-  // Essential fallback images
-  '/images/fallbacks/image-placeholder.svg',
-  '/images/fallbacks/logo-placeholder.svg',
-  '/images/fallbacks/calendar-placeholder.svg',
-  '/images/fallbacks/login-placeholder.svg',
-  '/images/fallbacks/qr-placeholder.svg',
-  '/images/fallbacks/order-placeholder.svg',
-  '/images/fallbacks/receipt-placeholder.svg',
-  '/images/fallbacks/admin-placeholder.svg',
-  '/images/fallbacks/icon-placeholder-192X192.svg'
-  // Add more static assets if needed
-];
-
-// Utility function to ensure icons are fetched and cached
-const precacheIcons = async () => {
-  // We only need to precache the essential icon sizes that are still used
-  const iconSizes = [192, 512];
-  const cache = await caches.open(STATIC_CACHE);
-  
-  // Fetch essential icon sizes and add them to cache
-  const iconPromises = iconSizes.map(size => {
-    // Use SVG icons instead of PNG
-    const iconUrl = `/images/icons/icon-${size}X${size}.svg`;
-    return fetch(iconUrl)
-      .then(response => {
-        if (response.ok) {
-          return cache.put(iconUrl, response);
-        }
-      })
-      .catch(error => console.warn(`Could not cache icon: ${iconUrl}`, error));
-  });
-  
-  return Promise.all(iconPromises);
+// Optimize cache names for better management
+const CACHE_NAMES = {
+  STATIC: STATIC_CACHE,
+  DYNAMIC: DYNAMIC_CACHE
 };
 
+// Optimize precache URLs with better organization
+const PRECACHE_URLS = {
+  ESSENTIAL: [
+    '/',
+    '/index.html',
+    '/offline.html',
+    '/manifest.json',
+    '/version.json'
+  ],
+  IMAGES: {
+    LOGO: '/images/logo/logo.png',
+    ICONS: [
+      '/images/icons/icon-192X192.png',
+      '/images/icons/icon-512X512.png'
+    ],
+    FALLBACKS: [
+      '/images/fallbacks/image-placeholder.svg',
+      '/images/fallbacks/logo-placeholder.svg',
+      '/images/fallbacks/calendar-placeholder.svg',
+      '/images/fallbacks/login-placeholder.svg',
+      '/images/fallbacks/qr-placeholder.svg',
+      '/images/fallbacks/order-placeholder.svg',
+      '/images/fallbacks/receipt-placeholder.svg',
+      '/images/fallbacks/admin-placeholder.svg',
+      '/images/fallbacks/icon-placeholder-192X192.svg'
+    ]
+  }
+};
+
+// Flatten precache URLs for easier use
+const FLAT_PRECACHE_URLS = [
+  ...PRECACHE_URLS.ESSENTIAL,
+  PRECACHE_URLS.IMAGES.LOGO,
+  ...PRECACHE_URLS.IMAGES.ICONS,
+  ...PRECACHE_URLS.IMAGES.FALLBACKS
+];
+
+// Optimize cache operations with better error handling
+const cacheOperations = {
+  async openCache(cacheName) {
+    try {
+      return await caches.open(cacheName);
+    } catch (error) {
+      console.error(`Failed to open cache ${cacheName}:`, error);
+      return null;
+    }
+  },
+
+  async addToCache(cache, request, response) {
+    try {
+      if (request.method === 'GET') {
+        await cache.put(request, response.clone());
+      }
+    } catch (error) {
+      console.error('Failed to add to cache:', error);
+    }
+  },
+
+  async getFromCache(request) {
+    try {
+      const cache = await caches.open(CACHE_NAMES.STATIC);
+      return await cache.match(request);
+    } catch (error) {
+      console.error('Failed to get from cache:', error);
+      return null;
+    }
+  }
+};
+
+// Optimize service worker installation
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => {
-        return cache.addAll(PRECACHE_URLS);
-      })
-      .then(() => precacheIcons())
+    (async () => {
+      const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);
+      if (cache) {
+        await cache.addAll(FLAT_PRECACHE_URLS);
+      }
+      await self.skipWaiting();
+    })()
   );
-  // Force immediate activation
-  self.skipWaiting();
 });
 
+// Optimize service worker activation
 self.addEventListener('activate', (event) => {
-  // Delete old caches immediately
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          // Delete any cache that isn't the current version
-          if (!cacheName.includes(`-${DEPLOYMENT_ID}`)) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
+    (async () => {
+      // Clean up old caches
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter(name => !name.includes(`-${DEPLOYMENT_ID}`))
+          .map(name => caches.delete(name))
       );
-    }).then(() => {
-      // Ensure new service worker takes control immediately
-      self.clients.claim();
-      
-      // Fetch the new version info
-      fetch('/version.json')
-        .then(response => response.json())
-        .then(versionInfo => {
-          // Notify clients about the update with version info
-          self.clients.matchAll().then(clients => {
-            clients.forEach(client => {
-              client.postMessage({ 
-                type: 'CACHE_UPDATED',
-                message: 'New version available and active!',
-                version: versionInfo.version
-              });
-            });
-          });
-        })
-        .catch(error => {
-          console.error('Error fetching version info:', error);
-          // Still notify clients about the update, just without version info
-          self.clients.matchAll().then(clients => {
-            clients.forEach(client => {
-              client.postMessage({ 
-                type: 'CACHE_UPDATED',
-                message: 'New version available and active!'
-              });
-            });
+
+      // Take control of all clients
+      await self.clients.claim();
+
+      // Notify clients about update
+      try {
+        const response = await fetch('/version.json');
+        const versionInfo = await response.json();
+        
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'CACHE_UPDATED',
+            message: 'New version available and active!',
+            version: versionInfo.version,
+            buildDate: versionInfo.buildDate
           });
         });
-    })
+      } catch (error) {
+        console.error('Error fetching version info:', error);
+      }
+    })()
   );
 });
 
+// Optimize fetch handling with better caching strategies
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
-  
-  // Special handling for icon requests
-  if (url.pathname.includes('/images/icons/')) {
-    event.respondWith(
-      caches.match(request)
-        .then((cachedResponse) => {
-          if (cachedResponse) {
-            // Return cached response without triggering network request
-            return cachedResponse;
-          }
-          
-          // If requesting a PNG icon, try to serve the SVG version instead
-          if (url.pathname.endsWith('.png')) {
-            const svgUrl = url.pathname.replace('.png', '.svg');
-            return caches.match(new Request(svgUrl))
-              .then(svgResponse => {
-                if (svgResponse) {
-                  return svgResponse;
-                }
-                
-                // If SVG not found, try network for original request
-                return fetch(request);
-              });
-          }
-          
-          return fetch(request)
-            .then((networkResponse) => {
-              // Cache the icon for future use
-              return caches.open(STATIC_CACHE).then((cache) => {
-                // Only cache GET requests, not HEAD requests
-                if (request.method === 'GET') {
-                  cache.put(request, networkResponse.clone());
-                }
-                return networkResponse;
-              });
-            })
-            .catch(() => {
-              // If the specific icon isn't available, use the corresponding fallback
-              if (url.pathname.includes('icon-')) {
-                // Extract the size and find the appropriate fallback
-                const sizeMatch = url.pathname.match(/icon-(\d+X\d+)\.(png|svg)/);
-                if (sizeMatch && sizeMatch[1]) {
-                  const size = sizeMatch[1];
-                  const fallbackUrl = `/images/fallbacks/icon-placeholder-${size}.svg`;
-                  return caches.match(fallbackUrl).then(fallbackResponse => {
-                    if (fallbackResponse) {
-                      return fallbackResponse;
-                    }
-                    // If size-specific fallback not found, use default size
-                    return caches.match('/images/fallbacks/icon-placeholder-192X192.svg');
-                  });
-                }
-                // If we can't extract size, use the default size
-                return caches.match('/images/fallbacks/icon-placeholder-192X192.svg');
-              }
-              return null;
-            });
-        })
-    );
-    return;
-  }
 
-  // Enhanced cache-first for static assets (JS, CSS, images)
-  if (
-    request.destination === 'script' ||
-    request.destination === 'style' ||
-    request.destination === 'image' ||
-    url.pathname.includes('/images/')
-  ) {
-    event.respondWith(
-      caches.match(request)
-        .then((cachedResponse) => {
-          // Return cached version immediately if available
-          if (cachedResponse) {
-            // For images, we don't need to re-validate on every request
-            // Only revalidate if the cached response is older than 7 days
-            const cachedDate = new Date(cachedResponse.headers.get('date') || 0);
-            const now = new Date();
-            const ageInDays = (now - cachedDate) / (1000 * 60 * 60 * 24);
-            
-            if (
-              (request.destination === 'image' || url.pathname.includes('/images/')) && 
-              ageInDays < 7
-            ) {
-              // Return the cached version without network request
-              return cachedResponse;
-            }
-            
-            // Start a background fetch to update the cache, but return cached immediately
-            const updateCachePromise = fetch(request)
-              .then(networkResponse => {
-                if (networkResponse.ok && request.method === 'GET') {
-                  caches.open(STATIC_CACHE)
-                    .then(cache => cache.put(request, networkResponse));
-                }
-                return networkResponse;
-              })
-              .catch(() => cachedResponse);
-            
-            // Use background fetch pattern - return cached immediately
-            return cachedResponse;
-          }
-          
-          // If not in cache, get from network and cache
-          return fetch(request)
-            .then((networkResponse) => {
-              if (!networkResponse || !networkResponse.ok) {
-                return networkResponse;
-              }
-              
-              return caches.open(STATIC_CACHE).then((cache) => {
-                // Only cache GET requests, not HEAD requests
-                if (request.method === 'GET') {
-                  cache.put(request, networkResponse.clone());
-                }
-                return networkResponse;
-              });
-            });
-        })
-    );
-    return;
+  // Handle different types of requests with optimized strategies
+  if (request.destination === 'image' || url.pathname.includes('/images/')) {
+    event.respondWith(handleImageRequest(request));
+  } else if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(handleNavigationRequest(request));
+  } else {
+    event.respondWith(handleDefaultRequest(request));
   }
-
-  // HTML pages should always go to network first to ensure fresh content
-  if (request.mode === 'navigate' || request.destination === 'document') {
-    event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
-          // Cache the network response for offline use
-          return caches.open(DYNAMIC_CACHE).then((cache) => {
-            // Only cache GET requests, not HEAD requests
-            if (request.method === 'GET') {
-              cache.put(request, networkResponse.clone());
-            }
-            return networkResponse;
-          });
-        })
-        .catch(() => {
-          return caches.match(request).then((cachedResponse) => {
-            return (
-              cachedResponse ||
-              caches.match('/offline.html') // Use offline.html as fallback when both network and cache fail
-            );
-          });
-        })
-    );
-    return;
-  }
-
-  // Default: try network, fallback to cache
-  event.respondWith(
-    fetch(request).catch(() => caches.match(request))
-  );
 });
 
+// Optimize image request handling
+async function handleImageRequest(request) {
+  const cachedResponse = await cacheOperations.getFromCache(request);
+  if (cachedResponse) {
+    // Start background update
+    updateCacheInBackground(request);
+    return cachedResponse;
+  }
+
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);
+      if (cache) {
+        await cacheOperations.addToCache(cache, request, response);
+      }
+    }
+    return response;
+  } catch (error) {
+    // Return fallback image if available
+    const fallbackUrl = getFallbackImageUrl(request.url);
+    const fallbackResponse = await cacheOperations.getFromCache(new Request(fallbackUrl));
+    return fallbackResponse || new Response('Image not available', { status: 404 });
+  }
+}
+
+// Optimize navigation request handling
+async function handleNavigationRequest(request) {
+  try {
+    const response = await fetch(request);
+    const cache = await cacheOperations.openCache(CACHE_NAMES.DYNAMIC);
+    if (cache) {
+      await cacheOperations.addToCache(cache, request, response);
+    }
+    return response;
+  } catch (error) {
+    const cachedResponse = await cacheOperations.getFromCache(request);
+    return cachedResponse || cacheOperations.getFromCache(new Request('/offline.html'));
+  }
+}
+
+// Optimize default request handling
+async function handleDefaultRequest(request) {
+  try {
+    const response = await fetch(request);
+    return response;
+  } catch (error) {
+    return cacheOperations.getFromCache(request);
+  }
+}
+
+// Helper function to update cache in background
+async function updateCacheInBackground(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);
+      if (cache) {
+        await cacheOperations.addToCache(cache, request, response);
+      }
+    }
+  } catch (error) {
+    console.error('Background cache update failed:', error);
+  }
+}
+
+// Helper function to get fallback image URL
+function getFallbackImageUrl(url) {
+  const path = new URL(url).pathname;
+  if (path.includes('icon-')) {
+    const sizeMatch = path.match(/icon-(\d+X\d+)\.(png|svg)/);
+    if (sizeMatch) {
+      return `/images/fallbacks/icon-placeholder-${sizeMatch[1]}.svg`;
+    }
+  }
+  return '/images/fallbacks/image-placeholder.svg';
+}
+
+// Optimize message handling
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'CHECK_UPDATE') {
+  if (event.data?.type === 'CHECK_UPDATE') {
     self.skipWaiting();
     self.clients.claim();
-    // Notify all clients that we've updated
     self.clients.matchAll().then(clients => {
-      clients.forEach(client => client.postMessage({ 
-        type: 'UPDATE_AVAILABLE' 
-      }));
+      clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
     });
   }
 }); 
