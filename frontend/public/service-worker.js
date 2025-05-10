@@ -10,6 +10,7 @@ const PRECACHE_URLS = [
   '/index.html',
   '/offline.html',
   '/manifest.json',
+  '/version.json', // Add version.json to precache
   '/images/logo/logo.png',
   '/images/calendar.png',
   '/images/login.png',
@@ -87,15 +88,33 @@ self.addEventListener('activate', (event) => {
       // Ensure new service worker takes control immediately
       self.clients.claim();
       
-      // Notify clients about the update
-      self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-          client.postMessage({ 
-            type: 'CACHE_UPDATED',
-            message: 'New version available and active!'
+      // Fetch the new version info
+      fetch('/version.json')
+        .then(response => response.json())
+        .then(versionInfo => {
+          // Notify clients about the update with version info
+          self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage({ 
+                type: 'CACHE_UPDATED',
+                message: 'New version available and active!',
+                version: versionInfo.version
+              });
+            });
+          });
+        })
+        .catch(error => {
+          console.error('Error fetching version info:', error);
+          // Still notify clients about the update, just without version info
+          self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage({ 
+                type: 'CACHE_UPDATED',
+                message: 'New version available and active!'
+              });
+            });
           });
         });
-      });
     })
   );
 });

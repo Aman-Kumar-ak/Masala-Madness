@@ -310,11 +310,11 @@ Order Number is reset on the basis of UTC timing.
 
 ## Issue 
 
-1. Date size for very small width dimensions 
+Issue Resolved 
 
 ## Things to do now
 
-1. Work on Authentication - Login Page 
+Adding Token System
 
 ## Future Features
 
