@@ -347,25 +347,18 @@ const Settings = () => {
       {/* Version Information Section */}
       <div className="fixed bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200 p-2 sm:p-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600">
-            <div className="flex items-center gap-1 sm:gap-4 mb-2 sm:mb-0">
-              <span className="font-medium">Version:</span>
-              <span>{versionInfo.version}</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-4 mb-2 sm:mb-0">
-              <span className="font-medium">Build Date:</span>
-              <span className="break-all sm:break-normal">{new Date(versionInfo.buildDate).toLocaleString()}</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-4">
-              <span className="font-medium">Environment:</span>
-              <span className={`px-1 sm:px-2 py-1 rounded text-xs font-medium ${
-                versionInfo.environment === 'production' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {versionInfo.environment}
-              </span>
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
+            <span className="font-medium">Version: {versionInfo.version}</span>
+            <span className="hidden sm:inline">|</span>
+            <span className="font-medium">Build: {new Date(versionInfo.buildDate).toLocaleString()}</span>
+            <span className="hidden sm:inline">|</span>
+            <span className={`px-1 sm:px-2 py-0.5 rounded text-xs font-medium ${
+              versionInfo.environment === 'production' 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {versionInfo.environment}
+            </span>
           </div>
         </div>
       </div>
