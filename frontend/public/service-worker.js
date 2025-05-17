@@ -1,5 +1,5 @@
 // Change this version number whenever you make updates to force cache refresh
-const VERSION = '7';
+const VERSION = '8';
 const DEPLOYMENT_ID = Date.now().toString(36);
 const STATIC_CACHE = `static-cache-v${VERSION}-${DEPLOYMENT_ID}`;
 const DYNAMIC_CACHE = `dynamic-cache-v${VERSION}-${DEPLOYMENT_ID}`;
@@ -92,26 +92,41 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Optimize service worker activation
+// Optimize service worker activation with improved cache cleanup
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      // Clean up old caches
+      // Clean up old caches more aggressively
       const cacheNames = await caches.keys();
       await Promise.all(
         cacheNames
           .filter(name => !name.includes(`-${DEPLOYMENT_ID}`))
-          .map(name => caches.delete(name))
+          .map(name => {
+            console.log(`Deleting old cache: ${name}`);
+            return caches.delete(name);
+          })
       );
 
-      // Take control of all clients
+      // Take control of all clients immediately
       await self.clients.claim();
 
-      // Notify clients about update
+      // Force a network request to check for new assets
       try {
-        const response = await fetch('/version.json');
+        const response = await fetch('/version.json', { 
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         const versionInfo = await response.json();
         
+        // Update the cache with the latest version info
+        const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);
+        if (cache) {
+          await cache.put(new Request('/version.json'), new Response(JSON.stringify(versionInfo), {
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+        
+        // Notify all clients about the update
         const clients = await self.clients.matchAll();
         clients.forEach(client => {
           client.postMessage({
@@ -184,24 +199,70 @@ async function handleNavigationRequest(request) {
   }
 }
 
-// Optimize default request handling
+// Optimize default request handling with improved cache validation
 async function handleDefaultRequest(request) {
-  try {
-    const response = await fetch(request);
-    return response;
-  } catch (error) {
-    return cacheOperations.getFromCache(request);
+  // For API requests or dynamic content, prefer network
+  if (request.url.includes('/api/') || request.headers.get('Accept')?.includes('application/json')) {
+    try {
+      const response = await fetch(request);
+      return response;
+    } catch (error) {
+      // Fall back to cache only if network fails
+      const cachedResponse = await cacheOperations.getFromCache(request);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return new Response(JSON.stringify({ error: 'Network request failed and no cache available' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
   }
+
+  // For other resources, use stale-while-revalidate strategy
+  const cachedResponse = await cacheOperations.getFromCache(request);
+  const fetchPromise = fetch(request).then(response => {
+    // Update cache in background if response is valid
+    if (response.ok) {
+      const clonedResponse = response.clone();
+      cacheOperations.openCache(CACHE_NAMES.STATIC).then(cache => {
+        if (cache) cacheOperations.addToCache(cache, request, clonedResponse);
+      });
+    }
+    return response;
+  }).catch(error => {
+    console.error('Network request failed:', error);
+    // If we have a cached response, we'll use that instead
+    if (cachedResponse) return cachedResponse;
+    throw error;
+  });
+
+  // Return cached response immediately if available, otherwise wait for fetch
+  return cachedResponse || fetchPromise;
 }
 
-// Helper function to update cache in background
+// Helper function to update cache in background with improved validation
 async function updateCacheInBackground(request) {
   try {
-    const response = await fetch(request);
+    // Add cache-busting parameter to force fresh content
+    const url = new URL(request.url);
+    url.searchParams.set('_cache', Date.now());
+    
+    const networkRequest = new Request(url.toString(), {
+      method: request.method,
+      headers: request.headers,
+      mode: request.mode,
+      credentials: request.credentials,
+      cache: 'no-store' // Force validation with the server
+    });
+    
+    const response = await fetch(networkRequest);
     if (response.ok) {
       const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);
       if (cache) {
+        // Store with the original request (without cache-busting)
         await cacheOperations.addToCache(cache, request, response);
+        console.log(`Updated cache for: ${request.url}`);
       }
     }
   } catch (error) {
@@ -221,13 +282,40 @@ function getFallbackImageUrl(url) {
   return '/images/fallbacks/image-placeholder.svg';
 }
 
-// Optimize message handling
+// Optimize message handling with improved cache validation
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'CHECK_UPDATE') {
+  if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
     self.clients.claim();
-    self.clients.matchAll().then(clients => {
-      clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
+    
+    // Force cache revalidation for critical resources
+    Promise.all([
+      fetch('/index.html', { cache: 'no-store' }),
+      fetch('/version.json', { cache: 'no-store' }),
+      fetch('/manifest.json', { cache: 'no-store' })
+    ])
+    .then(responses => {
+      return Promise.all(responses.map(response => {
+        if (response.ok) {
+          const url = new URL(response.url);
+          const request = new Request(url.pathname);
+          return cacheOperations.openCache(CACHE_NAMES.STATIC)
+            .then(cache => {
+              if (cache) return cacheOperations.addToCache(cache, request, response.clone());
+            });
+        }
+        return Promise.resolve();
+      }));
+    })
+    .catch(error => console.error('Failed to revalidate caches:', error))
+    .finally(() => {
+      // Notify all clients that update is ready
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ 
+          type: 'UPDATE_AVAILABLE',
+          message: 'New version is ready with fresh cache!'
+        }));
+      });
     });
   }
-}); 
+});
