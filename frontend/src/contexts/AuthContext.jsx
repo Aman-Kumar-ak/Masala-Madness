@@ -122,25 +122,20 @@ export const AuthProvider = ({ children }) => {
   }, [navigate, isAuthenticated]);
   
   // Login function
-  const login = async (username, password) => {
+  const login = async (username, password, rememberDevice = true, deviceToken = null) => {
     console.log('Attempting login...');
-    
     try {
-      // Use direct fetch for troubleshooting
+      const body = { username, password, rememberDevice };
+      if (deviceToken) body.deviceToken = deviceToken;
       const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(body)
       });
-      
       console.log('Login response status:', response.status);
-      
-      // Get response body as text first to inspect
       const responseText = await response.text();
-      
-      // Parse the JSON if it's a valid JSON string
       let data;
       try {
         data = JSON.parse(responseText);
@@ -151,23 +146,17 @@ export const AuthProvider = ({ children }) => {
           message: 'Invalid response from server. Please try again.' 
         };
       }
-      
       if (response.ok && data.status === 'success') {
         console.log('Login successful');
-        // Store token in sessionStorage
         sessionStorage.setItem('token', data.token);
-        
-        // Also store user data in sessionStorage
         sessionStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Set last activity time
         updateLastActivityTime();
-        
-        // Update state
         setUser(data.user);
         setIsAuthenticated(true);
-        
-        return { success: true };
+        if (data.deviceToken && rememberDevice) {
+          localStorage.setItem('deviceToken', data.deviceToken);
+        }
+        return { success: true, deviceToken: data.deviceToken };
       } else {
         console.log('Login failed');
         return { 

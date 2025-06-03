@@ -13,6 +13,7 @@ const Login = () => {
   const [showForm, setShowForm] = useState(false);
   const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -38,11 +39,16 @@ const Login = () => {
     setError('');
     
     try {
-      const result = await login(username, password);
+      const deviceToken = rememberDevice ? localStorage.getItem('deviceToken') : null;
+      const result = await login(username, password, rememberDevice, deviceToken);
       
       if (result.success) {
         // Show success notification
         showSuccess(`Welcome to Masala Madness!`, 3000);
+        
+        if (result.deviceToken && rememberDevice) {
+          localStorage.setItem('deviceToken', result.deviceToken);
+        }
         
         // Delay navigation slightly to allow notification to be seen
         setTimeout(() => {
@@ -477,6 +483,19 @@ const Login = () => {
                           autoComplete="new-password"
                         />
                       </div>
+                    </div>
+                    <div className="flex items-center mb-4">
+                      <input
+                        id="rememberDevice"
+                        name="rememberDevice"
+                        type="checkbox"
+                        checked={rememberDevice}
+                        onChange={e => setRememberDevice(e.target.checked)}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="rememberDevice" className="ml-2 block text-sm text-gray-700">
+                        Remember this device (stay signed in for 30 days)
+                      </label>
                     </div>
                   </motion.div>
                   

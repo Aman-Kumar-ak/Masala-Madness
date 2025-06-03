@@ -9,9 +9,9 @@ const { v4: uuidv4 } = require('uuid');
 // Admin login
 router.post('/login', async (req, res) => {
   try {
-    let { username, password, rememberDevice } = req.body;
+    let { username, password, rememberDevice, deviceToken } = req.body;
     if (rememberDevice === undefined) rememberDevice = true; // Default to true
-    console.log('Login attempt:', { username, rememberDevice });
+    console.log('Login attempt:', { username, rememberDevice, deviceToken });
     
     if (!username || !password) {
       return res.status(400).json({ 
@@ -65,22 +65,43 @@ router.post('/login', async (req, res) => {
       }
     };
 
-    // If remember device is requested, create a device token
+    // If remember device is requested, handle device token logic
     if (rememberDevice) {
-      const deviceId = uuidv4();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
+      let device;
+      if (deviceToken) {
+        // Try to find an existing valid device
+        device = await Device.findOne({
+          deviceId: deviceToken,
+          userId: admin._id,
+          isActive: true,
+          expiresAt: { $gt: new Date() },
+          userAgent: req.headers['user-agent'] || 'unknown'
+        });
+        if (device) {
+          // Update expiry and lastLogin
+          device.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+          device.lastLogin = new Date();
+          await device.save();
+          response.deviceToken = device.deviceId;
+          console.log('Existing device token reused and updated:', device.deviceId);
+        }
+      }
+      if (!device) {
+        // Create a new device token
+        const deviceId = uuidv4();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
 
-      const device = new Device({
-        deviceId,
-        userId: admin._id,
-        expiresAt,
-        userAgent: req.headers['user-agent'] || 'unknown'
-      });
-
-      await device.save();
-      response.deviceToken = deviceId;
-      console.log('Device token created and saved:', deviceId);
+        device = new Device({
+          deviceId,
+          userId: admin._id,
+          expiresAt,
+          userAgent: req.headers['user-agent'] || 'unknown'
+        });
+        await device.save();
+        response.deviceToken = deviceId;
+        console.log('Device token created and saved:', deviceId);
+      }
     } else {
       console.log('Device not remembered for this login.');
     }
