@@ -83,7 +83,7 @@ router.post('/login', async (req, res) => {
           device.lastLogin = new Date();
           await device.save();
           response.deviceToken = device.deviceId;
-          console.log('Existing device token reused and updated:', device.deviceId);
+          console.log(`[Device Auth] Existing device login: deviceId=${device.deviceId}`);
         }
       }
       if (!device) {
@@ -100,7 +100,7 @@ router.post('/login', async (req, res) => {
         });
         await device.save();
         response.deviceToken = deviceId;
-        console.log('Device token created and saved:', deviceId);
+        console.log(`[Device Auth] New device registered: deviceId=${deviceId}`);
       }
     } else {
       console.log('Device not remembered for this login.');

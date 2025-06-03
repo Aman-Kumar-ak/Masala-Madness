@@ -79,35 +79,56 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
           return;
         }
-        
         const token = sessionStorage.getItem('token');
-        
-        if (!token) {
+        if (token) {
+          // Use the api utility to verify the token
+          const data = await api.get('/auth/verify');
+          if (data.status === 'success') {
+            setUser(data.user);
+            setIsAuthenticated(true);
+            updateLastActivityTime();
+          } else {
+            // Token invalid/expired, remove it
+            logoutUser();
+          }
           setLoading(false);
           return;
         }
-        
-        // Use the api utility to verify the token
-        const data = await api.get('/auth/verify');
-        
-        if (data.status === 'success') {
-          setUser(data.user);
-          setIsAuthenticated(true);
-          updateLastActivityTime();
-        } else {
-          // Token invalid/expired, remove it
-          logoutUser();
+        // If no session token, check for deviceToken in localStorage
+        const deviceToken = localStorage.getItem('deviceToken');
+        if (deviceToken) {
+          // Try to verify device token
+          try {
+            const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${deviceToken}`
+              }
+            });
+            const data = await response.json();
+            if (response.ok && data.status === 'success') {
+              setUser(data.user);
+              setIsAuthenticated(true);
+              updateLastActivityTime();
+              navigate('/home');
+            } else {
+              // Device token invalid/expired, remove it
+              localStorage.removeItem('deviceToken');
+              logoutUser();
+            }
+          } catch (err) {
+            localStorage.removeItem('deviceToken');
+            logoutUser();
+          }
         }
+        setLoading(false);
       } catch (error) {
         console.error('Authentication verification failed:', error);
         logoutUser();
-      } finally {
         setLoading(false);
       }
     };
-    
     verifyUser();
-    
     // Set up periodic checks for session expiry
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
@@ -115,7 +136,6 @@ export const AuthProvider = ({ children }) => {
         navigate('/login');
       }
     }, 60000); // Check every minute
-    
     return () => {
       clearInterval(sessionCheckInterval);
     };
