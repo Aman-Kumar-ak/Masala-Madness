@@ -9,7 +9,9 @@ const { v4: uuidv4 } = require('uuid');
 // Admin login
 router.post('/login', async (req, res) => {
   try {
-    const { username, password, rememberDevice } = req.body;
+    let { username, password, rememberDevice } = req.body;
+    if (rememberDevice === undefined) rememberDevice = true; // Default to true
+    console.log('Login attempt:', { username, rememberDevice });
     
     if (!username || !password) {
       return res.status(400).json({ 
@@ -73,11 +75,14 @@ router.post('/login', async (req, res) => {
         deviceId,
         userId: admin._id,
         expiresAt,
-        userAgent: req.headers['user-agent']
+        userAgent: req.headers['user-agent'] || 'unknown'
       });
 
       await device.save();
       response.deviceToken = deviceId;
+      console.log('Device token created and saved:', deviceId);
+    } else {
+      console.log('Device not remembered for this login.');
     }
     
     return res.status(200).json(response);
