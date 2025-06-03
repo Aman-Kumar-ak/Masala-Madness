@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,22 +9,55 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showRecovery, setShowRecovery] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with loading state
   const [showForm, setShowForm] = useState(false);
   const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
+  const [initialCheckComplete, setInitialCheckComplete] = useState(false);
   
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { showSuccess } = useNotification();
+  const initialCheckRef = useRef(false);
   
-  // If already authenticated, redirect to home page
+  // Initial check for tokens to prevent login page flash
+  useEffect(() => {
+    const checkForExistingTokens = async () => {
+      // Only run this check once
+      if (initialCheckRef.current) return;
+      initialCheckRef.current = true;
+      
+      console.log('Login page: Checking for existing tokens...');
+      const jwtToken = sessionStorage.getItem('token');
+      const deviceToken = localStorage.getItem('deviceToken');
+      
+      // If we have either token, don't show the login page at all
+      if (jwtToken || deviceToken) {
+        console.log('Login page: Token found, keeping loading state active');
+        // Keep loading state, AuthContext will handle the redirect
+        return;
+      }
+      
+      console.log('Login page: No tokens found, showing login form');
+      // No tokens found, show the login form
+      setIsLoading(false);
+      setInitialCheckComplete(true);
+    };
+    
+    checkForExistingTokens();
+  }, []);
+  
+  // If already authenticated after initial check, redirect to home page
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('Login page: User is authenticated, redirecting to home');
       navigate('/home');
+    } else if (initialCheckComplete) {
+      console.log('Login page: Initial check complete, user not authenticated');
+      setIsLoading(false);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, initialCheckComplete]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -107,6 +140,42 @@ const Login = () => {
     }
   };
   
+  // If still in initial loading state, show a loading spinner
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading Masala Madness...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // If still in initial loading state, show a loading spinner
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading Masala Madness...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If still in initial loading state, show a loading spinner
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading Masala Madness...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-orange-100 to-red-50">
       {/* Decorative background elements */}
@@ -157,22 +226,17 @@ const Login = () => {
       <div className="w-full max-w-md p-8 space-y-8 z-10">
         <AnimatePresence mode="wait">
           {!showForm ? (
-            // Logo splash screen with login button
-            <motion.div 
-              key="splash"
-              className="flex flex-col items-center justify-center"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, y: -100, scale: 0.5 }}
-              transition={{ 
-                duration: 0.5,
-                exit: { duration: 0.5 }
-              }}
-            >
+            <>
               <motion.div 
-                className="flex justify-center mb-8"
-                initial={{ y: 0, opacity: 1 }}
-                animate={{ y: 0, opacity: 1 }}
+                key="splash"
+                className="flex flex-col items-center justify-center"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, y: -100, scale: 0.5 }}
+                transition={{ 
+                  duration: 0.5,
+                  exit: { duration: 0.5 }
+                }}
               >
                 <div className="relative">
                   <motion.div 
@@ -222,7 +286,7 @@ const Login = () => {
               </motion.p>
               <motion.button
                 onClick={handleLoginClick}
-                className="relative flex items-center overflow-hidden px-10 py-4 rounded-2xl bg-white border-2 border-orange-500 shadow-lg group hover:border-red-600 disabled:opacity-70"
+                className="relative flex items-center overflow-hidden px-10 py-4 rounded-2xl bg-white border-2 border-orange-500 shadow-lg group hover:border-red-600 disabled:opacity-70 mx-auto"
                 whileHover={{ 
                   scale: 1.03,
                   boxShadow: "0 15px 30px rgba(0, 0, 0, 0.2)"
@@ -237,7 +301,6 @@ const Login = () => {
                 {/* Decorative elements */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-red-500 to-orange-500 transform origin-left -translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
                 <div className="absolute inset-0 bg-gradient-to-tr from-orange-400 to-yellow-300 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100 blur-sm"></div>
-                
                 {/* Animated shine effect */}
                 <motion.span 
                   className="absolute top-0 left-0 w-16 h-full bg-white opacity-0 transform -skew-x-20"
@@ -246,7 +309,6 @@ const Login = () => {
                   animate="animate"
                   whileHover="hover"
                 ></motion.span>
-                
                 {/* Custom shine effect that follows the gradient fill */}
                 <motion.span
                   className="absolute top-0 left-0 w-20 h-full bg-gradient-to-r from-transparent via-white to-transparent opacity-0 transform -skew-x-20"
@@ -268,7 +330,6 @@ const Login = () => {
                     }
                   }}
                 ></motion.span>
-                
                 {/* Press effect overlay */}
                 <motion.div 
                   className="absolute inset-0 bg-orange-600 opacity-0"
@@ -277,7 +338,6 @@ const Login = () => {
                     transition: { duration: 0.1 }
                   }}
                 ></motion.div>
-                
                 {/* Button content */}
                 <div className="relative flex items-center">
                   {/* Fork and spoon icon */}
@@ -285,14 +345,13 @@ const Login = () => {
                     <path d="M7 5V19M7 5C7 3.89543 6.10457 3 5 3C3.89543 3 3 3.89543 3 5M7 5C7 3.89543 7.89543 3 9 3C10.1046 3 11 3.89543 11 5M3 5V9C3 11.1217 4.26522 13.1566 7 14M11 5V9C11 11.1217 9.73478 13.1566 7 14M21 3V11.2C21 12.8802 21 13.7202 20.673 14.362C20.3854 14.9265 19.9265 15.3854 19.362 15.673C18.7202 16 17.8802 16 16.2 16H15.5M14 21L17.5 16L14 11" 
                       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  
                   {/* Text with transition */}
                   <span className="font-bold text-lg text-red-600 group-hover:text-white transition-colors duration-300">
                     Sign In to Admin
                   </span>
                 </div>
               </motion.button>
-            </motion.div>
+            </>
           ) : (
             // Enhanced login form
             <motion.div 

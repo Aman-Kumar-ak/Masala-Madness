@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('lastActivityTime');
-      
+      sessionStorage.removeItem('jwtVerified');
       // Update state
       setUser(null);
       setIsAuthenticated(false);
@@ -100,15 +100,26 @@ export const AuthProvider = ({ children }) => {
     const verifyUser = async () => {
       try {
         setLoading(true);
-        
         // Check if session expired
         if (!checkSessionExpiry()) {
           setLoading(false);
           return;
         }
-        
-        // First try JWT token from session storage (higher priority)
+        // Only verify JWT once per session
+        const jwtVerified = sessionStorage.getItem('jwtVerified');
         const token = sessionStorage.getItem('token');
+        if (token && jwtVerified === 'true') {
+          // Already verified this session, just use session data
+          const userData = sessionStorage.getItem('user');
+          if (userData) {
+            setUser(JSON.parse(userData));
+            setIsAuthenticated(true);
+            updateLastActivityTime();
+          }
+          setLoading(false);
+          return;
+        }
+        // First try JWT token from session storage (higher priority)
         if (token) {
           console.log('Found JWT token, verifying...');
           try {
@@ -118,6 +129,7 @@ export const AuthProvider = ({ children }) => {
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
+              sessionStorage.setItem('jwtVerified', 'true');
               setLoading(false);
               return;
             } else {
@@ -125,16 +137,17 @@ export const AuthProvider = ({ children }) => {
               console.log('JWT token invalid, removing...');
               sessionStorage.removeItem('token');
               sessionStorage.removeItem('user');
+              sessionStorage.removeItem('jwtVerified');
               // Continue to try device token
             }
           } catch (jwtError) {
             console.error('JWT verification error:', jwtError);
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('user');
+            sessionStorage.removeItem('jwtVerified');
             // Continue to try device token
           }
         }
-        
         // If no valid session token, check for deviceToken in localStorage
         const deviceToken = localStorage.getItem('deviceToken');
         if (deviceToken) {
@@ -143,7 +156,6 @@ export const AuthProvider = ({ children }) => {
             // Add a timeout to prevent hanging on slow connections
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
             const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify', {
               method: 'GET',
               headers: {
@@ -151,19 +163,15 @@ export const AuthProvider = ({ children }) => {
               },
               signal: controller.signal
             });
-            
             clearTimeout(timeoutId);
-            
             const data = await response.json();
             if (response.ok && data.status === 'success') {
               console.log('Device token valid, auto-login successful');
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
-              
-              // Store the token in session storage as well for future API calls
               sessionStorage.setItem('user', JSON.stringify(data.user));
-              
+              sessionStorage.setItem('jwtVerified', 'true');
               // Don't navigate if we're already on a valid route
               const currentPath = window.location.pathname;
               if (currentPath === '/login' || currentPath === '/') {
@@ -173,6 +181,7 @@ export const AuthProvider = ({ children }) => {
               // Device token invalid/expired, remove it
               console.log('Device token invalid, removing...');
               localStorage.removeItem('deviceToken');
+              sessionStorage.removeItem('jwtVerified');
             }
           } catch (err) {
             console.error('Device token verification error:', err);
@@ -180,9 +189,14 @@ export const AuthProvider = ({ children }) => {
               console.log('Device token verification timed out');
             }
             localStorage.removeItem('deviceToken');
+            sessionStorage.removeItem('jwtVerified');
           }
+        } else if (!token) {
+          // No JWT and no device token, not authenticated
+          setIsAuthenticated(false);
+          setLoading(false);
+          return;
         }
-        
         setLoading(false);
       } catch (error) {
         console.error('Authentication verification failed:', error);
@@ -190,9 +204,7 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     };
-    
     verifyUser();
-    
     // Set up periodic checks for session expiry
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
@@ -202,7 +214,6 @@ export const AuthProvider = ({ children }) => {
         navigate('/login');
       }
     }, 60000); // Check every minute
-    
     return () => {
       clearInterval(sessionCheckInterval);
     };
