@@ -113,8 +113,10 @@ export const AuthProvider = ({ children }) => {
           const parsedUser = JSON.parse(storedUser);
           setUser(parsedUser);
           setIsAuthenticated(true);
+          updateLastActivityTime(); // Make sure to update activity time when preloading state
         } catch (e) {
           // Invalid stored user, will be handled by verification
+          console.error('Failed to parse stored user:', e);
         }
       }
     };
@@ -127,6 +129,8 @@ export const AuthProvider = ({ children }) => {
       try {
         // Check if session expired
         if (!checkSessionExpiry()) {
+          console.log('Session expired during verification');
+          logoutUser();
           setLoading(false);
           return;
         }
@@ -141,15 +145,18 @@ export const AuthProvider = ({ children }) => {
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
+              sessionStorage.setItem('user', JSON.stringify(data.user)); // Update stored user data
               setLoading(false);
               return;
             } else {
               // Token invalid/expired, remove it
+              console.log('JWT token verification failed, trying device token');
               sessionStorage.removeItem('token');
               sessionStorage.removeItem('user');
               // Continue to try device token
             }
           } catch (jwtError) {
+            console.error('JWT verification error:', jwtError);
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('user');
             // Continue to try device token
@@ -167,7 +174,8 @@ export const AuthProvider = ({ children }) => {
             const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify', {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${deviceToken}`
+                'Authorization': `Bearer ${deviceToken}`,
+                'Cache-Control': 'no-cache, no-store'
               },
               signal: controller.signal
             });
@@ -176,11 +184,17 @@ export const AuthProvider = ({ children }) => {
             
             const data = await response.json();
             if (response.ok && data.status === 'success') {
+              // Store the JWT token from the response
+              if (data.token) {
+                sessionStorage.setItem('token', data.token);
+              }
+              
+              // Update user data
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
               
-              // Store the token in session storage as well for future API calls
+              // Store the user data in session storage for future use
               sessionStorage.setItem('user', JSON.stringify(data.user));
               
               // Don't navigate if we're already on a valid route
@@ -190,6 +204,7 @@ export const AuthProvider = ({ children }) => {
               }
             } else {
               // Device token invalid/expired, remove it
+              console.log('Device token verification failed:', data.message);
               localStorage.removeItem('deviceToken');
               // If we preloaded auth state, we need to clear it
               if (isAuthenticated) {
@@ -202,6 +217,7 @@ export const AuthProvider = ({ children }) => {
               // Just log a warning, don't remove token on timeout
               console.warn('Device token verification timed out');
             } else {
+              console.error('Device token verification error:', err);
               localStorage.removeItem('deviceToken');
               // If we preloaded auth state, we need to clear it
               if (isAuthenticated) {
@@ -212,6 +228,7 @@ export const AuthProvider = ({ children }) => {
           }
         } else if (isAuthenticated) {
           // If we preloaded auth state but have no valid tokens, clear it
+          console.log('No valid tokens found but auth state was preloaded, clearing state');
           setUser(null);
           setIsAuthenticated(false);
         }
@@ -231,6 +248,7 @@ export const AuthProvider = ({ children }) => {
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
         // Force navigation to login if session expired
+        console.log('Session expired during periodic check');
         logoutUser();
         navigate('/login');
       }
@@ -258,7 +276,8 @@ export const AuthProvider = ({ children }) => {
       const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store'
         },
         body: JSON.stringify(body),
         signal: controller.signal
@@ -288,8 +307,13 @@ export const AuthProvider = ({ children }) => {
         sessionStorage.setItem('token', data.token);
         sessionStorage.setItem('user', JSON.stringify(data.user));
         
+        // Always store the JWT token regardless of remember device setting
+        // This ensures the current session works properly
         if (data.deviceToken && rememberDevice) {
           localStorage.setItem('deviceToken', data.deviceToken);
+        } else if (!rememberDevice) {
+          // If not remembering device, make sure to remove any existing device token
+          localStorage.removeItem('deviceToken');
         }
         
         setLoading(false);
