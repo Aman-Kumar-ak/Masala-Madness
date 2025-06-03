@@ -6,12 +6,21 @@ const Device = require('../models/Device');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { v4: uuidv4 } = require('uuid');
 
+// Helper to get current IST date
+function getISTDate() {
+  const now = new Date();
+  // IST is UTC+5:30
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  return new Date(now.getTime() + istOffset - now.getTimezoneOffset() * 60000);
+}
+
 // Admin login
 router.post('/login', async (req, res) => {
   try {
     let { username, password, rememberDevice, deviceToken } = req.body;
     if (rememberDevice === undefined) rememberDevice = true; // Default to true
-    console.log('Login attempt:', { username, rememberDevice, deviceToken });
+    const logDeviceToken = deviceToken ? deviceToken : '[none]';
+    console.log(`Login attempt: { username: '${username}', rememberDevice: ${rememberDevice}, deviceToken: ${logDeviceToken} }`);
     
     if (!username || !password) {
       return res.status(400).json({ 
@@ -80,9 +89,9 @@ router.post('/login', async (req, res) => {
         if (device) {
           // Update expiry and lastLogin
           device.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-          device.lastLogin = new Date();
+          device.lastLogin = getISTDate();
           device.isActive = true;
-          device.statusHistory.push({ status: 'active', reason: 'login' });
+          device.statusHistory.push({ status: 'active', reason: 'login', timestamp: getISTDate() });
           await device.save();
           response.deviceToken = device.deviceId;
           console.log(`[Device Auth] Existing device login: deviceId=${device.deviceId}`);
@@ -100,7 +109,9 @@ router.post('/login', async (req, res) => {
           expiresAt,
           userAgent: req.headers['user-agent'] || 'unknown',
           isActive: true,
-          statusHistory: [{ status: 'active', reason: 'new device login' }]
+          lastLogin: getISTDate(),
+          createdAt: getISTDate(),
+          statusHistory: [{ status: 'active', reason: 'new device login', timestamp: getISTDate() }]
         });
         await device.save();
         response.deviceToken = deviceId;
@@ -122,7 +133,6 @@ router.post('/login', async (req, res) => {
 
 // Verify token is valid (used for auth persistence)
 router.get('/verify', authenticateToken, (req, res) => {
-  console.log('Token verification successful');
   return res.status(200).json({ 
     status: 'success',
     user: {
@@ -141,7 +151,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
     if (deviceId) {
       const device = await Device.findOneAndUpdate(
         { deviceId },
-        { isActive: false, $push: { statusHistory: { status: 'inactive', reason: 'logout' } } }
+        { isActive: false, $push: { statusHistory: { status: 'inactive', reason: 'logout', timestamp: getISTDate() } } }
       );
       if (device) {
         console.log(`[Device Auth] Device deactivated (logout): deviceId=${deviceId}`);

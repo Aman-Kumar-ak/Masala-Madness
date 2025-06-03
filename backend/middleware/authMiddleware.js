@@ -33,13 +33,20 @@ const authenticateToken = async (req, res, next) => {
       return next();
     } catch (jwtError) {
       // If JWT verification fails, try device token
-      const device = await Device.findOne({ 
+      let device = await Device.findOne({ 
         deviceId: token,
         isActive: true,
         expiresAt: { $gt: new Date() }
       });
 
       if (!device) {
+        // If device exists but is expired or not active, update its status
+        device = await Device.findOne({ deviceId: token });
+        if (device && (device.isActive !== false || device.expiresAt <= new Date())) {
+          device.isActive = false;
+          device.statusHistory.push({ status: 'inactive', reason: 'expired or logged out', timestamp: new Date() });
+          await device.save();
+        }
         return res.status(401).json({ 
           status: 'error', 
           message: 'Invalid or expired device token.' 
