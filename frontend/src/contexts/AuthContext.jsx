@@ -97,6 +97,15 @@ export const AuthProvider = ({ children }) => {
   
   // Check if user is already logged in (via token in sessionStorage or deviceToken in localStorage)
   useEffect(() => {
+    // Create a refresh token flag to track page refreshes
+    const pageRefreshFlag = sessionStorage.getItem('pageRefreshFlag');
+    if (!pageRefreshFlag) {
+      // This is a page refresh or initial load, set the flag
+      sessionStorage.setItem('pageRefreshFlag', 'true');
+      // Clear the jwtVerified flag to force re-verification after refresh
+      sessionStorage.removeItem('jwtVerified');
+    }
+    
     const verifyUser = async () => {
       try {
         setLoading(true);
@@ -107,6 +116,7 @@ export const AuthProvider = ({ children }) => {
         }
         
         // Check if we've already verified authentication this session
+        // and it's not a page refresh (handled above)
         const jwtVerified = sessionStorage.getItem('jwtVerified');
         if (jwtVerified === 'true') {
           // Already verified this session, just use session data
