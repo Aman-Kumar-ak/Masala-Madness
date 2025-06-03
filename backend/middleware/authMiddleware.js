@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
+const Device = require('../models/Device');
 
-// Middleware to verify JWT token
+// Middleware to verify JWT token or device token
 const authenticateToken = async (req, res, next) => {
   try {
     // Get token from Authorization header
@@ -15,31 +16,56 @@ const authenticateToken = async (req, res, next) => {
         message: 'Access denied. No token provided.' 
       });
     }
-    
-    // Verify the token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Check if the admin still exists and is active
-    const admin = await Admin.findById(decoded.id);
-    
-    if (!admin || !admin.isActive) {
-      return res.status(403).json({ 
-        status: 'error', 
-        message: 'Invalid token or user disabled.' 
+
+    // Try to verify as JWT token first
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const admin = await Admin.findById(decoded.id);
+      
+      if (!admin || !admin.isActive) {
+        return res.status(403).json({ 
+          status: 'error', 
+          message: 'Invalid token or user disabled.' 
+        });
+      }
+      
+      req.user = decoded;
+      return next();
+    } catch (jwtError) {
+      // If JWT verification fails, try device token
+      const device = await Device.findOne({ 
+        deviceId: token,
+        isActive: true,
+        expiresAt: { $gt: new Date() }
       });
+
+      if (!device) {
+        return res.status(401).json({ 
+          status: 'error', 
+          message: 'Invalid or expired device token.' 
+        });
+      }
+
+      // Update last login time
+      device.lastLogin = new Date();
+      await device.save();
+
+      // Get admin info
+      const admin = await Admin.findById(device.userId);
+      if (!admin || !admin.isActive) {
+        return res.status(403).json({ 
+          status: 'error', 
+          message: 'User account is disabled.' 
+        });
+      }
+
+      req.user = {
+        id: admin._id,
+        username: admin.username
+      };
+      next();
     }
-    
-    // Attach the user info to the request
-    req.user = decoded;
-    next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        status: 'error', 
-        message: 'Token expired. Please login again.' 
-      });
-    }
-    
     return res.status(403).json({ 
       status: 'error', 
       message: 'Invalid token.' 

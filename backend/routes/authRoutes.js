@@ -2,51 +2,41 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
+const Device = require('../models/Device');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { v4: uuidv4 } = require('uuid');
 
 // Admin login
 router.post('/login', async (req, res) => {
-  console.log('Login attempt received');
-  
   try {
-    const { username, password } = req.body;
+    const { username, password, rememberDevice } = req.body;
     
-    // Additional validation to catch missing credentials
     if (!username || !password) {
-      console.log('Login failed: Missing credentials');
       return res.status(400).json({ 
         status: 'error', 
         message: 'Username and password are required' 
       });
     }
     
-    // Find the admin by username
     const admin = await Admin.findOne({ username });
     
-    // If admin not found
     if (!admin) {
-      console.log('Login failed: Invalid credentials');
       return res.status(401).json({ 
         status: 'error', 
         message: 'Invalid credentials' 
       });
     }
     
-    // Compare password
     const passwordMatches = await admin.comparePassword(password);
     
-    // If password doesn't match
     if (!passwordMatches) {
-      console.log('Login failed: Invalid credentials');
       return res.status(401).json({ 
         status: 'error', 
         message: 'Invalid credentials' 
       });
     }
     
-    // If admin account is not active
     if (!admin.isActive) {
-      console.log('Login failed: Account disabled');
       return res.status(403).json({ 
         status: 'error', 
         message: 'Account is disabled. Please contact support.' 
@@ -54,7 +44,6 @@ router.post('/login', async (req, res) => {
     }
     
     // Create JWT token
-    console.log('Authentication successful, creating token');
     const token = jwt.sign(
       { id: admin._id, username: admin.username },
       process.env.JWT_SECRET,
@@ -64,16 +53,34 @@ router.post('/login', async (req, res) => {
     // Update last login timestamp
     admin.lastLogin = new Date();
     await admin.save();
-    console.log('Login successful');
-    
-    return res.status(200).json({ 
+
+    const response = { 
       status: 'success', 
       token,
       user: {
         username: admin.username,
         id: admin._id
       }
-    });
+    };
+
+    // If remember device is requested, create a device token
+    if (rememberDevice) {
+      const deviceId = uuidv4();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
+
+      const device = new Device({
+        deviceId,
+        userId: admin._id,
+        expiresAt,
+        userAgent: req.headers['user-agent']
+      });
+
+      await device.save();
+      response.deviceToken = deviceId;
+    }
+    
+    return res.status(200).json(response);
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ 
@@ -95,13 +102,30 @@ router.get('/verify', authenticateToken, (req, res) => {
   });
 });
 
-// Logout route (client-side only - just for completeness)
-router.post('/logout', (req, res) => {
-  console.log('Logout request received');
-  return res.status(200).json({ 
-    status: 'success', 
-    message: 'Logged out successfully' 
-  });
+// Logout route
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    const deviceId = req.headers['authorization']?.split(' ')[1];
+    
+    // If it's a device token, deactivate it
+    if (deviceId) {
+      await Device.findOneAndUpdate(
+        { deviceId },
+        { isActive: false }
+      );
+    }
+    
+    return res.status(200).json({ 
+      status: 'success', 
+      message: 'Logged out successfully' 
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return res.status(500).json({ 
+      status: 'error', 
+      message: 'Internal server error' 
+    });
+  }
 });
 
 // Change password route
