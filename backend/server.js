@@ -22,7 +22,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      'https://masala-madness.vercel.app',
+      'https://masala-madness-main-production.up.railway.app',
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:5173'
     ],
@@ -37,7 +37,7 @@ app.set('io', io);
 // Middleware
 app.use(cors({
   origin: [
-    'https://masala-madness.vercel.app',
+    'https://masala-madness-main-production.up.railway.app',
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'http://localhost:5173'
   ],
