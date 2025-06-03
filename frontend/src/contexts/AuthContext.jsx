@@ -105,10 +105,10 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
           return;
         }
-        // Only verify JWT once per session
+        
+        // Check if we've already verified authentication this session
         const jwtVerified = sessionStorage.getItem('jwtVerified');
-        const token = sessionStorage.getItem('token');
-        if (token && jwtVerified === 'true') {
+        if (jwtVerified === 'true') {
           // Already verified this session, just use session data
           const userData = sessionStorage.getItem('user');
           if (userData) {
@@ -119,7 +119,9 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
           return;
         }
-        // First try JWT token from session storage (higher priority)
+        
+        // If not verified yet, try JWT token from session storage (higher priority)
+        const token = sessionStorage.getItem('token');
         if (token) {
           console.log('Found JWT token, verifying...');
           try {
@@ -129,7 +131,9 @@ export const AuthProvider = ({ children }) => {
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
+              // Mark as verified for this session to avoid repeated checks
               sessionStorage.setItem('jwtVerified', 'true');
+              sessionStorage.setItem('user', JSON.stringify(data.user));
               setLoading(false);
               return;
             } else {
@@ -137,17 +141,16 @@ export const AuthProvider = ({ children }) => {
               console.log('JWT token invalid, removing...');
               sessionStorage.removeItem('token');
               sessionStorage.removeItem('user');
-              sessionStorage.removeItem('jwtVerified');
               // Continue to try device token
             }
           } catch (jwtError) {
             console.error('JWT verification error:', jwtError);
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('user');
-            sessionStorage.removeItem('jwtVerified');
             // Continue to try device token
           }
         }
+        
         // If no valid session token, check for deviceToken in localStorage
         const deviceToken = localStorage.getItem('deviceToken');
         if (deviceToken) {
@@ -171,6 +174,7 @@ export const AuthProvider = ({ children }) => {
               setIsAuthenticated(true);
               updateLastActivityTime();
               sessionStorage.setItem('user', JSON.stringify(data.user));
+              // Mark as verified for this session to avoid repeated checks
               sessionStorage.setItem('jwtVerified', 'true');
               // Don't navigate if we're already on a valid route
               const currentPath = window.location.pathname;
@@ -181,7 +185,6 @@ export const AuthProvider = ({ children }) => {
               // Device token invalid/expired, remove it
               console.log('Device token invalid, removing...');
               localStorage.removeItem('deviceToken');
-              sessionStorage.removeItem('jwtVerified');
             }
           } catch (err) {
             console.error('Device token verification error:', err);
@@ -189,7 +192,6 @@ export const AuthProvider = ({ children }) => {
               console.log('Device token verification timed out');
             }
             localStorage.removeItem('deviceToken');
-            sessionStorage.removeItem('jwtVerified');
           }
         } else if (!token) {
           // No JWT and no device token, not authenticated
@@ -217,7 +219,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       clearInterval(sessionCheckInterval);
     };
-  }, [navigate, isAuthenticated]);
+  }, [navigate]);
   
   // Login function
   const login = async (username, password, rememberDevice = true, deviceToken = null) => {
