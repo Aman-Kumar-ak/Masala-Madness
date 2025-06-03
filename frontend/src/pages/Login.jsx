@@ -459,14 +459,6 @@ const Login = () => {
                   >
                     Masala Madness
                   </motion.h1>
-                  <motion.h2 
-                    className="mt-1 text-lg font-medium text-gray-700"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.7 }}
-                  >
-                    Admin Access Portal
-                  </motion.h2>
                 </div>
                 
                 {error && (
@@ -543,17 +535,17 @@ const Login = () => {
                         />
                       </div>
                     </div>
-                    <div className="flex items-center mb-4">
+                    <div className="flex items-center justify-center gap-3 px-2 py-2 rounded-lg bg-orange-50 border border-orange-200 w-full">
                       <input
                         id="rememberDevice"
                         name="rememberDevice"
                         type="checkbox"
                         checked={rememberDevice}
                         onChange={e => setRememberDevice(e.target.checked)}
-                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                        className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded transition-all duration-200"
                       />
-                      <label htmlFor="rememberDevice" className="ml-2 block text-sm text-gray-700">
-                        Remember this device (stay signed in for 30 days)
+                      <label htmlFor="rememberDevice" className="text-base text-gray-700 select-none cursor-pointer font-medium">
+                        Remember this device
                       </label>
                     </div>
                   </motion.div>
