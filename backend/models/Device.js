@@ -30,7 +30,14 @@ const deviceSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  statusHistory: [
+    {
+      status: { type: String, enum: ['active', 'inactive'], required: true },
+      timestamp: { type: Date, default: Date.now },
+      reason: { type: String }
+    }
+  ]
 });
 
 // Add index for faster queries

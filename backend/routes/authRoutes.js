@@ -81,6 +81,8 @@ router.post('/login', async (req, res) => {
           // Update expiry and lastLogin
           device.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
           device.lastLogin = new Date();
+          device.isActive = true;
+          device.statusHistory.push({ status: 'active', reason: 'login' });
           await device.save();
           response.deviceToken = device.deviceId;
           console.log(`[Device Auth] Existing device login: deviceId=${device.deviceId}`);
@@ -96,7 +98,9 @@ router.post('/login', async (req, res) => {
           deviceId,
           userId: admin._id,
           expiresAt,
-          userAgent: req.headers['user-agent'] || 'unknown'
+          userAgent: req.headers['user-agent'] || 'unknown',
+          isActive: true,
+          statusHistory: [{ status: 'active', reason: 'new device login' }]
         });
         await device.save();
         response.deviceToken = deviceId;
@@ -131,16 +135,18 @@ router.get('/verify', authenticateToken, (req, res) => {
 // Logout route
 router.post('/logout', authenticateToken, async (req, res) => {
   try {
-    const deviceId = req.headers['authorization']?.split(' ')[1];
-    
+    const authHeader = req.headers['authorization'];
+    const deviceId = authHeader && authHeader.split(' ')[1];
     // If it's a device token, deactivate it
     if (deviceId) {
-      await Device.findOneAndUpdate(
+      const device = await Device.findOneAndUpdate(
         { deviceId },
-        { isActive: false }
+        { isActive: false, $push: { statusHistory: { status: 'inactive', reason: 'logout' } } }
       );
+      if (device) {
+        console.log(`[Device Auth] Device deactivated (logout): deviceId=${deviceId}`);
+      }
     }
-    
     return res.status(200).json({ 
       status: 'success', 
       message: 'Logged out successfully' 

@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('lastActivityTime');
-    
+    localStorage.removeItem('deviceToken'); // Remove deviceToken on logout
     // Update state
     setUser(null);
     setIsAuthenticated(false);
@@ -196,7 +196,6 @@ export const AuthProvider = ({ children }) => {
   // Logout function
   const logout = () => {
     logoutUser();
-    
     // Redirect to login page
     navigate('/login');
   };
