@@ -15,28 +15,24 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
-  // Function to check if session has expired
+  // Check if session has expired
   const checkSessionExpiry = () => {
     const lastActivityTime = sessionStorage.getItem('lastActivityTime');
-    if (!lastActivityTime) {
-      return false; // No activity time recorded, session is expired
-    }
-    
-    const currentTime = Date.now();
-    const lastActivity = parseInt(lastActivityTime, 10);
-    const timeDifference = currentTime - lastActivity;
-    
-    if (timeDifference > SESSION_EXPIRY_TIME) {
-      // Session expired - but don't call logoutUser() here to avoid circular dependencies
-      // Just return false and let the caller handle it
-      return false;
+    if (lastActivityTime) {
+      const currentTime = new Date().getTime();
+      if (currentTime - parseInt(lastActivityTime) > SESSION_EXPIRY_TIME) {
+        // Session expired, log the user out
+        console.log('Session expired, logging out user');
+        logoutUser();
+        return false;
+      }
     }
     return true;
   };
   
   // Update the last activity time
   const updateLastActivityTime = () => {
-    sessionStorage.setItem('lastActivityTime', Date.now().toString());
+    sessionStorage.setItem('lastActivityTime', new Date().getTime().toString());
   };
   
   // Function to handle logout
@@ -101,36 +97,12 @@ export const AuthProvider = ({ children }) => {
   
   // Check if user is already logged in (via token in sessionStorage or deviceToken in localStorage)
   useEffect(() => {
-    // First, immediately set auth state based on stored data to prevent UI flicker
-    const preloadAuthState = () => {
-      const storedUser = sessionStorage.getItem('user');
-      const token = sessionStorage.getItem('token');
-      const deviceToken = localStorage.getItem('deviceToken');
-      
-      // If we have a stored user and either token, preload the auth state
-      if (storedUser && (token || deviceToken)) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-          setIsAuthenticated(true);
-          updateLastActivityTime(); // Make sure to update activity time when preloading state
-        } catch (e) {
-          // Invalid stored user, will be handled by verification
-          console.error('Failed to parse stored user:', e);
-        }
-      }
-    };
-    
-    // Run this synchronously before any async operations
-    preloadAuthState();
-    
-    // Then verify the tokens asynchronously
     const verifyUser = async () => {
       try {
+        setLoading(true);
+        
         // Check if session expired
         if (!checkSessionExpiry()) {
-          console.log('Session expired during verification');
-          logoutUser();
           setLoading(false);
           return;
         }
@@ -138,6 +110,7 @@ export const AuthProvider = ({ children }) => {
         // First try JWT token from session storage (higher priority)
         const token = sessionStorage.getItem('token');
         if (token) {
+          console.log('Found JWT token, verifying...');
           try {
             // Use the api utility to verify the token
             const data = await api.get('/auth/verify');
@@ -145,12 +118,11 @@ export const AuthProvider = ({ children }) => {
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
-              sessionStorage.setItem('user', JSON.stringify(data.user)); // Update stored user data
               setLoading(false);
               return;
             } else {
               // Token invalid/expired, remove it
-              console.log('JWT token verification failed, trying device token');
+              console.log('JWT token invalid, removing...');
               sessionStorage.removeItem('token');
               sessionStorage.removeItem('user');
               // Continue to try device token
@@ -166,16 +138,16 @@ export const AuthProvider = ({ children }) => {
         // If no valid session token, check for deviceToken in localStorage
         const deviceToken = localStorage.getItem('deviceToken');
         if (deviceToken) {
+          console.log('Found device token, verifying...');
           try {
-            // Use a shorter timeout for faster response
+            // Add a timeout to prevent hanging on slow connections
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
             
             const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify', {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${deviceToken}`,
-                'Cache-Control': 'no-cache, no-store'
+                'Authorization': `Bearer ${deviceToken}`
               },
               signal: controller.signal
             });
@@ -184,17 +156,12 @@ export const AuthProvider = ({ children }) => {
             
             const data = await response.json();
             if (response.ok && data.status === 'success') {
-              // Store the JWT token from the response
-              if (data.token) {
-                sessionStorage.setItem('token', data.token);
-              }
-              
-              // Update user data
+              console.log('Device token valid, auto-login successful');
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
               
-              // Store the user data in session storage for future use
+              // Store the token in session storage as well for future API calls
               sessionStorage.setItem('user', JSON.stringify(data.user));
               
               // Don't navigate if we're already on a valid route
@@ -204,33 +171,16 @@ export const AuthProvider = ({ children }) => {
               }
             } else {
               // Device token invalid/expired, remove it
-              console.log('Device token verification failed:', data.message);
+              console.log('Device token invalid, removing...');
               localStorage.removeItem('deviceToken');
-              // If we preloaded auth state, we need to clear it
-              if (isAuthenticated) {
-                setUser(null);
-                setIsAuthenticated(false);
-              }
             }
           } catch (err) {
+            console.error('Device token verification error:', err);
             if (err.name === 'AbortError') {
-              // Just log a warning, don't remove token on timeout
-              console.warn('Device token verification timed out');
-            } else {
-              console.error('Device token verification error:', err);
-              localStorage.removeItem('deviceToken');
-              // If we preloaded auth state, we need to clear it
-              if (isAuthenticated) {
-                setUser(null);
-                setIsAuthenticated(false);
-              }
+              console.log('Device token verification timed out');
             }
+            localStorage.removeItem('deviceToken');
           }
-        } else if (isAuthenticated) {
-          // If we preloaded auth state but have no valid tokens, clear it
-          console.log('No valid tokens found but auth state was preloaded, clearing state');
-          setUser(null);
-          setIsAuthenticated(false);
         }
         
         setLoading(false);
@@ -241,101 +191,71 @@ export const AuthProvider = ({ children }) => {
       }
     };
     
-    // Start verification process
     verifyUser();
     
-    // Set up periodic checks for session expiry (less frequent to reduce overhead)
+    // Set up periodic checks for session expiry
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
-        // Force navigation to login if session expired
         console.log('Session expired during periodic check');
+        // Force navigation to login if session expired
         logoutUser();
         navigate('/login');
       }
-    }, 300000); // Check every 5 minutes instead of every minute
+    }, 60000); // Check every minute
     
     return () => {
       clearInterval(sessionCheckInterval);
     };
-  }, [navigate]);
+  }, [navigate, isAuthenticated]);
   
   // Login function
   const login = async (username, password, rememberDevice = true, deviceToken = null) => {
+    console.log('Attempting login...');
     try {
-      // Set loading state immediately
-      setLoading(true);
-      
-      // Prepare request body
       const body = { username, password, rememberDevice };
       if (deviceToken) body.deviceToken = deviceToken;
-      
-      // Set up timeout for faster response
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-      
       const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store'
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(body),
-        signal: controller.signal
+        body: JSON.stringify(body)
       });
-      
-      clearTimeout(timeoutId);
-      
-      // Use response.json() directly instead of text parsing
+      console.log('Login response status:', response.status);
+      const responseText = await response.text();
       let data;
       try {
-        data = await response.json();
+        data = JSON.parse(responseText);
       } catch (e) {
-        setLoading(false);
+        console.error('Failed to parse response as JSON');
         return { 
           success: false, 
           message: 'Invalid response from server. Please try again.' 
         };
       }
-      
       if (response.ok && data.status === 'success') {
-        // Set auth state before storage operations for faster UI update
-        setUser(data.user);
-        setIsAuthenticated(true);
-        updateLastActivityTime();
-        
-        // Store tokens after state is updated
+        console.log('Login successful');
         sessionStorage.setItem('token', data.token);
         sessionStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Always store the JWT token regardless of remember device setting
-        // This ensures the current session works properly
+        updateLastActivityTime();
+        setUser(data.user);
+        setIsAuthenticated(true);
         if (data.deviceToken && rememberDevice) {
           localStorage.setItem('deviceToken', data.deviceToken);
-        } else if (!rememberDevice) {
-          // If not remembering device, make sure to remove any existing device token
-          localStorage.removeItem('deviceToken');
         }
-        
-        setLoading(false);
         return { success: true, deviceToken: data.deviceToken };
       } else {
-        setLoading(false);
+        console.log('Login failed');
         return { 
           success: false, 
           message: data.message || 'Login failed. Please check your credentials.' 
         };
       }
     } catch (error) {
-      setLoading(false);
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          message: 'Login request timed out. Please try again.'
-        };
-      }
+      console.error('Login error occurred');
       return { 
         success: false, 
-        message: 'Network error. Please check your connection and try again.' 
+        message: 'Login failed. Please try again later.' 
       };
     }
   };

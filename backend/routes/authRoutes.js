@@ -160,27 +160,13 @@ router.post('/login', async (req, res) => {
 
 // Verify token is valid (used for auth persistence)
 router.get('/verify', authenticateToken, (req, res) => {
-  // If this is a device token verification, also generate a fresh JWT token
-  // This helps with smoother transitions between pages
-  let response = {
+  return res.status(200).json({ 
     status: 'success',
     user: {
       username: req.user.username,
       id: req.user.id
     }
-  };
-  
-  // If this was a device token auth, generate a fresh JWT token for the session
-  if (req.tokenType === 'device') {
-    const token = jwt.sign(
-      { id: req.user.id, username: req.user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
-    response.token = token;
-  }
-  
-  return res.status(200).json(response);
+  });
 });
 
 // Logout route
