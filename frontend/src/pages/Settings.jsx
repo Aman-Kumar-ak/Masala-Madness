@@ -251,11 +251,9 @@ const Settings = () => {
     // Display logout notification first
     showSuccess('Logging out successfully...', 3000);
     
-    // Short delay before actual logout to allow notification to be seen
-    setTimeout(() => {
-      logout();
-      setShowLogoutConfirm(false);
-    }, 1000);
+    // Perform logout immediately
+    logout();
+    setShowLogoutConfirm(false);
   };
   
   return (
