@@ -28,6 +28,11 @@ const Settings = () => {
   const [isCurrentPasswordValid, setIsCurrentPasswordValid] = useState(false);
   const [showNewPasswordFields, setShowNewPasswordFields] = useState(false);
   
+  // Add state for password visibility
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   // State for confirmation dialogs
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
@@ -67,13 +72,52 @@ const Settings = () => {
       setPasswordError('Please enter your current password');
       return;
     }
-    
+
     setIsVerifying(true);
     setPasswordError('');
-    
+
     try {
-      // Use fetch directly instead of api utility to avoid automatic redirect on 401
-      const token = sessionStorage.getItem('token');
+      let token = sessionStorage.getItem('token');
+      // If no token, try to log in with username and entered password
+      if (!token) {
+        if (!user || !user.username) {
+          setPasswordError('User information missing. Please log in again.');
+          setIsVerifying(false);
+          return;
+        }
+        // Attempt login
+        const loginResponse = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user.username, password: currentPassword, rememberDevice: true })
+        });
+        let loginData = {};
+        try {
+          loginData = await loginResponse.json();
+        } catch (jsonErr) {
+          setPasswordError('Server error during login. Please try again later.');
+          console.error('Login: Failed to parse JSON response', jsonErr);
+          setIsVerifying(false);
+          return;
+        }
+        if (loginResponse.ok && loginData.status === 'success' && loginData.token) {
+          // Set token and user in sessionStorage
+          sessionStorage.setItem('token', loginData.token);
+          sessionStorage.setItem('user', JSON.stringify(loginData.user));
+          token = loginData.token;
+          // Optionally update context if needed (if you have a setUser/setIsAuthenticated function)
+          setPasswordError('');
+          setIsCurrentPasswordValid(true);
+          setShowNewPasswordFields(true);
+          setIsVerifying(false);
+          return;
+        } else {
+          setPasswordError('Incorrect password. Please try again.');
+          setIsVerifying(false);
+          return;
+        }
+      }
+      // If token exists, proceed as before
       const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify-password', {
         method: 'POST',
         headers: {
@@ -82,10 +126,33 @@ const Settings = () => {
         },
         body: JSON.stringify({ password: currentPassword })
       });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.status === 'success') {
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        setPasswordError('Server error. Please try again later.');
+        console.error('Password verification: Failed to parse JSON response', jsonErr);
+        setIsVerifying(false);
+        return;
+      }
+
+      if (response.status === 401) {
+        setIsCurrentPasswordValid(false);
+        setShowNewPasswordFields(false);
+        setPasswordError('Current password is incorrect.');
+        console.warn('Password verification: Incorrect password.');
+      } else if (response.status === 500) {
+        setIsCurrentPasswordValid(false);
+        setShowNewPasswordFields(false);
+        setPasswordError('Server error. Please try again later.');
+        console.error('Password verification: Server error.', data);
+      } else if (!response.ok) {
+        setIsCurrentPasswordValid(false);
+        setShowNewPasswordFields(false);
+        setPasswordError('Unexpected error. Please try again.');
+        console.error('Password verification: Unexpected error.', data);
+      } else if (response.ok && data.status === 'success') {
         setIsCurrentPasswordValid(true);
         setShowNewPasswordFields(true);
         setPasswordError('');
@@ -93,14 +160,19 @@ const Settings = () => {
       } else {
         setIsCurrentPasswordValid(false);
         setShowNewPasswordFields(false);
-        setPasswordError('Current password is incorrect');
-        console.error(`User ${user?.username || 'Admin'} entered incorrect password`);
+        setPasswordError(data.message || 'Failed to verify current password.');
+        console.error(`User ${user?.username || 'Admin'} entered incorrect password`, data);
       }
     } catch (error) {
-      console.error('Password verification error:', error);
       setIsCurrentPasswordValid(false);
       setShowNewPasswordFields(false);
-      setPasswordError('Failed to verify current password. Please try again.');
+      if (error.name === 'TypeError') {
+        setPasswordError('Network error. Please check your connection.');
+        console.error('Password verification: Network error.', error);
+      } else {
+        setPasswordError('Failed to verify current password. Please try again.');
+        console.error('Password verification error:', error);
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -239,7 +311,7 @@ const Settings = () => {
                   <div className="flex gap-2">
                     <input
                       id="currentPassword"
-                      type="password"
+                      type={showCurrentPassword ? "text" : "password"}
                       value={currentPassword}
                       onChange={(e) => {
                         setCurrentPassword(e.target.value);
@@ -250,6 +322,7 @@ const Settings = () => {
                       required
                       disabled={isVerifying}
                     />
+
                     <button 
                       type="button"
                       onClick={verifyCurrentPassword}
@@ -266,6 +339,17 @@ const Settings = () => {
                     <p className="mt-1 text-sm text-green-600">Current password verified</p>
                   )}
                 </div>
+                {/* Show Password Checkbox */}
+                <div className="flex items-center mt-1">
+                  <input
+                    id="showCurrentPassword"
+                    type="checkbox"
+                    checked={showCurrentPassword}
+                    onChange={() => setShowCurrentPassword((prev) => !prev)}
+                    className="mr-2"
+                  />
+                  <label htmlFor="showCurrentPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                </div>
                 
                 {showNewPasswordFields && (
                   <>
@@ -275,13 +359,24 @@ const Settings = () => {
                       </label>
                       <input
                         id="newPassword"
-                        type="password"
+                        type={showNewPassword ? "text" : "password"}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                         required
                         minLength={8}
                       />
+                      {/* Show Password Checkbox */}
+                      <div className="flex items-center mt-1">
+                        <input
+                          id="showNewPassword"
+                          type="checkbox"
+                          checked={showNewPassword}
+                          onChange={() => setShowNewPassword((prev) => !prev)}
+                          className="mr-2"
+                        />
+                        <label htmlFor="showNewPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                      </div>
                       {newPassword && newPassword.length < 8 && (
                         <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
                       )}
@@ -293,12 +388,23 @@ const Settings = () => {
                       </label>
                       <input
                         id="confirmPassword"
-                        type="password"
+                        type={showConfirmPassword ? "text" : "password"}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                         required
                       />
+                      {/* Show Password Checkbox */}
+                      <div className="flex items-center mt-1">
+                        <input
+                          id="showConfirmPassword"
+                          type="checkbox"
+                          checked={showConfirmPassword}
+                          onChange={() => setShowConfirmPassword((prev) => !prev)}
+                          className="mr-2"
+                        />
+                        <label htmlFor="showConfirmPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                      </div>
                       {confirmPassword && newPassword !== confirmPassword && (
                         <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
                       )}

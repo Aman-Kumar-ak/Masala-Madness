@@ -95,6 +95,55 @@ export const AuthProvider = ({ children }) => {
     };
   }, [isAuthenticated]);
   
+  // Expose a function to restore session from device token
+  const restoreSession = async () => {
+    // Try JWT first
+    const token = sessionStorage.getItem('token');
+    if (token) {
+      // Already handled by useEffect, nothing to do
+      return;
+    }
+    // Try device token
+    const deviceToken = localStorage.getItem('deviceToken');
+    if (deviceToken) {
+      try {
+        setLoading(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${deviceToken}`
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        const data = await response.json();
+        if (response.ok && data.status === 'success') {
+          setUser(data.user);
+          setIsAuthenticated(true);
+          updateLastActivityTime();
+          sessionStorage.setItem('user', JSON.stringify(data.user));
+          sessionStorage.setItem('jwtVerified', 'true');
+          // Optionally, you could request a new JWT here if your backend supports it
+        } else {
+          localStorage.removeItem('deviceToken');
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      } catch (err) {
+        localStorage.removeItem('deviceToken');
+        setIsAuthenticated(false);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setIsAuthenticated(false);
+      setUser(null);
+    }
+  };
+  
   // Check if user is already logged in (via token in sessionStorage or deviceToken in localStorage)
   useEffect(() => {
     // Create a refresh token flag to track page refreshes
@@ -109,17 +158,12 @@ export const AuthProvider = ({ children }) => {
     const verifyUser = async () => {
       try {
         setLoading(true);
-        // Check if session expired
         if (!checkSessionExpiry()) {
           setLoading(false);
           return;
         }
-        
-        // Check if we've already verified authentication this session
-        // and it's not a page refresh (handled above)
         const jwtVerified = sessionStorage.getItem('jwtVerified');
         if (jwtVerified === 'true') {
-          // Already verified this session, just use session data
           const userData = sessionStorage.getItem('user');
           if (userData) {
             setUser(JSON.parse(userData));
@@ -129,86 +173,29 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
           return;
         }
-        
-        // If not verified yet, try JWT token from session storage (higher priority)
         const token = sessionStorage.getItem('token');
         if (token) {
-          console.log('Found JWT token, verifying...');
           try {
-            // Use the api utility to verify the token
             const data = await api.get('/auth/verify');
             if (data.status === 'success') {
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
-              // Mark as verified for this session to avoid repeated checks
               sessionStorage.setItem('jwtVerified', 'true');
               sessionStorage.setItem('user', JSON.stringify(data.user));
               setLoading(false);
               return;
             } else {
-              // Token invalid/expired, remove it
-              console.log('JWT token invalid, removing...');
               sessionStorage.removeItem('token');
               sessionStorage.removeItem('user');
-              // Continue to try device token
             }
           } catch (jwtError) {
-            console.error('JWT verification error:', jwtError);
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('user');
-            // Continue to try device token
           }
         }
-        
-        // If no valid session token, check for deviceToken in localStorage
-        const deviceToken = localStorage.getItem('deviceToken');
-        if (deviceToken) {
-          console.log('Found device token, verifying...');
-          try {
-            // Add a timeout to prevent hanging on slow connections
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify', {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${deviceToken}`
-              },
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            const data = await response.json();
-            if (response.ok && data.status === 'success') {
-              console.log('Device token valid, auto-login successful');
-              setUser(data.user);
-              setIsAuthenticated(true);
-              updateLastActivityTime();
-              sessionStorage.setItem('user', JSON.stringify(data.user));
-              // Mark as verified for this session to avoid repeated checks
-              sessionStorage.setItem('jwtVerified', 'true');
-              // Don't navigate if we're already on a valid route
-              const currentPath = window.location.pathname;
-              if (currentPath === '/login' || currentPath === '/') {
-                navigate('/home');
-              }
-            } else {
-              // Device token invalid/expired, remove it
-              console.log('Device token invalid, removing...');
-              localStorage.removeItem('deviceToken');
-            }
-          } catch (err) {
-            console.error('Device token verification error:', err);
-            if (err.name === 'AbortError') {
-              console.log('Device token verification timed out');
-            }
-            localStorage.removeItem('deviceToken');
-          }
-        } else if (!token) {
-          // No JWT and no device token, not authenticated
-          setIsAuthenticated(false);
-          setLoading(false);
-          return;
-        }
+        // If no valid JWT, try to restore session from device token
+        await restoreSession();
         setLoading(false);
       } catch (error) {
         console.error('Authentication verification failed:', error);
@@ -361,7 +348,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     getUserDevices,
-    revokeDevice
+    revokeDevice,
+    restoreSession
   };
   
   return (
