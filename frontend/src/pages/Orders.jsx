@@ -129,7 +129,13 @@ const Orders = () => {
       return;
     }
     const url = `${API_URL}/api/orders/excel/${selectedDate}`;
-    window.open(url, '_blank');
+    // Use a method more compatible with WebViews for triggering downloads
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `orders-${selectedDate}.xlsx`); // Optional: suggest a filename
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const resetToCurrentDate = () => {
