@@ -36,7 +36,7 @@ const App = () => {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col select-none">
           <div className="flex-grow">
             <Routes>  {/* Routes for handling different paths */}
               {/* Root Route - Redirects based on auth state */}
