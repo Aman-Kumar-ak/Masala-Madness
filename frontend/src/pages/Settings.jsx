@@ -251,8 +251,8 @@ const Settings = () => {
   const confirmLogout = () => {
     // Perform logout immediately
     setIsLoggingOut(true);
-    logout();
-    setShowLogoutConfirm(false);
+      logout();
+      setShowLogoutConfirm(false);
   };
   
   return (
