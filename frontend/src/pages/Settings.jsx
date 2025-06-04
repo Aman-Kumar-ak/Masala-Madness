@@ -35,6 +35,7 @@ const Settings = () => {
   
   // State for confirmation dialogs
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -248,10 +249,8 @@ const Settings = () => {
   };
   
   const confirmLogout = () => {
-    // Display logout notification first
-    showSuccess('Logging out successfully...', 3000);
-    
     // Perform logout immediately
+    setIsLoggingOut(true);
     logout();
     setShowLogoutConfirm(false);
   };
@@ -477,6 +476,16 @@ const Settings = () => {
         confirmText="Yes, Logout"
         cancelText="Cancel"
       />
+      
+      {/* Logging Out Overlay */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div>
+            <p className="text-gray-700">Logging out...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

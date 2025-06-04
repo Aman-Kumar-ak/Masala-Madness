@@ -59,6 +59,15 @@ const Login = () => {
     }
   }, [isAuthenticated, navigate, initialCheckComplete]);
   
+  // Show logout success notification if redirected from logout
+  useEffect(() => {
+    const justLoggedOut = sessionStorage.getItem('justLoggedOut');
+    if (justLoggedOut === 'true') {
+      sessionStorage.removeItem('justLoggedOut');
+      showSuccess('Logged out successfully', 1000);
+    }
+  }, [showSuccess]); // Dependency on showSuccess to ensure it's available
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     

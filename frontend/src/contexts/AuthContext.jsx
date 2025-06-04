@@ -278,6 +278,8 @@ export const AuthProvider = ({ children }) => {
     
     // Redirect to login page if requested
     if (redirectToLogin) {
+      // Set a flag to indicate successful logout for the login page
+      sessionStorage.setItem('justLoggedOut', 'true');
       navigate('/login');
     }
   };
