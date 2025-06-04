@@ -232,10 +232,11 @@ const Login = () => {
                 className="flex flex-col items-center justify-center"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, y: -100, scale: 0.5 }}
-                transition={{ 
-                  duration: 0.5,
-                  exit: { duration: 0.5 }
+                exit={{
+                  opacity: 0,
+                  y: -100,
+                  scale: 0.5,
+                  transition: { duration: 0.5 }
                 }}
               >
                 <div className="relative">
@@ -271,6 +272,12 @@ const Login = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
+                exit={{
+                  opacity: 0,
+                  y: -100,
+                  scale: 0.5,
+                  transition: { duration: 0.5 }
+                }}
               >
                 <span className="bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
                   Masala Madness
@@ -281,6 +288,10 @@ const Login = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
+                exit={{
+                  opacity: 0,
+                  transition: { duration: 0.5 }
+                }}
               >
                 Restaurant Management System
               </motion.p>
@@ -297,6 +308,10 @@ const Login = () => {
                   backgroundColor: "rgba(254, 215, 170, 0.5)"
                 }}
                 disabled={isTransitioning}
+                exit={{
+                  opacity: 0,
+                  transition: { duration: 0.5 }
+                }}
               >
                 {/* Decorative elements */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-red-500 to-orange-500 transform origin-left -translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
