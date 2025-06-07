@@ -347,9 +347,6 @@ const Orders = () => {
                           aria-label="Delete order"
                           title="Delete order"
                         >
-                          {deleteLoading && orderToDelete?.orderId === order.orderId ? (
-                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-red-500 border-t-transparent"></div>
-                          ) : (
                             <svg 
                               xmlns="http://www.w3.org/2000/svg" 
                               className="h-5 w-5 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
@@ -364,7 +361,6 @@ const Orders = () => {
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
                               />
                             </svg>
-                          )}
                         </button>
                       </div>
                       <p className="text-sm text-gray-600 mt-1">{formatDateIST(order.updatedAt)}</p>
@@ -415,6 +411,7 @@ const Orders = () => {
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
         orderNumber={orderToDelete?.orderNumber}
+        isLoading={deleteLoading}
       />
 
       {/* Notification */}

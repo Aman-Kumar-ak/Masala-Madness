@@ -5,7 +5,8 @@ const DeleteOrderConfirmation = ({
   isOpen, 
   onClose, 
   onConfirm, 
-  orderNumber 
+  orderNumber,
+  isLoading = false
 }) => {
   return (
     <ConfirmationDialog
@@ -17,6 +18,7 @@ const DeleteOrderConfirmation = ({
       confirmText="Delete Order"
       cancelText="Cancel"
       type="danger"
+      isLoading={isLoading}
     />
   );
 };

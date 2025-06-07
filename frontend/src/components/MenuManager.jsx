@@ -5,6 +5,7 @@ import Notification from './Notification';
 import ConfirmationDialog from './ConfirmationDialog';
 import DishModal from './DishModal';
 import { fadeIn, fadeInUp, staggerChildren, listItem } from '../utils/animations';
+import { getCategoryEmoji } from '../utils/helpers';
 
 const MenuManager = ({ categories, onUpdate }) => {
   const [newCategory, setNewCategory] = useState('');
@@ -23,6 +24,10 @@ const MenuManager = ({ categories, onUpdate }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+  const [isDeletingDish, setIsDeletingDish] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [showSplashScreen, setShowSplashScreen] = useState(false);
   
   const categoryFormRef = useRef(null);
 
@@ -43,6 +48,18 @@ const MenuManager = ({ categories, onUpdate }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showCategoryInput]);
+
+  useEffect(() => {
+    if (showAddDishModal || showEditDishModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'; // Ensure cleanup on unmount
+    };
+  }, [showAddDishModal, showEditDishModal]);
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
@@ -66,7 +83,7 @@ const MenuManager = ({ categories, onUpdate }) => {
       return;
     }
 
-    setIsLoading(true);
+    setIsAddingCategory(true);
     try {
       await api.post('/dishes', { categoryName });
       setNewCategory('');
@@ -87,13 +104,13 @@ const MenuManager = ({ categories, onUpdate }) => {
         type: 'error'
       });
     } finally {
-      setIsLoading(false);
+      setIsAddingCategory(false);
     }
   };
 
-  const handleAddDish = async (e) => {
-    e.preventDefault();
-    if (!newDish.categoryId) {
+  const handleAddDish = async (newDishData) => {
+    // No e.preventDefault() needed here as the event is handled in DishModal
+    if (!newDishData.categoryId) {
       setNotification({
         message: 'Please select a category for the dish',
         type: 'warning'
@@ -101,7 +118,7 @@ const MenuManager = ({ categories, onUpdate }) => {
       return;
     }
 
-    const category = categories.find((cat) => cat._id === newDish.categoryId);
+    const category = categories.find((cat) => cat._id === newDishData.categoryId);
     if (!category) {
       setNotification({
         message: 'Selected category not found. Please refresh the page and try again.',
@@ -111,7 +128,7 @@ const MenuManager = ({ categories, onUpdate }) => {
     }
 
     const isDuplicate = category.dishes.some(
-      (dish) => dish.name.toLowerCase() === newDish.name.trim().toLowerCase()
+      (dish) => dish.name.toLowerCase() === newDishData.name.trim().toLowerCase()
     );
     if (isDuplicate) {
       setNotification({
@@ -123,11 +140,11 @@ const MenuManager = ({ categories, onUpdate }) => {
     
     setIsLoading(true);
     try {
-      await api.put(`/dishes/${newDish.categoryId}/dish`, {
-        name: newDish.name,
-        priceHalf: newDish.hasHalfFull ? Number(newDish.priceHalf) : null,
-        priceFull: newDish.hasHalfFull ? Number(newDish.priceFull) : null,
-        price: newDish.hasHalfFull ? null : Number(newDish.price)
+      await api.put(`/dishes/${newDishData.categoryId}/dish`, {
+        name: newDishData.name,
+        priceHalf: newDishData.hasHalfFull ? (newDishData.priceHalf === '' ? null : Number(newDishData.priceHalf)) : null,
+        priceFull: newDishData.hasHalfFull ? (newDishData.priceFull === '' ? null : Number(newDishData.priceFull)) : null,
+        price: newDishData.hasHalfFull ? null : (newDishData.price === '' ? null : Number(newDishData.price))
       });
       
       setNewDish({ categoryId: '', name: '', priceHalf: '', priceFull: '', price: '', hasHalfFull: true });
@@ -153,10 +170,10 @@ const MenuManager = ({ categories, onUpdate }) => {
     }
   };
 
-  const handleUpdateDish = async (e) => {
-    e.preventDefault();
+  const handleUpdateDish = async (updatedDishData) => {
+    // No e.preventDefault() needed here as the event is handled in DishModal
 
-    const category = categories.find(cat => cat._id === editingDish.categoryId);
+    const category = categories.find(cat => cat._id === updatedDishData.categoryId);
     if (!category) {
       setNotification({
         message: 'Category not found. Please refresh the page and try again.',
@@ -167,8 +184,8 @@ const MenuManager = ({ categories, onUpdate }) => {
 
     const isDuplicate = category.dishes.some(
       (dish) =>
-        dish._id !== editingDish.dishId &&
-        dish.name.toLowerCase() === editingDish.name.trim().toLowerCase()
+        dish._id !== updatedDishData.dishId &&
+        dish.name.toLowerCase() === updatedDishData.name.trim().toLowerCase()
     );
 
     if (isDuplicate) {
@@ -181,11 +198,11 @@ const MenuManager = ({ categories, onUpdate }) => {
 
     setIsLoading(true);
     try {
-      await api.put(`/dishes/${editingDish.categoryId}/dish/${editingDish.dishId}`, {
-        name: editingDish.name,
-        priceHalf: editingDish.hasHalfFull ? Number(editingDish.priceHalf) : null,
-        priceFull: editingDish.hasHalfFull ? Number(editingDish.priceFull) : null,
-        price: editingDish.hasHalfFull ? null : Number(editingDish.price)
+      await api.put(`/dishes/${updatedDishData.categoryId}/dish/${updatedDishData.dishId}`, {
+        name: updatedDishData.name,
+        priceHalf: updatedDishData.hasHalfFull ? (updatedDishData.priceHalf === '' ? null : Number(updatedDishData.priceHalf)) : null,
+        priceFull: updatedDishData.hasHalfFull ? (updatedDishData.priceFull === '' ? null : Number(updatedDishData.priceFull)) : null,
+        price: updatedDishData.hasHalfFull ? null : (updatedDishData.price === '' ? null : Number(updatedDishData.price))
       });
       
       setEditingDish(null);
@@ -228,7 +245,9 @@ const MenuManager = ({ categories, onUpdate }) => {
       cancelText: 'Cancel',
       type: 'danger',
       onConfirm: async () => {
-        setIsLoading(true);
+        setConfirmDialog(null);
+        setIsDeletingCategory(true);
+        setShowSplashScreen(true);
         try {
           await api.delete(`/dishes/${categoryId}`);
           await onUpdate();
@@ -247,10 +266,12 @@ const MenuManager = ({ categories, onUpdate }) => {
             type: 'error'
           });
         } finally {
-          setIsLoading(false);
-          setConfirmDialog(null);
+          setIsDeletingCategory(false);
+          setShowSplashScreen(false);
         }
-      }
+      },
+      isLoading: isDeletingCategory,
+      loadingText: 'Deleting...'
     });
   };
 
@@ -280,7 +301,9 @@ const MenuManager = ({ categories, onUpdate }) => {
       cancelText: 'Cancel',
       type: 'danger',
       onConfirm: async () => {
-        setIsLoading(true);
+        setConfirmDialog(null);
+        setIsDeletingDish(true);
+        setShowSplashScreen(true);
         try {
           await api.delete(`/dishes/${categoryId}/dish/${dishId}`);
           await onUpdate();
@@ -299,10 +322,12 @@ const MenuManager = ({ categories, onUpdate }) => {
             type: 'error'
           });
         } finally {
-          setIsLoading(false);
-          setConfirmDialog(null);
+          setIsDeletingDish(false);
+          setShowSplashScreen(false);
         }
-      }
+      },
+      isLoading: isDeletingDish,
+      loadingText: 'Deleting...'
     });
   };
 
@@ -311,17 +336,17 @@ const MenuManager = ({ categories, onUpdate }) => {
       categoryId,
       dishId: dish._id,
       name: dish.name,
-      priceHalf: dish.priceHalf || '',
-      priceFull: dish.priceFull || '',
-      price: dish.price || '',
-      hasHalfFull: !dish.price
+      priceHalf: dish.priceHalf ?? '',
+      priceFull: dish.priceFull ?? '',
+      price: dish.price ?? '',
+      hasHalfFull: dish.price === null || dish.price === undefined
     });
     setShowEditDishModal(true);
   };
 
-  const openAddDishModal = () => {
+  const openAddDishModal = (categoryId) => {
     setNewDish({ 
-      categoryId: categories.length > 0 ? categories[0]._id : '', 
+      categoryId, 
       name: '', 
       priceHalf: '', 
       priceFull: '', 
@@ -377,10 +402,10 @@ const MenuManager = ({ categories, onUpdate }) => {
                     <motion.button 
                       type="submit" 
                       className="flex-1 bg-green-500 text-white px-3 sm:px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 text-sm sm:text-base"
-                      disabled={isLoading}
+                      disabled={isAddingCategory}
                       whileTap={{ scale: 0.95 }}
                     >
-                      {isLoading ? (
+                      {isAddingCategory ? (
                         <>
                           <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent"></div>
                           <span className="ml-1">Adding...</span>
@@ -430,7 +455,7 @@ const MenuManager = ({ categories, onUpdate }) => {
           </AnimatePresence>
 
           <motion.button
-            onClick={openAddDishModal}
+            onClick={() => openAddDishModal(categories.length > 0 ? categories[0]._id : '')}
             className="w-full sm:w-auto bg-blue-500 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
             whileTap={{ scale: 0.95 }}
             initial={{ opacity: 0 }}
@@ -450,93 +475,86 @@ const MenuManager = ({ categories, onUpdate }) => {
           initial="initial"
           animate="animate"
         >
-          {categories.map((category, index) => (
-            <motion.div 
-              key={category._id} 
-              className="mb-6 bg-gray-50 rounded-lg shadow-sm border border-gray-200 overflow-hidden"
-              variants={listItem}
-              custom={index}
-              transition={{ delay: index * 0.05 }}
-            >
-              <div className="bg-gradient-to-r from-orange-100 to-white p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-orange-200">
-                <h3 className="text-2xl font-bold text-orange-700">{category.categoryName}</h3>
-                <motion.button
+          {categories.map((category) => (
+            <motion.div key={category._id} variants={listItem} className="mb-6 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <span className="text-xl">{getCategoryEmoji(category.categoryName)}</span>
+                  <span>{category.categoryName}</span>
+                </h2>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => openAddDishModal(category._id)}
+                    className="p-1.5 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors duration-200 shadow-sm"
+                    title="Add new dish"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </button>
+                  <button
                   onClick={() => handleDeleteCategory(category._id)}
-                  className="text-sm px-4 py-2 bg-rose-500 text-white rounded-lg transition-all duration-200 flex items-center gap-2"
-                  whileTap={{ scale: 0.95 }}
+                    className={`p-1.5 rounded-full transition-colors duration-200 shadow-sm ${
+                      isDeletingCategory
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-red-100 text-red-600 hover:bg-red-200'
+                    }`}
+                    title="Delete category"
+                    disabled={isDeletingDish || isDeletingCategory}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
-                  <span>Delete Category</span>
-                </motion.button>
+                  </button>
+                </div>
               </div>
-              
               <div className="p-4">
                 {category.dishes.length === 0 ? (
-                  <motion.div 
-                    className="text-center py-8 text-gray-500 italic"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    No dishes in this category. Add your first dish!
-                  </motion.div>
+                  <p className="text-gray-500 text-center py-4">No dishes in this category yet.</p>
                 ) : (
-                  <motion.div 
-                    className="space-y-4"
-                    variants={staggerChildren}
-                    initial="initial"
-                    animate="animate"
-                  >
-                    {category.dishes.map((dish, dishIndex) => (
-                      <motion.div 
-                        key={dish._id} 
-                        className="py-4 px-2 border-b last:border-b-0 transition-colors duration-150 rounded"
-                        variants={listItem}
-                        custom={dishIndex}
-                        transition={{ delay: dishIndex * 0.05, duration: 0.2 }}
-                      >
-                        <div className="flex flex-col gap-3">
-                          <div>
-                            <span className="text-lg font-medium">{dish.name}</span>
-                            <span className="text-gray-600 block sm:inline sm:ml-4">
-                              {dish.price ? (
-                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm">₹{dish.price}</span>
-                              ) : dish.priceHalf || dish.priceFull ? (
-                                <span>
-                                  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm mr-2">Half: ₹{dish.priceHalf || 'N/A'}</span>
-                                  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm">Full: ₹{dish.priceFull || 'N/A'}</span>
-                                </span>
-                              ) : null}
-                            </span>
+                  <ul className="space-y-3">
+                    {category.dishes
+                      .sort((a, b) => a.name.localeCompare(b.name)) // Sort dishes alphabetically
+                      .map((dish) => (
+                        <li key={dish._id} className="bg-gray-50 p-3 rounded-md flex flex-col justify-between shadow-sm border border-gray-100">
+                          <span className="font-medium text-gray-800 text-base flex-1 pr-2 mb-2">{dish.name}</span>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2 flex-shrink-0">
+                              {dish.priceHalf && dish.priceFull ? (
+                                <span className="text-gray-600 text-sm">H: ₹{dish.priceHalf} / F: ₹{dish.priceFull}</span>
+                              ) : (
+                                <span className="text-gray-600 text-sm">₹{dish.price}</span>
+                              )}
                           </div>
-                          <div className="flex flex-row gap-2">
-                            <motion.button
+                            <div className="flex items-center space-x-2">
+                              <button
                               onClick={() => startEditingDish(category._id, dish)}
-                              className="w-1/2 px-3 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 flex items-center justify-center gap-1 whitespace-nowrap text-sm"
-                              whileTap={{ scale: 0.95 }}
+                                className="p-1.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-200"
+                                title="Edit dish"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
-                              <span>Edit</span>
-                            </motion.button>
-                            <motion.button
+                              </button>
+                              <button
                               onClick={() => handleDeleteDish(category._id, dish._id)}
-                              className="w-1/2 px-3 py-2 bg-red-500 text-white rounded-lg transition-all duration-200 flex items-center justify-center gap-1 whitespace-nowrap text-sm"
-                              whileTap={{ scale: 0.95 }}
+                                className={`p-1.5 rounded-full transition-colors duration-200 ${
+                                  isDeletingDish
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-red-100 text-red-600 hover:bg-red-200'
+                                }`}
+                                title="Delete dish"
+                                disabled={isDeletingDish || isDeletingCategory}
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
-                              <span>Delete</span>
-                            </motion.button>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
+                        </li>
                     ))}
-                  </motion.div>
+                  </ul>
                 )}
               </div>
             </motion.div>
@@ -546,7 +564,7 @@ const MenuManager = ({ categories, onUpdate }) => {
 
       {/* Loading Overlay */}
       <AnimatePresence>
-        {isLoading && (
+        {isLoading && !showAddDishModal && !showEditDishModal && (
           <motion.div 
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
@@ -572,29 +590,22 @@ const MenuManager = ({ categories, onUpdate }) => {
       <DishModal
         isOpen={showAddDishModal}
         onClose={() => setShowAddDishModal(false)}
-        title="Add New Dish"
-        formData={newDish}
-        setFormData={setNewDish}
         onSubmit={handleAddDish}
         categories={categories}
-        isEditing={false}
+        initialDishData={{ categoryId: newDish.categoryId, name: '', priceHalf: '', priceFull: '', price: '', hasHalfFull: true }}
         isLoading={isLoading}
+        formType="add"
       />
 
       {/* Edit Dish Modal */}
       <DishModal
-        isOpen={showEditDishModal && editingDish !== null}
-        onClose={() => {
-          setShowEditDishModal(false);
-          setEditingDish(null);
-        }}
-        title={`Edit Dish: ${editingDish?.name || ''}`}
-        formData={editingDish || {}}
-        setFormData={setEditingDish}
+        isOpen={showEditDishModal}
+        onClose={() => setShowEditDishModal(false)}
         onSubmit={handleUpdateDish}
         categories={categories}
-        isEditing={true}
+        initialDishData={editingDish}
         isLoading={isLoading}
+        formType="edit"
       />
 
       {/* Notifications */}
@@ -620,7 +631,25 @@ const MenuManager = ({ categories, onUpdate }) => {
             confirmText={confirmDialog.confirmText || 'Confirm'}
             cancelText={confirmDialog.cancelText || 'Cancel'}
             type={confirmDialog.type}
+            isLoading={confirmDialog.isLoading}
+            loadingText={confirmDialog.loadingText}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Full-screen Loading Splash Screen for Deletions */}
+      <AnimatePresence>
+        {showSplashScreen && (
+          <motion.div 
+            className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+            <p className="text-gray-700 text-xl font-medium">Deleting...</p>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>

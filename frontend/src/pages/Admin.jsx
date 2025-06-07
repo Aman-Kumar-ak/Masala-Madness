@@ -23,6 +23,9 @@ const Admin = () => {
   });
   const [notification, setNotification] = useState(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [isSubmittingDiscount, setIsSubmittingDiscount] = useState(false);
+  const [isRemovingDiscount, setIsRemovingDiscount] = useState(false);
+  const [isDishModalOpen, setIsDishModalOpen] = useState(false);
   
   const discountFormRef = useRef(null);
 
@@ -30,7 +33,9 @@ const Admin = () => {
     try {
       setLoading(true);
       const data = await fetchCategories();
-      setCategories(data);
+      // Sort categories alphabetically by categoryName
+      const sortedCategories = data.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+      setCategories(sortedCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
       setNotification({ message: 'Failed to load categories', type: 'error' });
@@ -89,6 +94,7 @@ const Admin = () => {
 
   const handleDiscountSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmittingDiscount(true);
     try {
       const response = await fetch(`${API_URL}/api/discounts`, {
         method: 'POST',
@@ -114,6 +120,8 @@ const Admin = () => {
     } catch (error) {
       console.error('Error creating discount:', error);
       setNotification({ message: "Error creating discount: " + error.message, type: 'error' });
+    } finally {
+      setIsSubmittingDiscount(false);
     }
   };
 
@@ -123,6 +131,7 @@ const Admin = () => {
   };
 
   const confirmRemoveDiscount = async () => {
+    setIsRemovingDiscount(true);
     try {
       const response = await fetch(`${API_URL}/api/discounts/${activeDiscount._id}`, {
         method: 'DELETE'
@@ -144,6 +153,7 @@ const Admin = () => {
       setNotification({ message: "Failed to remove discount. Please try again.", type: "error" });
     } finally {
       setShowDeleteConfirmation(false);
+      setIsRemovingDiscount(false);
     }
   };
 
@@ -152,6 +162,22 @@ const Admin = () => {
     await loadCategories();
     setNotification({ message: "Categories/Dishes updated successfully", type: "success" });
   };
+
+  // Handler to update dish modal open state and manage body scroll
+  const handleDishModalToggle = (isOpen) => {
+    setIsDishModalOpen(isOpen);
+  };
+
+  useEffect(() => {
+    if (isDishModalOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    return () => {
+      document.body.classList.remove('overflow-hidden'); // Clean up on unmount
+    };
+  }, [isDishModalOpen]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
@@ -268,6 +294,7 @@ const Admin = () => {
                       })}
                       className="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-4 bg-white focus:ring-2 focus:ring-green-300 focus:border-green-300 transition-all duration-200"
                       placeholder="Enter percentage (0-100)"
+                      disabled={isSubmittingDiscount}
                     />
                   </div>
                   <div>
@@ -285,16 +312,32 @@ const Admin = () => {
                       })}
                       className="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-4 bg-white focus:ring-2 focus:ring-green-300 focus:border-green-300 transition-all duration-200"
                       placeholder="Enter minimum amount"
+                      disabled={isSubmittingDiscount}
                     />
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      checked={newDiscount.isActive}
+                      onChange={(e) => setNewDiscount({ ...newDiscount, isActive: e.target.checked })}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      disabled={isSubmittingDiscount}
+                    />
+                    <label htmlFor="isActive" className="ml-2 text-sm text-gray-700">Is Active</label>
                   </div>
                   <button
                     type="submit"
                     className="w-full bg-green-500 text-white py-2.5 px-4 rounded-lg font-medium transition-all duration-200 focus:ring-2 focus:ring-green-300 focus:outline-none shadow-sm flex items-center justify-center"
+                    disabled={isSubmittingDiscount}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Save Discount
+                    {isSubmittingDiscount ? (
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : null}
+                    {isSubmittingDiscount ? 'Saving...' : 'Save Discount'}
                   </button>
                 </form>
               </div>
@@ -308,7 +351,7 @@ const Admin = () => {
               </div>
             ) : (
               <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-2 rounded-lg border border-blue-200 shadow-sm">
-                <MenuManager categories={categories} onUpdate={handleMenuUpdate} />
+                <MenuManager categories={categories} onUpdate={handleMenuUpdate} onModalToggle={handleDishModalToggle} />
               </div>
             )}
           </div>
@@ -325,6 +368,7 @@ const Admin = () => {
         confirmText="Remove Discount"
         cancelText="Cancel"
         type="danger"
+        isLoading={isRemovingDiscount}
       />
     </div>
   );

@@ -1,15 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalAnimation, buttonHoverAnimation } from '../utils/animations';
 
-const DishModal = ({ isOpen, onClose, title, formData, setFormData, onSubmit, categories, isEditing, isLoading }) => {
+const DishModal = ({ isOpen, onClose, onSubmit, categories, initialDishData, isLoading, formType }) => {
+  const [formData, setFormData] = useState(initialDishData || {
+    categoryId: '',
+    name: '',
+    priceHalf: '',
+    priceFull: '',
+    price: '',
+    hasHalfFull: true
+  });
+
+  useEffect(() => {
+    if (isOpen && initialDishData) {
+      setFormData(initialDishData);
+    } else if (isOpen) {
+      // Reset form data for add mode if no initial data is provided
+      setFormData({
+        categoryId: initialDishData?.categoryId || '',
+        name: '',
+        priceHalf: '',
+        priceFull: '',
+        price: '',
+        hasHalfFull: true
+      });
+    }
+  }, [isOpen, initialDishData]);
+
   if (!isOpen) return null;
+
+  const title = formType === "edit" ? "Edit Dish" : "Add New Dish";
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -33,9 +60,12 @@ const DishModal = ({ isOpen, onClose, title, formData, setFormData, onSubmit, ca
               </motion.button>
             </div>
             
-            <form onSubmit={onSubmit} className="p-6">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit(formData);
+            }} className="p-6">
               <div className="grid grid-cols-1 gap-6">
-                {!isEditing && (
+                {!formType || formType === "add" && (
                   <motion.div 
                     className="form-group"
                     initial={{ opacity: 0, y: 10 }}
@@ -97,12 +127,12 @@ const DishModal = ({ isOpen, onClose, title, formData, setFormData, onSubmit, ca
                   <div className="flex items-center gap-2 mb-4">
                     <input
                       type="checkbox"
-                      id={isEditing ? "editHasHalfFull" : "hasHalfFull"}
+                      id={formType === "edit" ? "editHasHalfFull" : "hasHalfFull"}
                       checked={formData.hasHalfFull}
                       onChange={(e) => setFormData({...formData, hasHalfFull: e.target.checked})}
                       className="h-5 w-5 text-orange-600 focus:ring-orange-500 rounded"
                     />
-                    <label htmlFor={isEditing ? "editHasHalfFull" : "hasHalfFull"} className="text-sm font-medium text-gray-700">Has Half/Full options</label>
+                    <label htmlFor={formType === "edit" ? "editHasHalfFull" : "hasHalfFull"} className="text-sm font-medium text-gray-700">Has Half/Full options</label>
                   </div>
                   
                   <AnimatePresence mode="wait">
@@ -193,7 +223,7 @@ const DishModal = ({ isOpen, onClose, title, formData, setFormData, onSubmit, ca
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      <span>{isEditing ? 'Update Dish' : 'Add Dish'}</span>
+                      <span>{formType === 'edit' ? 'Update Dish' : 'Add Dish'}</span>
                     </>
                   )}
                 </motion.button>

@@ -12,7 +12,8 @@ const ConfirmationDialog = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   type = 'warning',
-  customContent = null
+  customContent = null,
+  isLoading = false
 }) => {
   if (!isOpen) return null;
 
@@ -155,17 +156,26 @@ const ConfirmationDialog = ({
             >
               <motion.button
                 onClick={onConfirm}
-                className={`${getConfirmButtonStyle()} text-white px-5 py-3 rounded-xl flex-1 font-medium transition-all duration-200 text-base shadow-sm hover:shadow`}
+                className={`${getConfirmButtonStyle()} text-white px-5 py-3 rounded-xl flex-1 font-medium transition-all duration-200 text-base shadow-sm hover:shadow flex items-center justify-center`}
                 whileHover={buttonHoverAnimation}
                 whileTap={{ scale: 0.95 }}
+                disabled={isLoading}
               >
-                {confirmText}
+                {isLoading ? (
+                  <>
+                    <div className="h-6 w-6 animate-spin rounded-full border-4 border-solid border-white border-t-transparent mr-3"></div>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  confirmText
+                )}
               </motion.button>
               <motion.button
                 onClick={handleCancel}
                 className="bg-gray-100 text-gray-700 px-5 py-3 rounded-xl flex-1 font-medium hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 text-base"
                 whileHover={buttonHoverAnimation}
                 whileTap={{ scale: 0.95 }}
+                disabled={isLoading}
               >
                 {cancelText}
               </motion.button>

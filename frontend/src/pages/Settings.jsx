@@ -9,7 +9,7 @@ import api from '../utils/api';
 const Settings = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
-  const { showSuccess } = useNotification();
+  const { showSuccess, showError } = useNotification();
   
   // Add version state
   const [versionInfo, setVersionInfo] = useState({
@@ -36,6 +36,8 @@ const Settings = () => {
   // State for confirmation dialogs
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showSplashScreen, setShowSplashScreen] = useState(false);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -248,11 +250,42 @@ const Settings = () => {
     setShowLogoutConfirm(true);
   };
   
-  const confirmLogout = () => {
-    // Perform logout immediately
-    setIsLoggingOut(true);
+  const confirmLogout = async () => {
+    setShowLogoutConfirm(false);
+    setShowSplashScreen(true);
+
+    try {
       logout();
-      setShowLogoutConfirm(false);
+      sessionStorage.setItem('logoutSuccess', 'true');
+    } catch (error) {
+      console.error("Logout failed:", error);
+      setShowSplashScreen(false);
+    }
+  };
+  
+  // Handle account deletion
+  const handleDeleteAccount = () => {
+    setShowDeleteAccountConfirm(true);
+  };
+  
+  const confirmDeleteAccount = async () => {
+    setShowDeleteAccountConfirm(false);
+    setShowSplashScreen(true);
+
+    try {
+      const response = await api.delete(`/auth/delete-account/${user.username}`);
+      if (response.status === 200) {
+        showSuccess("Account deleted successfully!");
+        logout();
+      } else {
+        throw new Error(response.data.message || "Failed to delete account");
+      }
+    } catch (error) {
+      console.error("Account deletion failed:", error);
+      showError("Failed to delete account: " + error.message);
+    } finally {
+      setShowSplashScreen(false);
+    }
   };
   
   return (
@@ -472,18 +505,28 @@ const Settings = () => {
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={confirmLogout}
         title="Confirm Logout"
-        message="Are you sure you want to logout?"
+        message="Are you sure you want to log out?"
         confirmText="Yes, Logout"
-        cancelText="Cancel"
+        isLoading={false}
       />
       
-      {/* Logging Out Overlay */}
-      {isLoggingOut && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div>
-            <p className="text-gray-700">Logging out...</p>
-          </div>
+      <ConfirmationDialog
+        isOpen={showDeleteAccountConfirm}
+        onClose={() => setShowDeleteAccountConfirm(false)}
+        onConfirm={confirmDeleteAccount}
+        title="Delete Account"
+        message="Are you sure you want to permanently delete your account? This action cannot be undone."
+        confirmText="Yes, Delete Account"
+        cancelText="No, Keep Account"
+        type="danger"
+        isLoading={false}
+      />
+      
+      {/* Full-screen Loading Splash Screen */}
+      {showSplashScreen && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+          <p className="text-gray-700 text-xl font-medium">Logging you out...</p>
         </div>
       )}
     </div>

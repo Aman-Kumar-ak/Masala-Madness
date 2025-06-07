@@ -153,7 +153,7 @@ const Notification = ({ message, type = 'info', duration = 1500, onClose, style 
   const styles = getTypeStyles();
 
   return (
-    <div className="fixed left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md px-4" style={{ top: '1rem', ...style }}>
+    <div className="fixed left-1/2 transform -translate-x-1/2 z-[999] w-full max-w-md px-4" style={{ top: '1rem', ...style }}>
       <motion.div 
         className={`
           ${styles.background} 

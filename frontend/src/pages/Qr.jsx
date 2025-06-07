@@ -21,6 +21,7 @@ export default function Qr() {
   const [isAddingUpi, setIsAddingUpi] = useState(false);
   const [isEditingUpi, setIsEditingUpi] = useState(false);
   const [currentUpiAddress, setCurrentUpiAddress] = useState(null);
+  const [isDeletingUpiAddress, setIsDeletingUpiAddress] = useState(false);
   const [newUpiAddress, setNewUpiAddress] = useState({
     name: '',
     upiId: '',
@@ -248,29 +249,24 @@ export default function Qr() {
     if (!id) return;
     
     try {
-      setIsLoading(true);
+      setIsDeletingUpiAddress(true);
       const response = await fetch(`${API_URL}/api/upi/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete UPI address');
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to delete UPI address');
       }
       
       await fetchUpiAddresses();
       showSuccess('UPI address deleted successfully');
-      
-      // Clear current UPI address if it was deleted
-      if (currentUpiAddress && currentUpiAddress._id === id) {
-        setCurrentUpiAddress(null);
-        setUpiId('');
-      }
+      setConfirmDialog(prev => ({ ...prev, isOpen: false }));
     } catch (error) {
       console.error('Error deleting UPI address:', error);
       showError(error.message || 'Failed to delete UPI address');
     } finally {
-      setIsLoading(false);
+      setIsDeletingUpiAddress(false);
     }
   };
 
@@ -279,11 +275,9 @@ export default function Qr() {
     setConfirmDialog({
       isOpen: true,
       title: 'Delete UPI Address',
-      message: `Are you sure you want to delete "${address.name}" (${address.upiId})? This cannot be undone.`,
-      onConfirm: () => {
-        deleteUpiAddress(address._id);
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-      },
+      message: `Are you sure you want to delete the UPI address for "${address.name}"? This action cannot be undone.`,
+      onConfirm: () => deleteUpiAddress(address._id),
+      upiAddressId: address._id,
       type: 'danger'
     });
   };
@@ -1009,7 +1003,7 @@ export default function Qr() {
         message={confirmDialog.message}
         type={confirmDialog.type || 'warning'}
         confirmText="Delete"
-        cancelText="Cancel"
+        isLoading={isDeletingUpiAddress}
       />
       
       {/* Password Verification Dialog */}

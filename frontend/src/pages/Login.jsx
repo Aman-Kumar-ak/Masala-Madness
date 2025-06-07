@@ -61,12 +61,12 @@ const Login = () => {
   
   // Show logout success notification if redirected from logout
   useEffect(() => {
-    const justLoggedOut = sessionStorage.getItem('justLoggedOut');
-    if (justLoggedOut === 'true') {
-      sessionStorage.removeItem('justLoggedOut');
-      showSuccess('Logged out successfully', 1000);
+    const logoutSuccess = sessionStorage.getItem('logoutSuccess');
+    if (logoutSuccess === 'true') {
+      sessionStorage.removeItem('logoutSuccess');
+      showSuccess('Logged out successfully!');
     }
-  }, [showSuccess]); // Dependency on showSuccess to ensure it's available
+  }, [showSuccess]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();

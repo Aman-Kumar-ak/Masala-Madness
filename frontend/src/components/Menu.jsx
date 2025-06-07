@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchCategories } from '../utils/fetchCategories';
 import MenuCard from './MenuCard';
 import { Link } from 'react-router-dom';
+import { getCategoryEmoji } from '../utils/helpers';
 
 const Menu = () => {
   const [categories, setCategories] = useState([]);
@@ -26,7 +27,9 @@ const Menu = () => {
       if (data.length === 0) {
         setEmptyMenu(true);
       }
-      setCategories(data);
+      // Sort categories alphabetically by categoryName
+      const sortedCategories = data.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+      setCategories(sortedCategories);
 
       // Dispatch a custom event to notify parent components to refresh their data
       window.dispatchEvent(new CustomEvent('refreshData'));
@@ -239,61 +242,6 @@ const Menu = () => {
       )}
     </div>
   );
-};
-
-// Helper function to get emoji for category
-const getCategoryEmoji = (category) => {
-  const emojiMap = {
-    'Chinese': '🥡',
-    'Burger': '🍔',
-    'Soup': '🥣',
-    'Pav Bhaji': '🫓',
-    'Noodles': '🍜',
-    'Rice': '🍚',
-    'Maggi': '🍲',
-    'Rolls': '🌯',
-    'Momos': '🥟',
-    'Finger': '🍗',
-    'Combos': '🍱',
-    'Starters': '🍟',
-    'Main Course': '🍛',
-    'Breads': '🍞',
-    'Desserts': '🍨',
-    'Beverages': '🥤',
-    'Water': '🧊',
-    'Water Bottle': '💧',
-    'Cold Drink': '🥤',
-    'Soda': '🥫',
-    'Cola': '🥤',
-    'Soft Drink': '🧋',
-  };
-  
-  // If category is found in the map, return its emoji
-  if (emojiMap[category]) {
-    return emojiMap[category];
-  }
-  
-  // For categories not in the predefined list, assign a random food emoji
-  const defaultEmojis = [
-    '🍽️', '🍴', '🥄', '🍳', '🥘', '🍝', '🌮', 
-    '🥗', '🥪', '🌭', '🍕', '🥓', '🧆', '🥙',
-    '🧇', '🍖', '🍤', '🥞', '🍙', '🍘', '🥠'
-  ];
-  
-  // Use a hash function based on the category name to ensure consistency
-  // This way the same category will always get the same emoji
-  const hashCode = str => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return hash;
-  };
-  
-  const hash = Math.abs(hashCode(category));
-  const index = hash % defaultEmojis.length;
-  
-  return defaultEmojis[index];
 };
 
 export default Menu;

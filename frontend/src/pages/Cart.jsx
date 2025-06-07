@@ -21,6 +21,8 @@ export default function Cart() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [defaultUpiAddress, setDefaultUpiAddress] = useState(null);
   const { showSuccess, showError, showWarning, showInfo } = useNotification();
+  const [manualDiscount, setManualDiscount] = useState(0);
+  const [showSplashScreen, setShowSplashScreen] = useState(false);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -39,10 +41,15 @@ export default function Cart() {
 
   // Calculate discount if applicable
   const calculateDiscount = () => {
-    if (!activeDiscount || subtotal < activeDiscount.minOrderAmount) {
-      return 0;
+    let percentageDiscount = 0;
+    if (activeDiscount && subtotal >= activeDiscount.minOrderAmount) {
+      percentageDiscount = Math.round((subtotal * activeDiscount.percentage) / 100);
     }
-    return Math.round((subtotal * activeDiscount.percentage) / 100);
+    // Ensure manual discount does not exceed the remaining amount after percentage discount
+    const maxManualDiscount = Math.max(0, subtotal - percentageDiscount);
+    const finalManualDiscount = Math.min(manualDiscount, maxManualDiscount);
+
+    return percentageDiscount + finalManualDiscount;
   };
 
   const discountAmount = calculateDiscount();
@@ -139,9 +146,9 @@ export default function Cart() {
     }
   };
 
-  const handleQrConfirmPayment = () => {
+  const handleQrConfirmPayment = async () => {
+    await processPayment(true);
     setShowQrCode(false);
-    processPayment(true);
   };
 
   const handleShowPaymentOptions = () => {
@@ -168,8 +175,8 @@ export default function Cart() {
   };
 
   const confirmAddToPending = async () => {
-    setShowPendingConfirm(false);
     await processPayment(false);
+    setShowPendingConfirm(false);
   };
 
   const processPayment = async (isPaid) => {
@@ -177,15 +184,6 @@ export default function Cart() {
     if (isProcessing) return;
     setIsProcessing(true);
     
-    // Immediately close all dialogs
-    setShowPaymentConfirm(false);
-    setShowPaymentOptions(false);
-    
-    // Remove the processing payment notification
-    if (!isPaid) {
-      showInfo("Adding to pending orders...");
-    }
-
     const payload = {
       items: cartItems.map((item) => ({
         dishId: item.id || "custom",
@@ -199,13 +197,19 @@ export default function Cart() {
       totalAmount,
       discountAmount,
       discountPercentage: activeDiscount?.percentage || 0,
+      manualDiscount,
       paymentMethod: isPaid ? paymentMethod : "",
       isPaid,
     };
 
     try {
       if (isPaid) {
-        // Confirm payment logic
+        // Close dialogs before showing splash screen
+        setShowPaymentConfirm(false);
+        setShowPaymentOptions(false);
+        setShowQrCode(false);
+        setShowSplashScreen(true);
+
         const res = await fetch(`${API_URL}/api/orders/confirm`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -215,7 +219,7 @@ export default function Cart() {
         const data = await res.json();
         if (res.ok) {
           // Handle successful payment
-          showSuccess(`Payment successful! Order confirmed for ₹${totalAmount}`);
+          showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
           clearCart();
           setTimeout(() => {
             navigate("/");
@@ -234,8 +238,9 @@ export default function Cart() {
         const data = await res.json();
         if (res.ok) {
           // Handle adding to pending
-          showInfo(`Order added to pending. Amount: ₹${totalAmount}`);
+          showInfo(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
           clearCart();
+          // The dialog (showPendingConfirm) will be closed by confirmAddToPending after this
           setTimeout(() => {
             navigate("/");
           }, 1500);
@@ -248,6 +253,7 @@ export default function Cart() {
       showError("Failed to process order: " + error.message);
     } finally {
       setIsProcessing(false);
+      setShowSplashScreen(false);
     }
   };
 
@@ -311,7 +317,7 @@ export default function Cart() {
                         {group.name}
                       </h3>
                       <span className="text-right font-semibold text-lg text-gray-800">
-                        ₹{group.types.reduce((sum, type) => sum + type.quantity * type.price, 0)}
+                        ₹{group.types.reduce((sum, type) => sum + type.quantity * type.price, 0).toFixed(2)}
                       </span>
                     </div>
                     
@@ -323,7 +329,7 @@ export default function Cart() {
                               {type.type === 'H' ? 'Half' : type.type === 'F' ? 'Full' : type.type === 'N/A' || type.type === 'Fixed' || type.type === 'FIXED' ? 'Fixed' : type.type}
                             </span>
                             <div className="flex items-center gap-2">
-                              <span className="text-base text-gray-500">₹{type.price} × {type.quantity}</span>
+                              <span className="text-base text-gray-500">₹{type.price.toFixed(2)} × {type.quantity}</span>
                               <button
                                 onClick={() => removeFromCart({ name: group.name, type: type.type })}
                                 className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-gray-100"
@@ -370,19 +376,51 @@ export default function Cart() {
               <div className="space-y-3 text-lg">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal:</span>
-                  <span>₹{subtotal}</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
                 </div>
               
                 {activeDiscount && subtotal >= activeDiscount.minOrderAmount && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount ({activeDiscount.percentage}%):</span>
-                    <span>-₹{discountAmount}</span>
+                    <span>-₹{Math.round(subtotal * activeDiscount.percentage / 100).toFixed(2)}</span>
                   </div>
                 )}
 
+                {/* Manual Discount Input */}
+                <div className="flex justify-between items-center text-gray-600 mb-2">
+                    <span className="font-medium">Discount:</span>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="number"
+                            value={manualDiscount || ''}
+                            onChange={(e) => setManualDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+                            className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
+                            placeholder="0.00"
+                            min="0"
+                            step="any"
+                        />
+                        {manualDiscount > 0 && (
+                            <button
+                                onClick={() => setManualDiscount(0)}
+                                className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
+                                aria-label="Remove manual discount"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 <div className="flex justify-between font-bold text-xl pt-3 border-t border-gray-100 text-gray-800">
+                  <span>Total Discount:</span>
+                  <span className="text-green-600">-₹{discountAmount.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between font-bold text-xl pt-3 text-gray-800">
                   <span>Amount:</span>
-                  <span>₹{totalAmount}</span>
+                  <span>₹{totalAmount.toFixed(2)}</span>
                 </div>
 
                 {activeDiscount && subtotal < activeDiscount.minOrderAmount && (
@@ -391,7 +429,7 @@ export default function Cart() {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Add items worth ₹{activeDiscount.minOrderAmount - subtotal} more to get {activeDiscount.percentage}% discount!
+                      Add items worth ₹{(activeDiscount.minOrderAmount - subtotal).toFixed(2)} more to get {activeDiscount.percentage}% discount!
                     </p>
                   </div>
                 )}
@@ -440,7 +478,7 @@ export default function Cart() {
         isOpen={showQrCode}
         onClose={() => setShowQrCode(false)}
         title="Scan QR Code to Pay"
-        message={`Total Amount: ₹${totalAmount}`}
+        message={`Total Amount: ₹${totalAmount.toFixed(2)}`}
         customContent={
           <div className="flex flex-col items-center gap-4 w-full">
             <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">
@@ -480,6 +518,7 @@ export default function Cart() {
         confirmText={null}
         cancelText="Cancel"
         type="info"
+        isLoading={isProcessing}
       />
 
       {/* Payment Options Dialog */}
@@ -513,6 +552,7 @@ export default function Cart() {
         confirmText={null}
         cancelText="Cancel"
         type="info"
+        isLoading={isProcessing}
       />
 
       {/* Payment Confirmation Dialog */}
@@ -525,10 +565,11 @@ export default function Cart() {
           processPayment(true);
         }}
         title="Confirm Payment"
-        message={`Confirm ${paymentMethod} payment of ₹${totalAmount}?`}
+        message={`Confirm ${paymentMethod} payment of ₹${totalAmount.toFixed(2)}?`}
         confirmText="Yes, Payment Received"
         cancelText="Cancel"
         type="warning"
+        isLoading={isProcessing}
       />
 
       {/* Add to Pending Confirmation Dialog */}
@@ -537,10 +578,11 @@ export default function Cart() {
         onClose={() => setShowPendingConfirm(false)}
         onConfirm={confirmAddToPending}
         title="Add to Pending Orders"
-        message={`Add this order (₹${totalAmount}) to pending orders?`}
+        message={`Add this order (₹${totalAmount.toFixed(2)}) to pending orders?`}
         confirmText="Yes, Add to Pending"
         cancelText="Cancel"
         type="warning"
+        isLoading={isProcessing}
       />
 
       {/* Clear Cart Confirmation Dialog */}
@@ -553,7 +595,16 @@ export default function Cart() {
         confirmText="Yes, Clear Cart"
         cancelText="Cancel"
         type="danger"
+        isLoading={isProcessing}
       />
+
+      {/* Full-screen Loading Splash Screen */}
+      {showSplashScreen && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+          <p className="text-gray-700 text-xl font-medium">Confirming Order Payment...</p>
+        </div>
+      )}
     </div>
   );
 }
