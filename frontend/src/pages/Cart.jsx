@@ -263,6 +263,19 @@ export default function Cart() {
     showInfo("Cart cleared successfully");
   };
 
+  const handleManualDiscountChange = (val) => {
+    let percentageDiscount = 0;
+    if (activeDiscount && subtotal >= activeDiscount.minOrderAmount) {
+      percentageDiscount = Math.round((subtotal * activeDiscount.percentage) / 100);
+    }
+    const maxManualDiscount = Math.max(0, subtotal - percentageDiscount);
+    if (val > maxManualDiscount) {
+      showWarning(`Manual discount cannot exceed ₹${maxManualDiscount.toFixed(2)} (total minus percentage discount)`);
+      return;
+    }
+    setManualDiscount(val);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <BackButton />
@@ -393,7 +406,7 @@ export default function Cart() {
                         <input
                             type="number"
                             value={manualDiscount || ''}
-                            onChange={(e) => setManualDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+                            onChange={(e) => handleManualDiscountChange(Math.max(0, parseFloat(e.target.value) || 0))}
                             className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
                             placeholder="0.00"
                             min="0"

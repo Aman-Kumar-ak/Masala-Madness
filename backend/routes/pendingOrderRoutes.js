@@ -153,7 +153,7 @@ router.post("/confirm/:id", async (req, res) => {
       });
     }
 
-    res.status(201).json({ message: "Order confirmed and moved to orders", orderId: newOrder.orderId });
+    res.status(201).json({ message: "Order confirmed", orderId: newOrder.orderId });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
