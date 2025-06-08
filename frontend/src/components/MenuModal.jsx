@@ -20,10 +20,24 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
           throw new Error('Failed to fetch categories');
         }
         const categoriesData = await res.json();
-        setCategories(categoriesData);
-        if (categoriesData.length > 0) {
-          setSelectedCategory(categoriesData[0].categoryName);
-        }
+        // Sort categories alphabetically by categoryName
+        const sortedCategories = categoriesData.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+        
+        // Create an "All Items" category
+        const allDishes = sortedCategories.flatMap(category => category.dishes.map(dish => ({
+          ...dish,
+          // Add category name to the dish for identification if needed, or modify as per backend structure
+          categoryName: category.categoryName // Useful for debugging/display
+        }))).sort((a, b) => a.name.localeCompare(b.name)); // Sort all dishes alphabetically
+
+        const allItemsCategory = {
+          _id: "all-items", // Unique ID for this virtual category
+          categoryName: "All Items",
+          dishes: allDishes
+        };
+
+        setCategories([allItemsCategory, ...sortedCategories]);
+        setSelectedCategory(allItemsCategory.categoryName);
       } catch (error) {
         console.error('Error fetching data:', error);
         setNotification({ message: 'Failed to load menu data', type: 'error' });
