@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotification } from '../components/NotificationContext';
+import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
 
 const Login = () => {
+  useKeyboardScrollAdjustment();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

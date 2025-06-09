@@ -7,8 +7,10 @@ import { useRefresh } from "../contexts/RefreshContext";
 import Notification from '../components/Notification';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import { API_URL } from "../utils/config";
+import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
 
 export default function PendingOrders() {
+  useKeyboardScrollAdjustment();
   const navigate = useNavigate();
   const [pendingOrders, setPendingOrders] = useState([]);
   const [loading, setLoading] = useState(true);

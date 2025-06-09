@@ -6,8 +6,10 @@ import Notification from "../components/Notification";
 import ConfirmationDialog from "../components/ConfirmationDialog";
 import { useNotification } from "../components/NotificationContext";
 import { API_URL } from "../utils/config";
+import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
 
 export default function Cart() {
+  useKeyboardScrollAdjustment();
   const { cartItems, removeFromCart, clearCart, updateQuantity } = useCart();
   const [paymentMethod, setPaymentMethod] = useState("");
   const [activeDiscount, setActiveDiscount] = useState(null);

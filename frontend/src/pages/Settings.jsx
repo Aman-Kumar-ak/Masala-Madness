@@ -5,8 +5,10 @@ import BackButton from '../components/BackButton';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import { useNotification } from '../components/NotificationContext';
 import api from '../utils/api';
+import useKeyboardScrollAdjustment from '../hooks/useKeyboardScrollAdjustment';
 
 const Settings = () => {
+  useKeyboardScrollAdjustment();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();

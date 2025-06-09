@@ -10,8 +10,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useRefresh } from "../contexts/RefreshContext";
 import { API_URL } from "../utils/config";
+import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
 
 const Admin = () => {
+  useKeyboardScrollAdjustment();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
