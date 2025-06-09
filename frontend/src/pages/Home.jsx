@@ -302,6 +302,9 @@ export default function Home() {
               <p className="text-sm text-gray-600 text-center">Orders</p>
               <p className="text-xl font-bold text-blue-600">
                 {stats.totalPaidOrders}
+                {pendingOrdersCount > 0 && (
+                  <span className="text-red-500 ml-1 text-xl font-bold">+ {pendingOrdersCount}</span>
+                )}
               </p>
             </Link>
 
