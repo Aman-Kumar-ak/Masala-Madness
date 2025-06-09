@@ -24,6 +24,7 @@ export default function PendingOrders() {
   const [showQrCode, setShowQrCode] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [currentOrderForQr, setCurrentOrderForQr] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState(null); // New state to hold the selected payment method
 
   const { refresh, triggerRefresh, socket, connected } = useRefresh();
 
@@ -39,6 +40,8 @@ export default function PendingOrders() {
 
   const [cashConfirmDialog, setCashConfirmDialog] = useState({ isOpen: false, orderId: null, isLoading: false });
   const [showSplashScreen, setShowSplashScreen] = useState(false);
+  const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
+  const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
 
   // Add manual discount state for each order
   const [manualDiscounts, setManualDiscounts] = useState({});
@@ -244,7 +247,20 @@ export default function PendingOrders() {
     setPendingOrders(newPendingOrders);
     
     let isOnline = paymentMethod === 'Online';
-    if (isOnline) {
+    
+    // Determine custom payment amounts if applicable
+    let customCashAmount = 0;
+    let customOnlineAmount = 0;
+    let finalPaymentMethod = paymentMethod; // Declare here
+
+    if (paymentMethod === "Custom") {
+      customCashAmount = options.customCashAmount || 0;
+      customOnlineAmount = options.customOnlineAmount || 0;
+      // Construct the paymentMethod string with amounts, similar to Cart.jsx
+      finalPaymentMethod = `Custom (Cash: ₹${customCashAmount.toFixed(2)}, Online: ₹${customOnlineAmount.toFixed(2)})`;
+    }
+
+    if (isOnline || paymentMethod === "Custom") {
       setShowSplashScreen(true);
     }
     
@@ -256,12 +272,14 @@ export default function PendingOrders() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          paymentMethod, 
+          paymentMethod: finalPaymentMethod, // Use the constructed finalPaymentMethod
           isPaid: true,
           discountAmount: totalDiscount,
           discountPercentage: percentageDiscount,
           manualDiscount,
-          totalAmount: discountedTotal
+          totalAmount: discountedTotal,
+          customCashAmount: paymentMethod === "Custom" ? customCashAmount : undefined,
+          customOnlineAmount: paymentMethod === "Custom" ? customOnlineAmount : undefined,
         }),
       });
       
@@ -295,7 +313,7 @@ export default function PendingOrders() {
       setPendingOrders(revertedOrders);
       setPaymentConfirmedOrderId(null);
     } finally {
-      if (isOnline) {
+      if (isOnline || paymentMethod === "Custom") {
         setShowSplashScreen(false);
       }
     }
@@ -500,6 +518,28 @@ export default function PendingOrders() {
       return;
     }
     setManualDiscounts(prev => ({ ...prev, [order.orderId]: val }));
+  };
+
+  const handlePaymentMethodSelect = (method, order) => {
+    setPaymentMethod(method);
+    setCurrentOrderForQr(order); // Set the current order when a method is selected
+    setManualPayment({ cash: 0, online: 0 }); // Reset manual payment on method change
+
+    if (method === "Online") {
+      if (defaultUpiAddress) {
+        generateQRCode(order);
+      } else {
+        setNotification({ message: "No UPI address configured for QR payments", type: "error" });
+        // Fallback to direct confirmation if no UPI address but Online is chosen
+        handleConfirmPayment(order.orderId, 'Online');
+      }
+    } else if (method === "Custom") {
+      setShowCustomPaymentDialog(true);
+    } else { // Cash
+      setCashConfirmDialog({ isOpen: true, orderId: order.orderId, isLoading: false });
+    }
+    // Close the payment options dialog after selection
+    setPaymentOptionOrderId(null);
   };
 
   return (
@@ -717,12 +757,8 @@ export default function PendingOrders() {
                           
                         <button
                           onClick={() => {
-                            if (paymentOptionOrderId === order.orderId) {
-                              setPaymentOptionOrderId(null);
-                              setPaymentMethodToConfirm(null);
-                            } else {
-                              setPaymentOptionOrderId(order.orderId);
-                            }
+                            setPaymentOptionOrderId(order.orderId); // Open payment options dialog
+                            setCurrentOrderForQr(order); // Ensure current order is set for dialogs
                           }}
                           className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2 ${
                         paymentConfirmedOrderId === order.orderId
@@ -740,78 +776,50 @@ export default function PendingOrders() {
                         </button>
                         </div>
 
-                        {/* Payment Options */}
-                        <div
-                          ref={el => {
-                            if (el) paymentOptionsRefs.current[order.orderId] = el;
-                            else delete paymentOptionsRefs.current[order.orderId];
-                          }}
-                          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                            paymentOptionOrderId === order.orderId
-                              ? 'max-h-40 opacity-100 mt-4'
-                              : 'max-h-0 opacity-0'
-                          }`}
-                        >
-                          {paymentOptionOrderId === order.orderId && (
-                            !paymentMethodToConfirm ? (
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                  <p className="text-sm text-gray-600 mb-3 text-center">Select payment method:</p>
-                                  <div className="flex justify-center space-x-4">
+                        {/* Payment Options Dialog */}
+                        {paymentOptionOrderId && (
+                          <ConfirmationDialog
+                            isOpen={!!paymentOptionOrderId}
+                            onClose={() => setPaymentOptionOrderId(null)}
+                            title="Select Payment Method"
+                            message="How would the customer like to pay?"
+                            customContent={
+                              <div className="flex flex-wrap justify-center gap-3 w-full">
                                 <button
-                                  onClick={() => setCashConfirmDialog({ isOpen: true, orderId: order.orderId, isLoading: false })}
-                                      className="bg-white border border-green-300 text-green-600 hover:bg-green-50 px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+                                  onClick={() => handlePaymentMethodSelect("Cash", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
+                                  className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
                                 >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                                      </svg>
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                  </svg>
                                   Cash
                                 </button>
                                 <button
-                                  onClick={() => {
-                                    if (defaultUpiAddress) {
-                                      generateQRCode(order);
-                                    } else {
-                                      setPaymentMethodToConfirm('Online');
-                                    }
-                                  }}
-                                      className="bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+                                  onClick={() => handlePaymentMethodSelect("Online", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
+                                  className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-yellow-500 hover:bg-yellow-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
                                 >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                      </svg>
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                  </svg>
                                   Online
                                 </button>
-                                  </div>
+                                <button
+                                  onClick={() => handlePaymentMethodSelect("Custom", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
+                                  className="w-full py-3 px-3 rounded-lg font-medium bg-purple-500 hover:bg-purple-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                  </svg>
+                                  Custom
+                                </button>
                               </div>
-                            ) : (
-                                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                                  <p className="text-gray-800 font-medium mb-3 text-center">
-                                    Confirm that you received the payment via <span className="font-bold">{paymentMethodToConfirm}</span>?
-                                  </p>
-                                  <div className="flex justify-center gap-4">
-                                  <button
-                                    onClick={() => handleConfirmPayment(order.orderId, paymentMethodToConfirm)}
-                                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
-                                  >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                      </svg>
-                                      Confirm
-                                  </button>
-                                  <button
-                                    onClick={() => setPaymentMethodToConfirm(null)}
-                                      className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
-                                  >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
+                            }
+                            confirmText={null}
+                            cancelText="Cancel"
+                            type="info"
+                            isLoading={false}
+                          />
+                        )}
                       </div>
                     </div>
                   );
@@ -935,6 +943,85 @@ export default function PendingOrders() {
           <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
           <p className="text-gray-700 text-xl font-medium">Confirming Order Payment...</p>
         </div>
+      )}
+
+      {/* Custom Payment Dialog for Pending Orders */}
+      {showCustomPaymentDialog && currentOrderForQr && ( // currentOrderForQr is a bit of a misnomer here, it's actually the current order being processed
+        <ConfirmationDialog
+          isOpen={showCustomPaymentDialog}
+          onClose={() => setShowCustomPaymentDialog(false)}
+          onConfirm={() => {
+            const totalPaid = manualPayment.cash + manualPayment.online;
+            const orderTotal = currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount;
+            if (Math.abs(totalPaid - orderTotal) > 0.01) { // Allow for minor floating point inaccuracies
+              setNotification({
+                message: `Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${orderTotal.toFixed(2)})`,
+                type: 'error'
+              });
+              return;
+            }
+            setShowCustomPaymentDialog(false);
+            handleConfirmPayment(currentOrderForQr.orderId, "Custom", { customCashAmount: manualPayment.cash, customOnlineAmount: manualPayment.online });
+          }}
+          title="Enter Custom Payment Amounts"
+          message={`Order Total: ₹${(currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount).toFixed(2)}`}
+          customContent={
+            <div className="space-y-4 w-full">
+              <div>
+                <label htmlFor="cash-amount" className="block text-sm font-medium text-gray-700 mb-1">Cash Amount</label>
+                <input
+                  type="number"
+                  id="cash-amount"
+                  value={manualPayment.cash === 0 && manualPayment.online === 0 ? '' : manualPayment.cash}
+                  onChange={(e) => {
+                    const cashValue = Math.max(0, parseFloat(e.target.value) || 0);
+                    const orderTotal = currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount;
+                    const newCash = Math.min(cashValue, orderTotal);
+                    const newOnline = Math.max(0, orderTotal - newCash);
+                    setManualPayment({ cash: newCash, online: newOnline });
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value === '') {
+                      setManualPayment(prev => ({ ...prev, cash: 0 }));
+                    }
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                  step="any"
+                  min="0"
+                  max={currentOrderForQr ? (currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount) : 0} // Set max to order total
+                />
+              </div>
+              <div>
+                <label htmlFor="online-amount" className="block text-sm font-medium text-gray-700 mb-1">Online Amount</label>
+                <input
+                  type="number"
+                  id="online-amount"
+                  value={manualPayment.online === 0 && manualPayment.cash === 0 ? '' : manualPayment.online}
+                  onChange={(e) => {
+                    const onlineValue = Math.max(0, parseFloat(e.target.value) || 0);
+                    const orderTotal = currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount;
+                    const newOnline = Math.min(onlineValue, orderTotal);
+                    const newCash = Math.max(0, orderTotal - newOnline);
+                    setManualPayment({ cash: newCash, online: newOnline });
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value === '') {
+                      setManualPayment(prev => ({ ...prev, online: 0 }));
+                    }
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                  step="any"
+                  min="0"
+                  max={currentOrderForQr ? (currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount) : 0} // Set max to order total
+                />
+              </div>
+            </div>
+          }
+          confirmText="Confirm Custom Payment"
+          cancelText="Cancel"
+          type="info"
+          isLoading={false} // Adjust based on your loading state
+        />
       )}
     </div>
   );

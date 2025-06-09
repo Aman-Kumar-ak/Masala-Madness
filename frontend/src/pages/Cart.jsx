@@ -23,6 +23,8 @@ export default function Cart() {
   const { showSuccess, showError, showWarning, showInfo } = useNotification();
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showSplashScreen, setShowSplashScreen] = useState(false);
+  const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
+  const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -93,6 +95,7 @@ export default function Cart() {
 
   const handlePaymentMethodSelect = (method) => {
     setPaymentMethod(method);
+    setManualPayment({ cash: 0, online: 0 }); // Reset manual payment on method change
     
     if (method === "Online") {
       // Check if we have a default UPI address to generate QR code
@@ -102,6 +105,8 @@ export default function Cart() {
         // If no UPI addresses are set up, just show regular confirmation
         setShowPaymentConfirm(true);
       }
+    } else if (method === "Custom") {
+      setShowCustomPaymentDialog(true);
     } else {
       // For Cash payments, show the regular confirmation
       setShowPaymentConfirm(true);
@@ -147,7 +152,7 @@ export default function Cart() {
   };
 
   const handleQrConfirmPayment = async () => {
-    await processPayment(true);
+    await processPayment(true, 'Online'); // Pass 'Online' as payment method for QR confirmation
     setShowQrCode(false);
   };
 
@@ -184,6 +189,16 @@ export default function Cart() {
     if (isProcessing) return;
     setIsProcessing(true);
     
+    let finalPaymentMethod = paymentMethod;
+    let customCashAmount = 0;
+    let customOnlineAmount = 0;
+
+    if (paymentMethod === "Custom") {
+      finalPaymentMethod = `Custom (Cash: ₹${manualPayment.cash.toFixed(2)}, Online: ₹${manualPayment.online.toFixed(2)})`;
+      customCashAmount = manualPayment.cash;
+      customOnlineAmount = manualPayment.online;
+    }
+
     const payload = {
       items: cartItems.map((item) => ({
         dishId: item.id || "custom",
@@ -198,8 +213,10 @@ export default function Cart() {
       discountAmount,
       discountPercentage: activeDiscount?.percentage || 0,
       manualDiscount,
-      paymentMethod: isPaid ? paymentMethod : "",
+      paymentMethod: isPaid ? finalPaymentMethod : "",
       isPaid,
+      customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
+      customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
     };
 
     try {
@@ -541,10 +558,10 @@ export default function Cart() {
         title="Select Payment Method"
         message="How would the customer like to pay?"
         customContent={
-          <div className="flex flex-row gap-4 w-full">
+          <div className="flex flex-wrap justify-center gap-3 w-full">
             <button
               onClick={() => handlePaymentMethodSelect("Cash")}
-              className="flex-1 py-3 px-3 rounded-lg font-medium bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
@@ -553,16 +570,98 @@ export default function Cart() {
             </button>
             <button
               onClick={() => handlePaymentMethodSelect("Online")}
-              className="flex-1 py-3 px-3 rounded-lg font-medium bg-yellow-500 hover:bg-yellow-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-yellow-500 hover:bg-yellow-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
               Online
             </button>
+            <button
+              onClick={() => handlePaymentMethodSelect("Custom")}
+              className="w-full py-3 px-3 rounded-lg font-medium bg-purple-500 hover:bg-purple-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Custom
+            </button>
           </div>
         }
         confirmText={null}
+        cancelText="Cancel"
+        type="info"
+        isLoading={isProcessing}
+      />
+
+      {/* Custom Payment Dialog */}
+      <ConfirmationDialog
+        isOpen={showCustomPaymentDialog}
+        onClose={() => setShowCustomPaymentDialog(false)}
+        onConfirm={() => {
+          const totalPaid = manualPayment.cash + manualPayment.online;
+          if (Math.abs(totalPaid - totalAmount) > 0.01) { // Allow for minor floating point inaccuracies
+            showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
+            return;
+          }
+          setShowCustomPaymentDialog(false);
+          processPayment(true);
+        }}
+        title="Enter Custom Payment Amounts"
+        message={`Order Total: ₹${totalAmount.toFixed(2)}`}
+        customContent={
+          <div className="space-y-4 w-full">
+            <div>
+              <label htmlFor="cash-amount" className="block text-sm font-medium text-gray-700 mb-1">Cash Amount</label>
+              <input
+                type="number"
+                id="cash-amount"
+                value={manualPayment.cash === 0 && manualPayment.online === 0 ? '' : manualPayment.cash}
+                onChange={(e) => {
+                  const cashValue = Math.max(0, parseFloat(e.target.value) || 0);
+                  const newCash = Math.min(cashValue, totalAmount);
+                  const newOnline = Math.max(0, totalAmount - newCash);
+                  setManualPayment({ cash: newCash, online: newOnline });
+                }}
+                onBlur={(e) => {
+                  // Ensure the value is formatted nicely on blur if it's empty
+                  if (e.target.value === '') {
+                    setManualPayment(prev => ({ ...prev, cash: 0 }));
+                  }
+                }}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                step="any"
+                min="0"
+                max={totalAmount} // Set max to totalAmount
+              />
+            </div>
+            <div>
+              <label htmlFor="online-amount" className="block text-sm font-medium text-gray-700 mb-1">Online Amount</label>
+              <input
+                type="number"
+                id="online-amount"
+                value={manualPayment.online === 0 && manualPayment.cash === 0 ? '' : manualPayment.online}
+                onChange={(e) => {
+                  const onlineValue = Math.max(0, parseFloat(e.target.value) || 0);
+                  const newOnline = Math.min(onlineValue, totalAmount);
+                  const newCash = Math.max(0, totalAmount - newOnline);
+                  setManualPayment({ cash: newCash, online: newOnline });
+                }}
+                onBlur={(e) => {
+                  // Ensure the value is formatted nicely on blur if it's empty
+                  if (e.target.value === '') {
+                    setManualPayment(prev => ({ ...prev, online: 0 }));
+                  }
+                }}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                step="any"
+                min="0"
+                max={totalAmount} // Set max to totalAmount
+              />
+            </div>
+          </div>
+        }
+        confirmText="Confirm Custom Payment"
         cancelText="Cancel"
         type="info"
         isLoading={isProcessing}

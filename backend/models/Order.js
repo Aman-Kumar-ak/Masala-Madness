@@ -25,6 +25,8 @@ const OrderSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true }, // Final amount after discount
   paymentMethod: { type: String, required: true }, // Cash or Online
   isPaid: { type: Boolean, required: true },
+  customCashAmount: { type: Number, default: 0 },
+  customOnlineAmount: { type: Number, default: 0 },
   createdAt: {
     type: Date,
     default: () => new Date(),

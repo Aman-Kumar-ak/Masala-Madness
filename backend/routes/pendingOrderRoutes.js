@@ -9,14 +9,16 @@ const router = express.Router();
 // Create a new pending order
 router.post("/", async (req, res) => {
   try {
-    const { items, subtotal, discountAmount, discountPercentage, totalAmount } = req.body;
+    const { items, subtotal, discountAmount, discountPercentage, totalAmount, customCashAmount, customOnlineAmount } = req.body;
     const newPendingOrder = new PendingOrder({
       orderId: uuidv4(),
       items,
       subtotal,
       discountAmount: discountAmount || 0,
       discountPercentage: discountPercentage || 0,
-      totalAmount: totalAmount || subtotal
+      totalAmount: totalAmount || subtotal,
+      customCashAmount: customCashAmount || 0,
+      customOnlineAmount: customOnlineAmount || 0
     });
     await newPendingOrder.save();
     
@@ -38,6 +40,7 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const pendingOrders = await PendingOrder.find().sort({ createdAt: -1 }).lean();
+    console.log('Fetched pending orders:', pendingOrders.map(order => order.orderId));
     res.status(200).json(pendingOrders);
   } catch (error) {
     console.error("Fetch pending orders error:", error);
@@ -106,7 +109,7 @@ router.post("/confirm/:id", async (req, res) => {
     }
 
     const { items, subtotal } = pendingOrder;
-    const { paymentMethod, isPaid, discountAmount, discountPercentage, totalAmount } = req.body;
+    const { paymentMethod, isPaid, discountAmount, discountPercentage, totalAmount, customCashAmount, customOnlineAmount } = req.body;
 
     // Use provided discount values or fallback to the ones in the pending order
     const finalDiscountAmount = discountAmount !== undefined ? discountAmount : (pendingOrder.discountAmount || 0);
@@ -133,12 +136,21 @@ router.post("/confirm/:id", async (req, res) => {
       totalAmount: finalTotalAmount,
       paymentMethod,
       isPaid,
+      customCashAmount: customCashAmount || 0,
+      customOnlineAmount: customOnlineAmount || 0,
       createdAt: pendingOrder.createdAt,
       updatedAt: new Date() // set updatedAt explicitly to current date/time
     });
 
     await newOrder.save({ session });
-    await PendingOrder.findOneAndDelete({ orderId: req.params.id }).session(session);
+    console.log(`Confirming order: ${req.params.id}. Pending order ID from object: ${pendingOrder.orderId}`);
+    console.log(`Attempting to delete pending order with _id: ${pendingOrder._id}`);
+    const deleteResult = await PendingOrder.findOneAndDelete({ orderId: req.params.id }).session(session);
+    if (deleteResult) {
+      console.log("Pending order deleted successfully:", deleteResult.orderId);
+    } else {
+      console.log("Pending order not found for deletion or already deleted.");
+    }
 
     await session.commitTransaction();
     session.endSession();
