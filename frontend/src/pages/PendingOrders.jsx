@@ -162,14 +162,27 @@ export default function PendingOrders() {
   // Periodic refresh for data sync - backup for socket issues
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!connected) {
+      if (!connected && !document.hidden) { // Only refresh if socket not connected and tab is visible
         console.log("Socket not connected, using interval-based refresh");
         saveScrollPosition(); // Save position before refresh
         fetchPendingOrders();
       }
-    }, 10000); // Refresh every 10 seconds if socket not connected
+    }, 10000); // Refresh every 10 seconds if socket not connected and tab is visible
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !connected) {
+        console.log("Tab became visible and socket not connected, triggering immediate refresh.");
+        saveScrollPosition();
+        fetchPendingOrders();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [connected, fetchPendingOrders]);
 
   // Auto-scroll to payment options when opened (robust for last order)
@@ -368,6 +381,30 @@ export default function PendingOrders() {
     setShowMenu(false);
   };
 
+  const handleRemoveManualDiscount = async (orderId) => {
+    // Directly update the local state for manualDiscounts
+    setManualDiscounts(prev => ({ ...prev, [orderId]: 0 }));
+
+    // Also update the pendingOrders state to reflect the change in totalAmount and discountAmount
+    setPendingOrders(prevOrders =>
+        prevOrders.map(order => {
+            if (order.orderId === orderId) {
+                // Temporarily create an order object with 0 manual discount to recalculate
+                const tempOrder = { ...order, manualDiscount: 0 };
+                const { percentageDiscount, manualDiscount: updatedManualDiscount, totalDiscount } = calculateOrderDiscount(tempOrder);
+                return {
+                    ...order,
+                    manualDiscount: 0, // Explicitly set to 0
+                    totalAmount: order.subtotal - totalDiscount,
+                    discountAmount: totalDiscount,
+                };
+            }
+            return order;
+        })
+    );
+    setNotification({ message: "Manual discount removed successfully", type: "success" });
+  };
+
   const handleRemoveItemOrOrder = async (order, item, index) => {
                               const isLastItem = order.items.length === 1;
                               const confirmMsg = isLastItem
@@ -451,12 +488,9 @@ export default function PendingOrders() {
     }
     
     try {
-      // Calculate discount if applicable
-      let totalAmount = order.subtotal;
-      if (activeDiscount && order.subtotal >= activeDiscount.minOrderAmount) {
-        const discountAmount = Math.round((order.subtotal * activeDiscount.percentage) / 100);
-        totalAmount = order.subtotal - discountAmount;
-      }
+      // Calculate discount if applicable, including manual discount
+      const { totalDiscount } = calculateOrderDiscount(order);
+      const totalAmount = order.subtotal - totalDiscount;
       
       // Create UPI payment URL
       // Format: upi://pay?pa=UPI_ID&pn=PAYEE_NAME&am=AMOUNT&cu=INR&tn=NOTE
@@ -662,7 +696,7 @@ export default function PendingOrders() {
                               />
                               {getManualDiscount(order.orderId) > 0 && (
                                 <button
-                                  onClick={() => setManualDiscounts(prev => ({ ...prev, [order.orderId]: 0 }))}
+                                  onClick={() => handleRemoveManualDiscount(order.orderId)}
                                   className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
                                   aria-label="Remove manual discount"
                                 >
@@ -805,7 +839,7 @@ export default function PendingOrders() {
                                 </button>
                                 <button
                                   onClick={() => handlePaymentMethodSelect("Custom", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
-                                  className="w-full py-3 px-3 rounded-lg font-medium bg-purple-500 hover:bg-purple-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+                                  className="w-full py-3 px-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -862,11 +896,7 @@ export default function PendingOrders() {
         isOpen={showQrCode}
         onClose={() => setShowQrCode(false)}
         title="Scan QR Code to Pay"
-        message={`Total Amount: ₹${currentOrderForQr ? 
-          (activeDiscount && currentOrderForQr.subtotal >= activeDiscount.minOrderAmount 
-            ? (currentOrderForQr.subtotal - Math.round((currentOrderForQr.subtotal * activeDiscount.percentage) / 100)).toFixed(2)
-            : currentOrderForQr.subtotal.toFixed(2)) 
-          : '0.00'}`}
+        message={`Total Amount: ₹${currentOrderForQr ? (currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount).toFixed(2) : '0.00'}`}
         customContent={
           <div className="flex flex-col items-center gap-4 w-full">
             <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">

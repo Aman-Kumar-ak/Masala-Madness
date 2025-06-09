@@ -318,4 +318,46 @@ router.delete("/:orderId", async (req, res) => {
   }
 });
 
+// @route   PATCH /api/pending-orders/:orderId/manual-discount
+// Set manual discount for a pending order
+router.patch("/:orderId/manual-discount", async (req, res) => {
+  try {
+    const { manualDiscount } = req.body;
+
+    const pendingOrder = await PendingOrder.findOne({ orderId: req.params.orderId });
+
+    if (!pendingOrder) {
+      return res.status(404).json({ message: "Pending order not found" });
+    }
+
+    // Update manual discount
+    pendingOrder.manualDiscount = manualDiscount;
+    pendingOrder.updatedAt = new Date();
+
+    // Recalculate total discount and total amount
+    let percentageDiscountAmount = 0;
+    // Assuming active discount logic is handled on frontend or fetched separately if needed
+    // For simplicity, this backend route will just recalculate based on saved percentageDiscount from frontend
+    if (pendingOrder.discountPercentage > 0) {
+      percentageDiscountAmount = Math.round((pendingOrder.subtotal * pendingOrder.discountPercentage) / 100);
+    }
+    
+    pendingOrder.discountAmount = percentageDiscountAmount + manualDiscount;
+    pendingOrder.totalAmount = pendingOrder.subtotal - pendingOrder.discountAmount;
+
+    const updatedOrder = await pendingOrder.save();
+    
+    // Emit event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'updated-pending-order', order: updatedOrder });
+    }
+
+    res.status(200).json({ message: "Manual discount updated successfully", order: updatedOrder });
+  } catch (error) {
+    console.error("Error updating manual discount:", error);
+    res.status(500).json({ message: "Failed to update manual discount", error: error.message });
+  }
+});
+
 module.exports = router;

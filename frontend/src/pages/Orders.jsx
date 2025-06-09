@@ -393,7 +393,13 @@ const Orders = () => {
                           <span className="font-medium"> {order.paymentMethod}</span>
                         )}
                       </span>
+
                       <p className="text-xl font-bold text-gray-800 mt-1">₹{order.totalAmount.toFixed(2)}</p>
+                      {order.discountAmount > 0 && (
+                        <p className="text-sm text-gray-500 line-through">
+                          ₹{order.subtotal.toFixed(2)}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 bg-gray-50 p-3 rounded-lg">
