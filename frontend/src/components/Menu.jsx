@@ -110,7 +110,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
         observer.current.disconnect();
       }
     };
-  }, [categories]); // Re-run when categories change
+  }, [categories, searchTerm]); // Re-run when categories or search changes
 
   // Get all dishes across all categories
   const allDishes = React.useMemo(() => {
