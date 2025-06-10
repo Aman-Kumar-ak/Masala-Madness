@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Menu from "../components/Menu";
 import { useCart } from "../components/CartContext";
@@ -20,6 +20,9 @@ export default function Home() {
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
   const { showInfo } = useNotification();
+  const [showHeader, setShowHeader] = useState(true);
+  const headerRef = useRef(null);
+  const menuSectionRef = useRef(null);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -129,6 +132,26 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (headerRef.current && menuSectionRef.current) {
+        const headerHeight = headerRef.current.offsetHeight;
+        const menuSectionTop = menuSectionRef.current.getBoundingClientRect().top;
+
+        if (menuSectionTop <= headerHeight) {
+          setShowHeader(false);
+        } else {
+          setShowHeader(true);
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const handleConfirmClearCart = () => {
     clearCart();
     setShowClearCartConfirm(false);
@@ -138,7 +161,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
       {/* Header */}
-      <header className="bg-white shadow-md sticky top-0 z-50 border-b border-orange-200">
+      <header ref={headerRef} className={`bg-white shadow-md sticky top-0 z-50 border-b border-orange-200 transition-transform duration-300 ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center py-3">
             {/* Logo and Title */}
@@ -384,29 +407,12 @@ export default function Home() {
       )}
 
       {/* Menu Section */}
-      <div className="container mx-auto px-4 py-8 pb-28">
-        <div className="bg-white rounded-lg shadow-sm border border-orange-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-100 to-orange-50 p-3 border-b border-orange-200 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-orange-700 flex items-center gap-2">
-              <span className="text-2xl">🍽️</span>
-              <span>Our Menu</span>
-            </h2>
-            {cartItems.length > 0 && (
-              <button
-                onClick={() => setShowClearCartConfirm(true)}
-                className="flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 text-red-500 text-sm font-medium px-3 py-1.5 rounded-full border border-red-200 transition-all duration-200 shadow-sm hover:shadow"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span>Clear Cart</span>
-              </button>
-            )}
-          </div>
-          <div className="p-4">
-            <Menu />
-          </div>
-        </div>
+      <div ref={menuSectionRef} className="container mx-auto px-4 py-8 pb-28">
+        <Menu 
+          cartItems={cartItems}
+          handleConfirmClearCart={handleConfirmClearCart}
+          setShowClearCartConfirm={setShowClearCartConfirm}
+        />
       </div>
 
       {/* Clear Cart Confirmation Dialog */}
