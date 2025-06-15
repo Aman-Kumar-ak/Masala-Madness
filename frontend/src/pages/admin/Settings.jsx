@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import BackButton from '../components/BackButton';
-import ConfirmationDialog from '../components/ConfirmationDialog';
-import { useNotification } from '../components/NotificationContext';
-import api from '../utils/api';
-import useKeyboardScrollAdjustment from '../hooks/useKeyboardScrollAdjustment';
+import { useAuth } from '../../contexts/AuthContext';
+import BackButton from '../../components/BackButton';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
+import { useNotification } from '../../components/NotificationContext';
+import api from '../../utils/api';
+import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
 
 const Settings = () => {
   useKeyboardScrollAdjustment();

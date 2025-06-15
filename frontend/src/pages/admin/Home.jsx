@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Menu from "../components/Menu";
-import { useCart } from "../components/CartContext";
-import ConfirmationDialog from "../components/ConfirmationDialog";
-import { useNotification } from "../components/NotificationContext";
-import { API_URL } from "../utils/config";
-import OptimizedImage from "../components/OptimizedImage";
+import Menu from "../../components/Menu";
+import { useCart } from "../../components/CartContext";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { useNotification } from "../../components/NotificationContext";
+import { API_URL } from "../../utils/config";
+import OptimizedImage from "../../components/OptimizedImage";
 
 export default function Home() {
   const { cartItems, clearCart } = useCart();
@@ -280,11 +280,11 @@ export default function Home() {
               </Link>
               <Link
                 to="/settings"
-                className="w-10 h-10 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors duration-200 flex items-center justify-center shadow-sm"
+                className="w-9 h-10 rounded-full flex items-center justify-center"
                 title="Settings"
-              >
+              > 
                 <OptimizedImage
-                  src="/images/login.png"
+                  src="/images/settings.png"
                   alt="Settings"
                   className="w-10 h-10 object-contain"
                   width={40}

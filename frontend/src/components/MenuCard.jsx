@@ -5,7 +5,7 @@ import Notification from "./Notification";
 const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedType, setSelectedType] = useState("");
-  const { addToCart } = useCart();
+  const { addToCart, removeFromCart, cartItems } = useCart();
   const [isAdding, setIsAdding] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -48,153 +48,139 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
 
   const hasHalfFull = !price && (priceHalf || priceFull);
 
+  // Check if this item is in the cart
+  let isInCart = false;
+  let removeType = "";
+  if (price) {
+    isInCart = cartItems.some(item => item.name === name && item.type === "Fixed");
+    removeType = "Fixed";
+  } else {
+    // If any type of this item is in the cart, show X
+    const found = cartItems.find(item => item.name === name && (item.type === "H" || item.type === "F"));
+    if (found) {
+      isInCart = true;
+      removeType = found.type;
+    }
+  }
+
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden border border-orange-100">
-      <div className="p-5">
-        {/* Dish Name and Category */}
-        <div className="mb-3">
-          <div className="flex justify-between items-start">
-            <h3 className="text-lg font-bold text-gray-800">{name}</h3>
-            {category && (
-              <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full font-medium">
-                {category}
-              </span>
-            )}
+    <div className={`relative rounded-xl shadow-md transition-all duration-300 border border-orange-200 p-2 ${isInCart ? 'bg-gradient-to-br from-orange-50 to-white' : 'bg-white'}`}>
+      {/* X Button */}
+      {isInCart && (
+        <button
+          className="absolute -top-3 -right-3 z-10 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:bg-red-600 focus:outline-none"
+          onClick={() => removeFromCart({ name, type: removeType })}
+          aria-label="Remove from cart"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <line x1="6" y1="6" x2="18" y2="18" stroke="white" strokeLinecap="round"/>
+            <line x1="6" y1="18" x2="18" y2="6" stroke="white" strokeLinecap="round"/>
+          </svg>
+        </button>
+      )}
+      {/* First Row: Name (and Price if fixed) */}
+      {price ? (
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0 pr-2">
+            <h3
+              className="text-lg sm:text-xl font-bold text-gray-800 leading-tight whitespace-normal break-words"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+            >
+              {name}
+            </h3>
           </div>
-          
-          <div className="text-xs text-gray-500 mt-1">
-            {price ? (
-              <span className="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Fixed Price
-              </span>
-            ) : (
-              <span className="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Available in {priceHalf ? 'Half' : ''} {priceHalf && priceFull ? '&' : ''} {priceFull ? 'Full' : ''}
-              </span>
+          <span className="text-base font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-lg whitespace-nowrap ml-2" style={{ alignSelf: 'flex-start', marginRight: '2px' }}>₹{price}</span>
+        </div>
+      ) : (
+        <div className="mb-2">
+          <h3
+            className="text-lg sm:text-xl font-bold text-gray-800 leading-tight line-clamp-2 whitespace-normal break-words"
+            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+          >
+            {name}
+          </h3>
+        </div>
+      )}
+      {/* Second Row: Toggle/Price for variable price */}
+      {!price && (
+        <div className="mb-3 w-full px-2 flex justify-center mt-4">
+          <div className="flex items-center bg-orange-50 rounded-lg overflow-hidden border border-orange-200 w-full max-w-full">
+            {priceHalf && (
+              <button
+                onClick={() => handleTypeSelect('H')}
+                className={`flex-1 px-3 py-2 text-sm font-semibold focus:outline-none transition-all duration-200 ${
+                  selectedType === 'H'
+                    ? 'bg-orange-500 text-white shadow'
+                    : 'text-orange-600 hover:bg-orange-100'
+                }`}
+                style={{ borderRight: priceFull ? '1px solid #fdba74' : 'none' }}
+              >
+                Half <span className="ml-1 font-bold">₹{priceHalf}</span>
+              </button>
+            )}
+            {priceFull && (
+              <button
+                onClick={() => handleTypeSelect('F')}
+                className={`flex-1 px-3 py-2 text-sm font-semibold focus:outline-none transition-all duration-200 ${
+                  selectedType === 'F'
+                    ? 'bg-orange-500 text-white shadow'
+                    : 'text-orange-600 hover:bg-orange-100'
+                }`}
+              >
+                Full <span className="ml-1 font-bold">₹{priceFull}</span>
+              </button>
             )}
           </div>
         </div>
-
-        {/* Price Display */}
-        <div className="mb-4">
-          {price ? (
-            <div className="bg-orange-50 px-3 py-2 rounded-lg flex justify-between items-center">
-              <span className="text-gray-700 text-sm">Price</span>
-              <span className="text-lg font-bold text-orange-600">₹{price}</span>
-            </div>
-          ) : (
-            <div className="bg-orange-50 px-3 py-2 rounded-lg">
-              <div className="flex justify-between items-center gap-4">
-                {priceHalf && (
-                  <div className="flex-1 flex justify-between items-center">
-                    <span className="text-gray-700 text-sm">Half</span>
-                    <span className="font-bold text-orange-600">₹{priceHalf}</span>
-                  </div>
-                )}
-                {priceHalf && priceFull && (
-                  <div className="h-8 border-r border-orange-200"></div>
-                )}
-                {priceFull && (
-                  <div className="flex-1 flex justify-between items-center">
-                    <span className="text-gray-700 text-sm">Full</span>
-                    <span className="font-bold text-orange-600">₹{priceFull}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Controls */}
-        <div className="flex flex-col space-y-3">
-          {/* Quantity Controls */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
-            <button 
-              onClick={decreaseQuantity}
-              disabled={quantity <= 1}
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-colors duration-200 ${
-                quantity <= 1 
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                : 'bg-white shadow-sm hover:bg-orange-50 text-orange-500 font-bold'
-              }`}
-            >
-              -
-            </button>
-            <div className="px-3 py-1 rounded-md bg-white shadow-sm">
-              <span className="font-medium text-gray-700">{quantity}</span>
-            </div>
-            <button 
-              onClick={increaseQuantity}
-              className="w-8 h-8 rounded-full bg-white shadow-sm hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg"
-            >
-              +
-            </button>
-          </div>
-
-          {/* Size Selection */}
-          {hasHalfFull && (
-            <div className="flex gap-2">
-              {priceHalf && (
-                <button 
-                  onClick={() => handleTypeSelect("H")}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    selectedType === "H"
-                      ? "bg-orange-500 text-white shadow-sm"
-                      : "bg-white border border-orange-300 text-orange-500 hover:bg-orange-50"
-                  }`}
-                >
-                  Half
-                </button>
-              )}
-              {priceFull && (
-                <button 
-                  onClick={() => handleTypeSelect("F")}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    selectedType === "F"
-                      ? "bg-orange-500 text-white shadow-sm"
-                      : "bg-white border border-orange-300 text-orange-500 hover:bg-orange-50"
-                  }`}
-                >
-                  Full
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Add to Cart Button */}
+      )}
+      {/* Third Row: Quantity + Add to Cart */}
+      <div className="flex items-center justify-between gap-3 px-2">
+        {/* Quantity Bar */}
+        <div className="flex items-center bg-gray-50 rounded-full py-1 shadow-sm flex-1 min-w-0 justify-between">
           <button
-            onClick={handleAddToCart}
-            className={`w-full py-2.5 rounded-lg font-medium text-white transition-all duration-300 flex items-center justify-center gap-2 ${
-              isAdding
-                ? "bg-green-500 scale-95"
-                : "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 hover:shadow"
+            onClick={decreaseQuantity}
+            disabled={quantity <= 1}
+            className={`w-7 h-7 rounded-full flex items-center justify-center text-lg transition-colors duration-200 ml-1 ${
+              quantity <= 1
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-white hover:bg-orange-50 text-orange-500 font-bold shadow'
             }`}
           >
-            {isAdding ? (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span>Added!</span>
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span>Add to Cart</span>
-              </>
-            )}
+            -
+          </button>
+          <span className="text-center font-medium text-gray-700 select-none" style={{ minWidth: '1.5rem' }}>{quantity}</span>
+          <button
+            onClick={increaseQuantity}
+            className="w-7 h-7 rounded-full bg-white hover:bg-orange-50 flex items-center justify-center text-orange-500 transition-colors duration-200 font-bold text-lg shadow mr-1"
+          >
+            +
           </button>
         </div>
+        {/* Add to Cart Button */}
+        <button
+          onClick={handleAddToCart}
+          className={`flex-1 py-2 rounded-full font-medium text-white transition-all duration-300 flex items-center justify-center gap-2 shadow ${
+            isAdding
+              ? 'bg-green-500 scale-95'
+              : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 hover:shadow-lg'
+          }`}
+          style={{ maxWidth: '100%' }}
+        >
+          {isAdding ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Added!</span>
+            </>
+          ) : (
+            <>
+              <span>Add to Cart</span>
+            </>
+          )}
+        </button>
       </div>
-      
+      {/* Notification */}
       {notification && (
         <Notification
           message={notification.message}
@@ -207,3 +193,4 @@ const MenuCard = ({ name, priceHalf, priceFull, price, category }) => {
 };
 
 export default MenuCard;
+  

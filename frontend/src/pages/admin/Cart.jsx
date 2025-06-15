@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useCart } from "../components/CartContext";
+import { useCart } from "../../components/CartContext";
 import { useNavigate } from "react-router-dom";
-import BackButton from "../components/BackButton";
-import Notification from "../components/Notification";
-import ConfirmationDialog from "../components/ConfirmationDialog";
-import { useNotification } from "../components/NotificationContext";
-import { API_URL } from "../utils/config";
-import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
+import BackButton from "../../components/BackButton";
+import Notification from "../../components/Notification";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { useNotification } from "../../components/NotificationContext";
+import { API_URL } from "../../utils/config";
+import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 
 export default function Cart() {
   useKeyboardScrollAdjustment();

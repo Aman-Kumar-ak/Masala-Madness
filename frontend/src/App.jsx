@@ -1,17 +1,22 @@
 import React from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';  // Import Navigate for redirects
-import Home from './pages/Home';  // Import your Home component
-import Cart from './pages/Cart';  // Import Cart component (add other pages similarly)
-import Admin from './pages/Admin';  // Import Admin page
-import Orders from './pages/Orders';  // Import Orders page
-import PendingOrders from './pages/PendingOrders';  // Import Pending Orders page
-import Qr from './pages/Qr';  // Import QR page
+import Home from './pages/admin/Home';  // Import your Home component
+import Cart from './pages/admin/Cart';  // Import Cart component (add other pages similarly)
+import Admin from './pages/admin/Admin';  // Import Admin page
+import Orders from './pages/admin/Orders';  // Import Orders page
+import PendingOrders from './pages/admin/PendingOrders';  // Import Pending Orders page
+import Qr from './pages/admin/Qr';  // Import QR page
 import Login from './pages/Login';
-import Settings from './pages/Settings';  // Import Settings page
+import Settings from './pages/admin/Settings';  // Import Settings page
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './components/NotificationContext';
 import OfflineDetector from './components/OfflineDetector';  // Import the OfflineDetector component
+import WorkerHome from './pages/worker/WorkerHome';
+import WorkerCart from './pages/worker/WorkerCart';
+import WorkerSettings from './pages/worker/WorkerSettings';
+import WorkerOrders from './pages/worker/WorkerOrders';
+import WorkerPendingOrders from './pages/worker/WorkerPendingOrders';
 
 // Component to redirect based on authentication
 const RedirectBasedOnAuth = () => {
@@ -56,11 +61,6 @@ const App = () => {
                   <Cart />
                 </ProtectedRoute>
               } />
-              <Route path="/admin" element={
-                <ProtectedRoute>
-                  <Admin />
-                </ProtectedRoute>
-              } />
               <Route path="/orders" element={
                 <ProtectedRoute>
                   <Orders />
@@ -79,6 +79,11 @@ const App = () => {
               <Route path="/settings" element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <ProtectedRoute>
+                  <Admin />
                 </ProtectedRoute>
               } />
               

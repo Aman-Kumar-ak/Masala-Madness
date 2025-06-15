@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
-import BackButton from "../components/BackButton";
-import { useNotification } from "../components/NotificationContext";
-import ConfirmationDialog from "../components/ConfirmationDialog";
-import PasswordVerificationDialog from "../components/PasswordVerificationDialog";
-import { useAuth } from "../contexts/AuthContext";
-import { API_URL } from "../utils/config";
+import BackButton from "../../components/BackButton";
+import { useNotification } from "../../components/NotificationContext";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import PasswordVerificationDialog from "../../components/PasswordVerificationDialog";
+import { useAuth } from "../../contexts/AuthContext";
+import { API_URL } from "../../utils/config";
 
 
 export default function Qr() {

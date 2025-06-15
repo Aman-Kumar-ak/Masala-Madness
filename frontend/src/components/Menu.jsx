@@ -211,7 +211,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
   return (
     <div className="h-full flex flex-col">
       {/* Main sticky header container */}
-      <div className="sticky top-0 z-40 p-4 border-b border-orange-100 shadow-sm transform translate3d(0, 0, 0) will-change-transform rounded-t-2xl bg-white" style={{ backfaceVisibility: 'hidden', outline: '1px solid transparent', filter: 'blur(0px)' }}>
+      <div className="sticky top-0 z-40 p-4 border-b transform translate3d(0, 0, 0) will-change-transform rounded-t-2xl bg-white" style={{ backfaceVisibility: 'hidden', outline: '1px solid transparent', filter: 'blur(0px)' }}>
         <div className="bg-white text-center">
           <h2 className="text-3xl font-extrabold text-gray-800 flex items-center justify-center gap-2">
           </h2>
@@ -293,7 +293,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
       </div>
 
       {/* Menu Sections by Category (scrollable content) */}
-      <div ref={menuContentRef} className="flex-1 overflow-y-auto pt-4 pb-4 px-4 bg-white">
+      <div ref={menuContentRef} className="flex-1 overflow-y-auto pt-4 pb-4 px-4 bg-white rounded-b-xl">
         {categories.map(category => {
           const filteredCategoryDishes = category.dishes.filter(dish => {
             if (!searchTerm) return true;
@@ -311,7 +311,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
               <h3 className="text-2xl font-bold text-gray-800 mb-4 pb-2 pt-4 border-b-2s">
                 {getCategoryEmoji(category.categoryName)} {category.categoryName}
               </h3>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 overflow-visible">
                 {filteredCategoryDishes.map(dish => (
                   <MenuCard
                     key={dish._id}
