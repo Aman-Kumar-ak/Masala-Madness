@@ -167,5 +167,6 @@ const workerAuth = async (req, res, next) => {
 module.exports = {
   authenticateToken,
   adminAuth,
-  workerAuth
+  workerAuth,
+  auth: authenticateToken // Alias for routes expecting 'auth'
 };
