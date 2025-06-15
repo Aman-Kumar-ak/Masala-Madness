@@ -32,13 +32,13 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
+    
     // Verify password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
+    
     // Update last login
     user.lastLogin = getISTDate();
     await user.save();
@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
-
+    
     // Handle device token if remember device is enabled
     let newDeviceToken = null;
     if (rememberDevice) {

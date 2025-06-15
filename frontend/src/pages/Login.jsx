@@ -20,7 +20,7 @@ const Login = () => {
   
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const { showSuccess } = useNotification();
+  const { showSuccess, showError } = useNotification();
   const initialCheckRef = useRef(false);
   
   // Initial check for tokens to prevent login page flash
@@ -76,6 +76,7 @@ const Login = () => {
     // Basic validation
     if (!username.trim() || !password.trim()) {
       setError('Please enter both username and password');
+      showError('Please enter both username and password');
       return;
     }
     
@@ -100,6 +101,13 @@ const Login = () => {
         }, 800);
       } else {
         setError(result.message);
+        if (result.message.toLowerCase().includes('disabled')) {
+          showError('Your account is disabled. Please contact the administrator.');
+        } else if (result.message.toLowerCase().includes('invalid') || result.message.toLowerCase().includes('credentials')) {
+          showError('Invalid credentials. Please try again.');
+        } else {
+          showError(result.message);
+        }
         // Show recovery instructions if we get an indication that admin user doesn't exist
         if (result.message.includes('credentials') || result.message.includes('not found')) {
           setShowRecovery(true);
@@ -107,7 +115,7 @@ const Login = () => {
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
-      console.error('Login error:', err);
+      showError('An unexpected error occurred. Please try again.');
       setShowRecovery(true);
     } finally {
       setIsLoading(false);

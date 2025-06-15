@@ -69,6 +69,10 @@ const Settings = () => {
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [deviceError, setDeviceError] = useState('');
   
+  // Add state for delete confirmation
+  const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -488,6 +492,31 @@ const Settings = () => {
     }
     // eslint-disable-next-line
   }, [activeTab, user]);
+
+  // Delete user handler
+  const handleDeleteUser = async (userObj) => {
+    setUserToDelete(userObj);
+    setShowDeleteUserConfirm(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    try {
+      await api.delete(`/auth/users/${userToDelete._id}`);
+      showSuccess('User deleted successfully!');
+      await fetchUsers();
+    } catch (err) {
+      showError(err.message || 'Failed to delete user.');
+    } finally {
+      setShowDeleteUserConfirm(false);
+      setUserToDelete(null);
+    }
+  };
+
+  const cancelDeleteUser = () => {
+    setShowDeleteUserConfirm(false);
+    setUserToDelete(null);
+  };
   
   return (
     <div className="min-h-screen bg-orange-50">
@@ -529,6 +558,7 @@ const Settings = () => {
                   <table className="min-w-full text-sm border rounded-xl">
                     <thead>
                       <tr className="bg-blue-50">
+                        <th className="px-2 py-2 border"></th>
                         <th className="px-4 py-2 border">User Name</th>
                         <th className="px-4 py-2 border">Mobile Number</th>
                         <th className="px-4 py-2 border">Role</th>
@@ -539,23 +569,53 @@ const Settings = () => {
                     <tbody>
                       {users && users.length > 0 ? users.map(u => (
                         <tr key={u._id} className="border-b hover:bg-blue-50 transition">
+                          <td className="px-2 py-2 border text-center">
+                            <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                          </td>
                           <td className="px-4 py-2 border">{u.name}</td>
                           <td className="px-4 py-2 border">{u.mobileNumber}</td>
                           <td className="px-4 py-2 border capitalize">{u.role}</td>
-                          <td className="px-4 py-2 border text-center">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{u.isActive ? 'Active' : 'Inactive'}</span>
+                          <td className="px-2 py-1 border text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                className="focus:outline-none"
+                                onClick={() => handleToggleActive(u)}
+                                aria-label={u.isActive ? 'Disable account' : 'Enable account'}
+                                type="button"
+                              >
+                                <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
+                                  style={{ position: 'relative' }}>
+                                  <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
+                                </span>
+                              </button>
+                              <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
+                            </div>
                           </td>
-                          <td className="px-4 py-2 border text-center">
-                            <button
-                              className={`px-3 py-1 rounded text-xs font-bold shadow-sm transition ${u.isActive ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
-                              onClick={() => handleToggleActive(u)}
-                            >
-                              {u.isActive ? 'Disable' : 'Enable'}
-                            </button>
+                          <td className="px-2 py-1 border text-center">
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
+                                onClick={() => openEditUserModal(u)}
+                                title="Edit User"
+                                aria-label="Edit User"
+                              >
+                                <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
+                                Edit
+                              </button>
+                              <button
+                                className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
+                                onClick={() => handleDeleteUser(u)}
+                                title="Delete User"
+                                aria-label="Delete User"
+                              >
+                                <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )) : (
-                        <tr><td colSpan={5} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                        <tr><td colSpan={6} className="text-center text-gray-400 py-6">No users found.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -578,6 +638,7 @@ const Settings = () => {
                   try {
                     await api.post('/auth/register', addUserForm);
                     showSuccess('User added successfully!');
+                    setShowAddUserModal(false);
                     setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
                     await fetchUsers();
                     window.location.reload(); // Force reload to ensure new user can log in
@@ -615,6 +676,7 @@ const Settings = () => {
                   <table className="min-w-full text-sm border rounded-xl">
                     <thead>
                       <tr className="bg-emerald-50">
+                        <th className="px-2 py-2 border"></th>
                         <th className="px-4 py-2 border">Name</th>
                         <th className="px-4 py-2 border">Mobile Number</th>
                         <th className="px-4 py-2 border">Role</th>
@@ -627,28 +689,55 @@ const Settings = () => {
                     <tbody>
                       {users && users.length > 0 ? users.map(u => (
                         <tr key={u._id} className="border-b hover:bg-emerald-50 transition">
+                          <td className="px-2 py-2 border text-center">
+                            <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                          </td>
                           <td className="px-4 py-2 border">{u.name}</td>
                           <td className="px-4 py-2 border">{u.mobileNumber}</td>
                           <td className="px-4 py-2 border capitalize">{u.role}</td>
-                          <td className="px-4 py-2 border text-center">
-                            <button
-                              className={`px-2 py-1 rounded text-xs font-semibold ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
-                              onClick={() => handleToggleActive(u)}
-                            >
-                              {u.isActive ? 'Enabled' : 'Disabled'}
-                            </button>
+                          <td className="px-2 py-1 border text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                className="focus:outline-none"
+                                onClick={() => handleToggleActive(u)}
+                                aria-label={u.isActive ? 'Disable account' : 'Enable account'}
+                                type="button"
+                              >
+                                <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
+                                  style={{ position: 'relative' }}>
+                                  <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
+                                </span>
+                              </button>
+                              <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
+                            </div>
                           </td>
                           <td className="px-4 py-2 border">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '-'}</td>
                           <td className="px-4 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
-                          <td className="px-4 py-2 border">
-                            <button
-                              className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded mr-2 hover:bg-yellow-200"
-                              onClick={() => openEditUserModal(u)}
-                            >Edit</button>
+                          <td className="px-2 py-1 border text-center">
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
+                                onClick={() => openEditUserModal(u)}
+                                title="Edit User"
+                                aria-label="Edit User"
+                              >
+                                <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
+                                Edit
+                              </button>
+                              <button
+                                className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
+                                onClick={() => handleDeleteUser(u)}
+                                title="Delete User"
+                                aria-label="Delete User"
+                              >
+                                <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )) : (
-                        <tr><td colSpan={7} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                        <tr><td colSpan={8} className="text-center text-gray-400 py-6">No users found.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -946,6 +1035,19 @@ const Settings = () => {
           <p className="text-gray-700 text-xl font-medium">Logging you out...</p>
         </div>
       )}
+
+      {/* Delete User Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteUserConfirm}
+        onClose={cancelDeleteUser}
+        onConfirm={confirmDeleteUser}
+        title="Delete User"
+        message={`Are you sure you want to delete user '${userToDelete?.name}'? This action cannot be undone.`}
+        confirmText="Yes, Delete User"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={false}
+      />
     </div>
   );
 };

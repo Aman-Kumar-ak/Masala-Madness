@@ -38,22 +38,20 @@ export const AuthProvider = ({ children }) => {
   // Function to handle logout
   const logoutUser = async (keepDeviceToken = false) => {
     try {
-      // If we have a device token and we're not keeping it, remove it
       if (!keepDeviceToken) {
         localStorage.removeItem('deviceToken');
       }
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
     } catch (error) {
       console.error('Error in logout process:', error);
     } finally {
-      // Remove all session data
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('lastActivityTime');
       sessionStorage.removeItem('jwtVerified');
-      // Update state
       setUser(null);
       setIsAuthenticated(false);
-      // Set a flag to indicate successful logout for the Login page
       sessionStorage.setItem('logoutSuccess', 'true');
     }
   };
@@ -226,35 +224,40 @@ export const AuthProvider = ({ children }) => {
         data = JSON.parse(responseText);
       } catch (e) {
         console.error('Failed to parse response as JSON');
-        return {
-          success: false,
-          message: 'Invalid response from server. Please try again.'
+        return { 
+          success: false, 
+          message: 'Invalid response from server. Please try again.' 
         };
       }
-      // Check only for successful response as backend no longer sends status: 'success'
       if (response.ok) {
         console.log('Login successful');
         sessionStorage.setItem('token', data.token);
-        sessionStorage.setItem('user', JSON.stringify(data.user)); // data.user will contain role
+        sessionStorage.setItem('user', JSON.stringify(data.user));
+        if (rememberDevice) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+        } else {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
         updateLastActivityTime();
         setIsAuthenticated(true);
-        setUser(data.user); // Set user state with role
-
+        setUser(data.user);
         return {
           success: true,
           deviceToken: data.deviceToken,
-          user: data.user // Return user data including role
+          user: data.user
         };
       } else {
-        return {
-          success: false,
-          message: data.message || 'Login failed. Please check your credentials.'
+        return { 
+          success: false, 
+          message: data.message || 'Login failed. Please check your credentials.' 
         };
       }
     } catch (err) {
       console.error('Login error:', err);
-      return {
-        success: false,
+      return { 
+        success: false, 
         message: 'An unexpected error occurred. Please try again.'
       };
     }
@@ -289,6 +292,16 @@ export const AuthProvider = ({ children }) => {
       return { success: false, message: error.message || 'Failed to revoke device.' };
     }
   };
+  
+  // On app load, restore JWT and user from localStorage if not in sessionStorage
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    const userData = sessionStorage.getItem('user');
+    if (!token && localStorage.getItem('token')) {
+      sessionStorage.setItem('token', localStorage.getItem('token'));
+      sessionStorage.setItem('user', localStorage.getItem('user'));
+    }
+  }, []);
   
   // Provide auth data and functions to components
   const authContextValue = {
