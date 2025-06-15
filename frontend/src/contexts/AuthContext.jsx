@@ -38,25 +38,9 @@ export const AuthProvider = ({ children }) => {
   // Function to handle logout
   const logoutUser = async (keepDeviceToken = false) => {
     try {
-      // If we have a device token and we're not keeping it, try to revoke it on the server
-      const deviceToken = localStorage.getItem('deviceToken');
-      if (deviceToken && !keepDeviceToken) {
-        try {
-          // Attempt to notify the server about logout
-          await fetch('https://masala-madness-production.up.railway.app/api/auth/logout', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${deviceToken}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          // Remove from localStorage regardless of server response
-          localStorage.removeItem('deviceToken');
-        } catch (err) {
-          console.error('Error during device logout:', err);
-          // Still remove from localStorage even if server call fails
-          localStorage.removeItem('deviceToken');
-        }
+      // If we have a device token and we're not keeping it, remove it
+      if (!keepDeviceToken) {
+        localStorage.removeItem('deviceToken');
       }
     } catch (error) {
       console.error('Error in logout process:', error);
@@ -69,6 +53,8 @@ export const AuthProvider = ({ children }) => {
       // Update state
       setUser(null);
       setIsAuthenticated(false);
+      // Set a flag to indicate successful logout for the Login page
+      sessionStorage.setItem('logoutSuccess', 'true');
     }
   };
   
@@ -119,8 +105,9 @@ export const AuthProvider = ({ children }) => {
         });
         clearTimeout(timeoutId);
         const data = await response.json();
-        if (response.ok && data.status === 'success') {
-          setUser(data.user);
+        // Check only response.ok as backend no longer sends status: 'success'
+        if (response.ok) {
+          setUser(data.user); // data.user will contain role
           setIsAuthenticated(true);
           updateLastActivityTime();
           sessionStorage.setItem('user', JSON.stringify(data.user));
@@ -166,7 +153,7 @@ export const AuthProvider = ({ children }) => {
         if (jwtVerified === 'true') {
           const userData = sessionStorage.getItem('user');
           if (userData) {
-            setUser(JSON.parse(userData));
+            setUser(JSON.parse(userData)); // user will contain role
             setIsAuthenticated(true);
             updateLastActivityTime();
           }
@@ -177,8 +164,9 @@ export const AuthProvider = ({ children }) => {
         if (token) {
           try {
             const data = await api.get('/auth/verify');
-            if (data.status === 'success') {
-              setUser(data.user);
+            // Check only for successful response as backend no longer sends status: 'success'
+            if (data.user) { // Backend returns data.user directly on success
+              setUser(data.user); // user will contain role
               setIsAuthenticated(true);
               updateLastActivityTime();
               sessionStorage.setItem('jwtVerified', 'true');
@@ -238,112 +226,72 @@ export const AuthProvider = ({ children }) => {
         data = JSON.parse(responseText);
       } catch (e) {
         console.error('Failed to parse response as JSON');
-        return { 
-          success: false, 
-          message: 'Invalid response from server. Please try again.' 
+        return {
+          success: false,
+          message: 'Invalid response from server. Please try again.'
         };
       }
-      if (response.ok && data.status === 'success') {
+      // Check only for successful response as backend no longer sends status: 'success'
+      if (response.ok) {
         console.log('Login successful');
         sessionStorage.setItem('token', data.token);
-        sessionStorage.setItem('user', JSON.stringify(data.user));
+        sessionStorage.setItem('user', JSON.stringify(data.user)); // data.user will contain role
         updateLastActivityTime();
-        setUser(data.user);
         setIsAuthenticated(true);
-        if (data.deviceToken && rememberDevice) {
-          localStorage.setItem('deviceToken', data.deviceToken);
-        }
-        return { success: true, deviceToken: data.deviceToken };
+        setUser(data.user); // Set user state with role
+
+        return {
+          success: true,
+          deviceToken: data.deviceToken,
+          user: data.user // Return user data including role
+        };
       } else {
-        console.log('Login failed');
-        return { 
-          success: false, 
-          message: data.message || 'Login failed. Please check your credentials.' 
+        return {
+          success: false,
+          message: data.message || 'Login failed. Please check your credentials.'
         };
       }
-    } catch (error) {
-      console.error('Login error occurred');
-      return { 
-        success: false, 
-        message: 'Login failed. Please try again later.' 
+    } catch (err) {
+      console.error('Login error:', err);
+      return {
+        success: false,
+        message: 'An unexpected error occurred. Please try again.'
       };
     }
   };
   
   // Logout function
   const logout = async (options = {}) => {
-    const { keepDeviceToken = false, redirectToLogin = true } = options;
-    
-    await logoutUser(keepDeviceToken);
-    
-    // Redirect to login page if requested
-    if (redirectToLogin) {
-      // Set a flag to indicate successful logout for the login page
-      sessionStorage.setItem('justLoggedOut', 'true');
-      navigate('/login');
-    }
+    await logoutUser(options.keepDeviceToken);
   };
   
-  // Function to get user's remembered devices
+  // Device management functions (assuming they interact with backend)
   const getUserDevices = async () => {
     try {
-      // Use the current active token (either JWT or device token)
-      const token = sessionStorage.getItem('token') || localStorage.getItem('deviceToken');
-      if (!token) return { success: false, message: 'No authentication token available' };
-      
-      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/devices', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      const data = await response.json();
-      if (response.ok && data.status === 'success') {
-        return { success: true, devices: data.devices };
-      } else {
-        return { success: false, message: data.message || 'Failed to fetch devices' };
-      }
+      const res = await api.get('/auth/devices');
+      return res.devices;
     } catch (error) {
-      console.error('Error fetching devices:', error);
-      return { success: false, message: 'Error fetching devices' };
+      console.error('Error fetching user devices:', error);
+      return [];
     }
   };
   
-  // Function to revoke a specific device
   const revokeDevice = async (deviceId) => {
     try {
-      // Use the current active token (either JWT or device token)
-      const token = sessionStorage.getItem('token') || localStorage.getItem('deviceToken');
-      if (!token) return { success: false, message: 'No authentication token available' };
-      
-      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/revoke-device', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ deviceId })
-      });
-      
-      const data = await response.json();
-      if (response.ok && data.status === 'success') {
-        // If the user revoked their current device token, log them out
-        if (data.isCurrentDevice) {
-          await logout({ keepDeviceToken: false });
-        }
-        return { success: true, message: 'Device revoked successfully', isCurrentDevice: data.isCurrentDevice };
-      } else {
-        return { success: false, message: data.message || 'Failed to revoke device' };
+      await api.post(`/auth/devices/revoke/${deviceId}`);
+      // Remove the device from local storage if it was the current one
+      if (localStorage.getItem('deviceToken') === deviceId) {
+        localStorage.removeItem('deviceToken');
       }
+      return { success: true };
     } catch (error) {
       console.error('Error revoking device:', error);
-      return { success: false, message: 'Error revoking device' };
+      return { success: false, message: error.message || 'Failed to revoke device.' };
     }
   };
   
   // Provide auth data and functions to components
-  const value = {
+  const authContextValue = {
     isAuthenticated,
     user,
     loading,
@@ -351,11 +299,11 @@ export const AuthProvider = ({ children }) => {
     logout,
     getUserDevices,
     revokeDevice,
-    restoreSession
+    restoreSession // Expose restoreSession for external use if needed
   };
   
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );

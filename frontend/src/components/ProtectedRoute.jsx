@@ -1,9 +1,11 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from './NotificationContext';
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute = ({ children, requiredRole }) => {
+  const { isAuthenticated, user, loading } = useAuth();
+  const { showError } = useNotification();
 
   // If still checking auth status, show a spinner
   if (loading) {
@@ -22,7 +24,14 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" />;
   }
 
-  // If authenticated, render the protected component
+  // If requiredRole is specified, check user's role
+  if (requiredRole && user && user.role !== requiredRole) {
+    showError(`Access denied. You need ${requiredRole} privileges to view this page.`);
+    // Redirect to login page or a general unauthorized page
+    return <Navigate to="/login" />;
+  }
+
+  // If authenticated and authorized, render the protected component
   return children;
 };
 

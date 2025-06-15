@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const Admin = require('../models/Admin');
 const Device = require('../models/Device');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { v4: uuidv4 } = require('uuid');
+const User = require('../models/User');
+const { auth, adminAuth } = require('../middleware/authMiddleware');
 
 // Helper to get current IST date
 function getISTDate() {
@@ -17,156 +18,92 @@ function getISTDate() {
 // Admin login
 router.post('/login', async (req, res) => {
   try {
-    let { username, password, rememberDevice, deviceToken } = req.body;
-    if (rememberDevice === undefined) rememberDevice = true; // Default to true
-    const logDeviceToken = deviceToken ? deviceToken.substring(0, 8) + '...' : '[none]'; // Log only part of the token for security
-    console.log(`Login attempt: { username: '${username}', rememberDevice: ${rememberDevice}, deviceToken: ${logDeviceToken} }`);
-    
-    if (!username || !password) {
-      return res.status(400).json({ 
-        status: 'error', 
-        message: 'Username and password are required' 
-      });
+    const { username, password, rememberDevice, deviceToken } = req.body;
+
+    // Find user by username (mobile number for workers/new admins, or specific username for main admin)
+    const user = await User.findOne({ 
+      $or: [
+        { username: username },
+        { mobileNumber: username }
+      ],
+      isActive: true 
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
-    
-    const admin = await Admin.findOne({ username });
-    
-    if (!admin) {
-      return res.status(401).json({ 
-        status: 'error', 
-        message: 'Invalid credentials' 
-      });
+
+    // Verify password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
-    
-    const passwordMatches = await admin.comparePassword(password);
-    
-    if (!passwordMatches) {
-      return res.status(401).json({ 
-        status: 'error', 
-        message: 'Invalid credentials' 
-      });
-    }
-    
-    if (!admin.isActive) {
-      return res.status(403).json({ 
-        status: 'error', 
-        message: 'Account is disabled. Please contact support.' 
-      });
-    }
-    
-    // Create JWT token
+
+    // Update last login
+    user.lastLogin = getISTDate();
+    await user.save();
+
+    // Generate JWT token
     const token = jwt.sign(
-      { id: admin._id, username: admin.username },
+      { 
+        userId: user._id,
+        role: user.role
+      },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '24h' }
     );
-    
-    // Update last login timestamp
-    admin.lastLogin = getISTDate();
-    await admin.save();
 
-    const response = { 
-      status: 'success', 
-      token,
-      user: {
-        username: admin.username,
-        id: admin._id
-      }
-    };
-
-    // If remember device is requested, handle device token logic
+    // Handle device token if remember device is enabled
+    let newDeviceToken = null;
     if (rememberDevice) {
-      const userAgent = req.headers['user-agent'] || 'unknown';
-      const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-      let device;
-      
       if (deviceToken) {
-        // Try to find an existing valid device
-        device = await Device.findOne({
-          deviceId: deviceToken,
-          userId: admin._id,
-          isActive: true,
-          expiresAt: { $gt: new Date() }
-        });
-        
+        // Update existing device token
+        const device = await Device.findOne({ deviceId: deviceToken });
         if (device) {
-          // Check if user agent has changed significantly
-          const userAgentChanged = device.userAgent !== userAgent;
-          
-          // Update device information
-          device.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
           device.lastLogin = getISTDate();
           device.isActive = true;
-          
-          // Record user agent change in history if needed
-          if (userAgentChanged) {
-            device.statusHistory.push({ 
-              status: 'active', 
-              reason: 'user agent changed on login', 
-              timestamp: getISTDate() 
-            });
-            device.userAgent = userAgent; // Update to new user agent
-          } else {
-            device.statusHistory.push({ 
-              status: 'active', 
-              reason: 'login', 
-              timestamp: getISTDate() 
-            });
-          }
-          
           await device.save();
-          response.deviceToken = device.deviceId;
-          console.log(`[Device Auth] Existing device login: deviceId=${device.deviceId.substring(0, 8)}...`);
+          newDeviceToken = deviceToken;
         }
-      }
-      
-      if (!device) {
-        // Create a new device token with improved security
-        const deviceId = uuidv4();
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
-
-        device = new Device({
-          deviceId,
-          userId: admin._id,
-          expiresAt,
-          userAgent,
-          isActive: true,
-          lastLogin: getISTDate(),
-          createdAt: getISTDate(),
-          statusHistory: [{ 
-            status: 'active', 
-            reason: 'new device login', 
-            timestamp: getISTDate() 
-          }]
+      } else {
+        // Create new device token
+        const device = new Device({
+          deviceId: require('crypto').randomBytes(32).toString('hex'),
+          userId: user._id,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+          userAgent: req.headers['user-agent']
         });
         await device.save();
-        response.deviceToken = deviceId;
-        console.log(`[Device Auth] New device registered: deviceId=${deviceId.substring(0, 8)}...`);
+        newDeviceToken = device.deviceId;
       }
-    } else {
-      console.log('Device not remembered for this login.');
     }
-    
-    return res.status(200).json(response);
+
+    res.json({
+      token,
+      deviceToken: newDeviceToken,
+      user: user.getPublicProfile()
+    });
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ 
-      status: 'error', 
-      message: 'Internal server error' 
-    });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
 // Verify token is valid (used for auth persistence)
-router.get('/verify', authenticateToken, (req, res) => {
-  return res.status(200).json({ 
-    status: 'success',
-    user: {
-      username: req.user.username,
-      id: req.user.id
+router.get('/verify', authenticateToken, async (req, res) => {
+  try {
+    // Fetch the full user object (excluding password)
+    const user = await User.findById(req.user._id || req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
-  });
+    return res.status(200).json({ 
+      user: user // This will include role, name, etc.
+    });
+  } catch (error) {
+    console.error('Verify user error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // Logout route
@@ -320,7 +257,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     }
     
     // Find the admin by ID from the token
-    const admin = await Admin.findById(req.user.id);
+    const admin = await User.findById(req.user.id);
     
     if (!admin) {
       return res.status(404).json({
@@ -374,7 +311,7 @@ router.post('/verify-password', authenticateToken, async (req, res) => {
     }
     
     // Find the admin by ID from the token
-    const admin = await Admin.findById(req.user.id);
+    const admin = await User.findById(req.user.id);
     
     if (!admin) {
       return res.status(404).json({
@@ -405,6 +342,137 @@ router.post('/verify-password', authenticateToken, async (req, res) => {
       status: 'error',
       message: 'An error occurred while verifying password'
     });
+  }
+});
+
+// Register new user (admin only)
+router.post('/register', adminAuth, async (req, res) => {
+  try {
+    const { name, mobileNumber, password, role } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      $or: [
+        { username: mobileNumber },
+        { mobileNumber: mobileNumber }
+      ]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    // Create new user
+    const user = new User({
+      username: mobileNumber, // Use mobile number as username
+      password,
+      name,
+      mobileNumber,
+      role,
+      assignedBy: req.user._id
+    });
+
+    await user.save();
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user: user.getPublicProfile()
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all users (admin only)
+router.get('/users', adminAuth, async (req, res) => {
+  try {
+    const users = await User.find({})
+      .select('-password')
+      .populate('assignedBy', 'name username')
+      .sort({ createdAt: -1 });
+
+    res.json(users);
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update user (admin only)
+router.put('/users/:id', adminAuth, async (req, res) => {
+  try {
+    const { name, mobileNumber, password, role, isActive } = req.body;
+    const updates = {};
+
+    if (name) updates.name = name;
+    if (mobileNumber) {
+      updates.mobileNumber = mobileNumber;
+      updates.username = mobileNumber; // Update username to match mobile number
+    }
+    if (password) updates.password = password;
+    if (role) updates.role = role;
+    if (typeof isActive === 'boolean') updates.isActive = isActive;
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'User updated successfully',
+      user
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get user profile
+router.get('/profile', auth, async (req, res) => {
+  try {
+    res.json(req.user.getPublicProfile());
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all devices with user info (admin only)
+router.get('/devices/all', adminAuth, async (req, res) => {
+  try {
+    const devices = await Device.find({})
+      .populate('userId', 'name role')
+      .sort({ createdAt: -1 });
+    res.json(devices);
+  } catch (error) {
+    console.error('Get all devices error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update device status (admin only)
+router.put('/devices/:id', adminAuth, async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    const device = await Device.findByIdAndUpdate(
+      req.params.id,
+      { $set: { isActive } },
+      { new: true }
+    );
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+    res.json({ message: 'Device updated', device });
+  } catch (error) {
+    console.error('Update device error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

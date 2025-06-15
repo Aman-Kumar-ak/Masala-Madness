@@ -8,7 +8,7 @@ const deviceSchema = new mongoose.Schema({
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
+    ref: 'User',
     required: true
   },
   lastLogin: {

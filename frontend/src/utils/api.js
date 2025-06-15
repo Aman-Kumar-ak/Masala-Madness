@@ -87,8 +87,15 @@ const api = {
 
 // Handle API responses
 async function handleResponse(response) {
-  const data = await response.json();
-  
+  let data;
+  let isJson = true;
+  try {
+    data = await response.json();
+  } catch (e) {
+    isJson = false;
+    data = null;
+  }
+
   // If response is not ok, handle error
   if (!response.ok) {
     // If unauthorized, redirect to login
@@ -97,14 +104,22 @@ async function handleResponse(response) {
       sessionStorage.removeItem('user'); // Clear user data
       window.location.href = '/login'; // Redirect to login
     }
-    
+
+    // If not JSON, provide a clearer error
+    if (!isJson) {
+      const error = new Error(`API error: Received non-JSON response (status ${response.status}). Possible 404 or server error.`);
+      error.status = response.status;
+      error.data = null;
+      throw error;
+    }
+
     // Return error with data
-    const error = new Error(data.message || 'API error');
+    const error = new Error((data && data.message) || 'API error');
     error.status = response.status;
     error.data = data;
     throw error;
   }
-  
+
   return data;
 }
 

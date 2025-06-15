@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
-const Admin = require('../models/Admin');
+// const Admin = require('../models/Admin'); // Remove old Admin model
 const Device = require('../models/Device');
+const User = require('../models/User');
 
 // Helper to get current IST date (reused from authRoutes.js)
 function getISTDate() {
@@ -33,16 +34,17 @@ const authenticateToken = async (req, res, next) => {
       try {
         // Verify JWT token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const admin = await Admin.findById(decoded.id);
+        // Use User model instead of Admin
+        const user = await User.findById(decoded.userId || decoded.id);
         
-        if (!admin || !admin.isActive) {
+        if (!user || !user.isActive) {
           return res.status(403).json({ 
             status: 'error', 
             message: 'Invalid token or user disabled.' 
           });
         }
-        
-        req.user = decoded;
+        // Attach user info to req.user
+        req.user = user;
         req.tokenType = 'jwt';
         return next();
       } catch (jwtError) {
@@ -103,14 +105,14 @@ const authenticateToken = async (req, res, next) => {
     
     await device.save();
 
-    // Get admin info
-    const admin = await Admin.findById(device.userId);
-    if (!admin || !admin.isActive) {
-      // Deactivate device if admin account is disabled
+    // Get user info (use User model)
+    const user = await User.findById(device.userId);
+    if (!user || !user.isActive) {
+      // Deactivate device if user account is disabled
       device.isActive = false;
       device.statusHistory.push({ 
         status: 'inactive', 
-        reason: 'admin account disabled', 
+        reason: 'user account disabled', 
         timestamp: currentDate 
       });
       await device.save();
@@ -121,10 +123,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    req.user = {
-      id: admin._id,
-      username: admin.username
-    };
+    req.user = user;
     req.tokenType = 'device';
     req.deviceId = device.deviceId;
     next();
@@ -137,4 +136,36 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticateToken };
+// Middleware to check if user is admin
+const adminAuth = async (req, res, next) => {
+  try {
+    await authenticateToken(req, res, () => {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied. Admin privileges required.' });
+      }
+      next();
+    });
+  } catch (error) {
+    res.status(401).json({ message: 'Please authenticate' });
+  }
+};
+
+// Middleware to check if user is worker
+const workerAuth = async (req, res, next) => {
+  try {
+    await authenticateToken(req, res, () => {
+      if (!req.user || req.user.role !== 'worker') {
+        return res.status(403).json({ message: 'Access denied. Worker privileges required.' });
+      }
+      next();
+    });
+  } catch (error) {
+    res.status(401).json({ message: 'Please authenticate' });
+  }
+};
+
+module.exports = {
+  authenticateToken,
+  adminAuth,
+  workerAuth
+};

@@ -52,6 +52,23 @@ const Settings = () => {
   const [revokeSuccess, setRevokeSuccess] = useState('');
   const [revokeError, setRevokeError] = useState('');
   
+  // Add state for user management
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userError, setUserError] = useState('');
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [addUserForm, setAddUserForm] = useState({ name: '', mobileNumber: '', password: '', role: 'worker' });
+  const [editUserForm, setEditUserForm] = useState({ name: '', mobileNumber: '', password: '', role: 'worker', isActive: true });
+  const [addUserLoading, setAddUserLoading] = useState(false);
+  const [editUserLoading, setEditUserLoading] = useState(false);
+  
+  // Add state for all devices
+  const [allDevices, setAllDevices] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [deviceError, setDeviceError] = useState('');
+  
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -354,6 +371,124 @@ const Settings = () => {
     setDeviceToRevoke(null);
   };
 
+  // Fetch users (admins & workers)
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    setUserError('');
+    try {
+      const res = await api.get('/auth/users');
+      setUsers(res);
+    } catch (err) {
+      setUserError('Failed to load users.');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // Fetch users when Devices and Roles tab is active
+  useEffect(() => {
+    if (activeTab === 'adminControl' && user?.role === 'admin') {
+      fetchUsers();
+    }
+    // eslint-disable-next-line
+  }, [activeTab, user]);
+
+  // Add user handler
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    setAddUserLoading(true);
+    setUserError('');
+    try {
+      await api.post('/auth/register', addUserForm);
+      showSuccess('User added successfully!');
+      setShowAddUserModal(false);
+      setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
+      await fetchUsers();
+      window.location.reload(); // Force reload to ensure new user can log in
+    } catch (err) {
+      showError(err.message || 'Failed to add user.');
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
+
+  // Edit user handler
+  const handleEditUser = async (e) => {
+    e.preventDefault();
+    setEditUserLoading(true);
+    setUserError('');
+    try {
+      const updateData = { ...editUserForm };
+      if (!updateData.password) delete updateData.password; // Don't send empty password
+      await api.put(`/auth/users/${selectedUser._id}`, updateData);
+      showSuccess('User updated successfully!');
+      setShowEditUserModal(false);
+      setSelectedUser(null);
+      await fetchUsers();
+    } catch (err) {
+      setUserError(err.message || 'Failed to update user.');
+    } finally {
+      setEditUserLoading(false);
+    }
+  };
+
+  // Enable/disable user
+  const handleToggleActive = async (userObj) => {
+    try {
+      await api.put(`/auth/users/${userObj._id}`, { isActive: !userObj.isActive });
+      showSuccess(`User ${userObj.isActive ? 'disabled' : 'enabled'} successfully!`);
+      await fetchUsers();
+    } catch (err) {
+      showError('Failed to update user status.');
+    }
+  };
+
+  // Open edit modal
+  const openEditUserModal = (userObj) => {
+    setSelectedUser(userObj);
+    setEditUserForm({
+      name: userObj.name,
+      mobileNumber: userObj.mobileNumber,
+      password: '',
+      role: userObj.role,
+      isActive: userObj.isActive
+    });
+    setShowEditUserModal(true);
+  };
+
+  // Fetch all devices for admin
+  const fetchAllDevices = async () => {
+    setLoadingDevices(true);
+    setDeviceError('');
+    try {
+      const res = await api.get('/auth/devices/all'); // You may need to implement this endpoint in backend
+      setAllDevices(res);
+    } catch (err) {
+      setDeviceError('Failed to load devices.');
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  // Toggle device active status
+  const handleToggleDeviceActive = async (deviceObj) => {
+    try {
+      await api.put(`/auth/devices/${deviceObj._id}`, { isActive: !deviceObj.isActive });
+      showSuccess(`Device ${deviceObj.isActive ? 'disabled' : 'enabled'} successfully!`);
+      fetchAllDevices();
+    } catch (err) {
+      showError('Failed to update device status.');
+    }
+  };
+
+  // Fetch all devices when Devices and Roles tab is active
+  useEffect(() => {
+    if (activeTab === 'adminControl' && user?.role === 'admin') {
+      fetchAllDevices();
+    }
+    // eslint-disable-next-line
+  }, [activeTab, user]);
+  
   return (
     <div className="min-h-screen bg-orange-50">
       <BackButton />
@@ -380,72 +515,185 @@ const Settings = () => {
 
           {/* Content based on active tab */}
           {activeTab === 'adminControl' && (
-            <div className="space-y-6">
-              <div className="bg-white shadow-md rounded-lg p-6 border border-blue-200 min-h-[calc(100vh-220px)] overflow-y-auto">
-                <div className="flex items-center space-x-4 mb-6">
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
-                    Devices and Roles
-                  </h2>
+            <div className="space-y-8">
+              {/* Device Management Card - Show unique users only */}
+              <div className="bg-white shadow-lg rounded-xl p-6 border border-blue-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
+                    <i className="fas fa-tablet-alt"></i>
+                  </span>
+                  <h2 className="text-2xl font-bold text-blue-700">User Devices & Status</h2>
                 </div>
-                {/* Device Management Section */}
-                <div className="border border-gray-200 rounded-lg p-5 mb-6">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-                    <span className="text-purple-600">📱</span> Device Management
-                  </h2>
-                  {revokeError && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                      <span className="block sm:inline">{revokeError}</span>
-                    </div>
-                  )}
-                  {revokeSuccess && (
-                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-                      <span className="block sm:inline">{revokeSuccess}</span>
-                    </div>
-                  )}
-                  {devices.length === 0 ? (
-                    <p className="text-gray-600 text-center py-4">No devices found.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {devices.map(device => (
-                        <div key={device.deviceId} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
-                          <div>
-                            <p className="font-medium text-gray-800">{device.deviceName} {device.isCurrent && '(Current Device)'}</p>
-                            <p className="text-sm text-gray-500">Last Used: {new Date(device.lastUsed).toLocaleString()}</p>
-                          </div>
-                          {!device.isCurrent && (
+                {/* Unique Users Table */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border rounded-xl">
+                    <thead>
+                      <tr className="bg-blue-50">
+                        <th className="px-4 py-2 border">User Name</th>
+                        <th className="px-4 py-2 border">Mobile Number</th>
+                        <th className="px-4 py-2 border">Role</th>
+                        <th className="px-4 py-2 border">Status</th>
+                        <th className="px-4 py-2 border">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users && users.length > 0 ? users.map(u => (
+                        <tr key={u._id} className="border-b hover:bg-blue-50 transition">
+                          <td className="px-4 py-2 border">{u.name}</td>
+                          <td className="px-4 py-2 border">{u.mobileNumber}</td>
+                          <td className="px-4 py-2 border capitalize">{u.role}</td>
+                          <td className="px-4 py-2 border text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{u.isActive ? 'Active' : 'Inactive'}</span>
+                          </td>
+                          <td className="px-4 py-2 border text-center">
                             <button
-                              onClick={() => handleRevokeClick(device)}
-                              className="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200"
-                              disabled={isRevoking}
+                              className={`px-3 py-1 rounded text-xs font-bold shadow-sm transition ${u.isActive ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                              onClick={() => handleToggleActive(u)}
                             >
-                              Revoke
+                              {u.isActive ? 'Disable' : 'Enable'}
                             </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Role Details Section */}
-                <div className="border border-gray-200 rounded-lg p-5">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-                    <span className="text-emerald-600">👥</span> User Roles & Details
-                  </h2>
-                  <p className="text-gray-600 mb-2">Manage user roles and permissions.</p>
-                  {/* Add actual role management UI here later */}
-                  <div className="space-y-2">
-                    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                      <h3 className="font-semibold text-green-800">Admin Users</h3>
-                      <p className="text-gray-700">Users with full control over the system, including menu management, discounts, and full order access.</p>
-                    </div>
-                    <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                      <h3 className="font-semibold text-yellow-800">Worker Users</h3>
-                      <p className="text-gray-700">Users with partial control, primarily focused on order fulfillment and payment processing.</p>
-                    </div>
-                  </div>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={5} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
+
+              {/* User Management Card */}
+              <div className="bg-white shadow-lg rounded-xl p-6 border border-emerald-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
+                    <i className="fas fa-users-cog"></i>
+                  </span>
+                  <h2 className="text-2xl font-bold text-emerald-700">User Management</h2>
+                </div>
+                {/* Add User Form */}
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  setAddUserLoading(true);
+                  setUserError('');
+                  try {
+                    await api.post('/auth/register', addUserForm);
+                    showSuccess('User added successfully!');
+                    setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
+                    await fetchUsers();
+                    window.location.reload(); // Force reload to ensure new user can log in
+                  } catch (err) {
+                    showError(err.message || 'Failed to add user.');
+                  } finally {
+                    setAddUserLoading(false);
+                  }
+                }} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Name</label>
+                    <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Mobile Number</label>
+                    <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.mobileNumber} onChange={e => setAddUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Password</label>
+                    <input type="password" className="w-full border rounded px-3 py-2" required value={addUserForm.password} onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Role</label>
+                    <select className="w-full border rounded px-3 py-2" value={addUserForm.role} onChange={e => setAddUserForm(f => ({ ...f, role: e.target.value }))}>
+                      <option value="admin">Admin</option>
+                      <option value="worker">Worker</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-4 flex justify-end mt-2">
+                    <button type="submit" className="px-6 py-2 rounded bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
+                  </div>
+                </form>
+                {/* User Table */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border rounded-xl">
+                    <thead>
+                      <tr className="bg-emerald-50">
+                        <th className="px-4 py-2 border">Name</th>
+                        <th className="px-4 py-2 border">Mobile Number</th>
+                        <th className="px-4 py-2 border">Role</th>
+                        <th className="px-4 py-2 border">Active</th>
+                        <th className="px-4 py-2 border">Last Login</th>
+                        <th className="px-4 py-2 border">Created</th>
+                        <th className="px-4 py-2 border">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users && users.length > 0 ? users.map(u => (
+                        <tr key={u._id} className="border-b hover:bg-emerald-50 transition">
+                          <td className="px-4 py-2 border">{u.name}</td>
+                          <td className="px-4 py-2 border">{u.mobileNumber}</td>
+                          <td className="px-4 py-2 border capitalize">{u.role}</td>
+                          <td className="px-4 py-2 border text-center">
+                            <button
+                              className={`px-2 py-1 rounded text-xs font-semibold ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                              onClick={() => handleToggleActive(u)}
+                            >
+                              {u.isActive ? 'Enabled' : 'Disabled'}
+                            </button>
+                          </td>
+                          <td className="px-4 py-2 border">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '-'}</td>
+                          <td className="px-4 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
+                          <td className="px-4 py-2 border">
+                            <button
+                              className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded mr-2 hover:bg-yellow-200"
+                              onClick={() => openEditUserModal(u)}
+                            >Edit</button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={7} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Edit User Modal (reuse ConfirmationDialog) */}
+              <ConfirmationDialog
+                isOpen={showEditUserModal}
+                onClose={() => setShowEditUserModal(false)}
+                title="Edit User"
+                confirmText={null}
+                cancelText={null}
+                customContent={(
+                  <form onSubmit={handleEditUser} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Name</label>
+                      <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Mobile Number</label>
+                      <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Password (leave blank to keep unchanged)</label>
+                      <input type="password" className="w-full border rounded px-3 py-2" value={editUserForm.password} onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Role</label>
+                      <select className="w-full border rounded px-3 py-2" value={editUserForm.role} onChange={e => setEditUserForm(f => ({ ...f, role: e.target.value }))}>
+                        <option value="admin">Admin</option>
+                        <option value="worker">Worker</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
+                      <label htmlFor="isActive" className="text-sm">Active</label>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
+                      <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
+                    </div>
+                  </form>
+                )}
+              />
             </div>
           )}
 
@@ -457,199 +705,199 @@ const Settings = () => {
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
                     Personal Settings
                   </h1>
+          </div>
+          
+          {user && (
+            <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+              <h2 className="text-lg font-semibold text-blue-800 mb-2">Current User</h2>
+              <p className="text-gray-700">
+                Logged in as: <span className="font-medium">{user.username}</span>
+              </p>
+            </div>
+          )}
+          
+          {/* Password Change Section */}
+          <div className="border border-gray-200 rounded-lg p-5 mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
+              <span className="text-orange-600">🔐</span> Change Password
+            </h2>
+            
+            {passwordError && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span className="block sm:inline">{passwordError}</span>
+              </div>
+            )}
+            
+            {passwordSuccess && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span className="block sm:inline">{passwordSuccess}</span>
+              </div>
+            )}
+            
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                    Current Password
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="currentPassword"
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value);
+                        setIsCurrentPasswordValid(false);
+                        setShowNewPasswordFields(false);
+                      }}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                      required
+                      disabled={isVerifying}
+                    />
+
+                    <button 
+                      type="button"
+                      onClick={verifyCurrentPassword}
+                      disabled={!currentPassword || isVerifying || isCurrentPasswordValid}
+                      className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
+                        ${isCurrentPasswordValid 
+                          ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
+                          : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'}`}
+                    >
+                      {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified' : 'Verify'}
+                    </button>
+                  </div>
+                  {isCurrentPasswordValid && (
+                    <p className="mt-1 text-sm text-green-600">Current password verified</p>
+                  )}
+                </div>
+                {/* Show Password Checkbox */}
+                <div className="flex items-center mt-1">
+                  <input
+                    id="showCurrentPassword"
+                    type="checkbox"
+                    checked={showCurrentPassword}
+                    onChange={() => setShowCurrentPassword((prev) => !prev)}
+                    className="mr-2"
+                  />
+                  <label htmlFor="showCurrentPassword" className="text-xs text-gray-600 select-none">Show Password</label>
                 </div>
                 
-                {user && (
-                  <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-                    <h2 className="text-lg font-semibold text-blue-800 mb-2">Current User</h2>
-                    <p className="text-gray-700">
-                      Logged in as: <span className="font-medium">{user.username}</span>
-                    </p>
-                  </div>
-                )}
-                
-                {/* Password Change Section */}
-                <div className="border border-gray-200 rounded-lg p-5 mb-6">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-                    <span className="text-orange-600">🔐</span> Change Password
-                  </h2>
-                  
-                  {passwordError && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                      <span className="block sm:inline">{passwordError}</span>
-                    </div>
-                  )}
-                  
-                  {passwordSuccess && (
-                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-                      <span className="block sm:inline">{passwordSuccess}</span>
-                    </div>
-                  )}
-                  
-                  <form onSubmit={handlePasswordChange} className="space-y-4">
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                          Current Password
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            id="currentPassword"
-                            type={showCurrentPassword ? "text" : "password"}
-                            value={currentPassword}
-                            onChange={(e) => {
-                              setCurrentPassword(e.target.value);
-                              setIsCurrentPasswordValid(false);
-                              setShowNewPasswordFields(false);
-                            }}
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                            required
-                            disabled={isVerifying}
-                          />
-
-                          <button 
-                            type="button"
-                            onClick={verifyCurrentPassword}
-                            disabled={!currentPassword || isVerifying || isCurrentPasswordValid}
-                            className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
-                              ${isCurrentPasswordValid 
-                                ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
-                                : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'}`}
-                          >
-                            {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified' : 'Verify'}
-                          </button>
-                        </div>
-                        {isCurrentPasswordValid && (
-                          <p className="mt-1 text-sm text-green-600">Current password verified</p>
-                        )}
-                      </div>
+                {showNewPasswordFields && (
+                  <>
+                    <div>
+                      <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                        New Password
+                      </label>
+                      <input
+                        id="newPassword"
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                        required
+                        minLength={8}
+                      />
                       {/* Show Password Checkbox */}
                       <div className="flex items-center mt-1">
                         <input
-                          id="showCurrentPassword"
+                          id="showNewPassword"
                           type="checkbox"
-                          checked={showCurrentPassword}
-                          onChange={() => setShowCurrentPassword((prev) => !prev)}
+                          checked={showNewPassword}
+                          onChange={() => setShowNewPassword((prev) => !prev)}
                           className="mr-2"
                         />
-                        <label htmlFor="showCurrentPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                        <label htmlFor="showNewPassword" className="text-xs text-gray-600 select-none">Show Password</label>
                       </div>
-                      
-                      {showNewPasswordFields && (
-                        <>
-                          <div>
-                            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                              New Password
-                            </label>
-                            <input
-                              id="newPassword"
-                              type={showNewPassword ? "text" : "password"}
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                              required
-                              minLength={8}
-                            />
-                            {/* Show Password Checkbox */}
-                            <div className="flex items-center mt-1">
-                              <input
-                                id="showNewPassword"
-                                type="checkbox"
-                                checked={showNewPassword}
-                                onChange={() => setShowNewPassword((prev) => !prev)}
-                                className="mr-2"
-                              />
-                              <label htmlFor="showNewPassword" className="text-xs text-gray-600 select-none">Show Password</label>
-                            </div>
-                            {newPassword && newPassword.length < 8 && (
-                              <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
-                            )}
-                          </div>
-                          
-                          <div>
-                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                              Confirm New Password
-                            </label>
-                            <input
-                              id="confirmPassword"
-                              type={showConfirmPassword ? "text" : "password"}
-                              value={confirmPassword}
-                              onChange={(e) => setConfirmPassword(e.target.value)}
-                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                              required
-                            />
-                            {/* Show Password Checkbox */}
-                            <div className="flex items-center mt-1">
-                              <input
-                                id="showConfirmPassword"
-                                type="checkbox"
-                                checked={showConfirmPassword}
-                                onChange={() => setShowConfirmPassword((prev) => !prev)}
-                                className="mr-2"
-                              />
-                              <label htmlFor="showConfirmPassword" className="text-xs text-gray-600 select-none">Show Password</label>
-                            </div>
-                            {confirmPassword && newPassword !== confirmPassword && (
-                              <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
-                            )}
-                          </div>
-                        </>
+                      {newPassword && newPassword.length < 8 && (
+                        <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
                       )}
                     </div>
                     
                     <div>
-                      <button
-                        type="submit"
-                        disabled={!isFormValid()}
-                        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
-                          ${isFormValid() 
-                            ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
-                            : 'bg-gray-400 cursor-not-allowed'} 
-                          focus:outline-none focus:ring-2 focus:ring-offset-2`}
-                      >
-                        Update Password
-                      </button>
+                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                        Confirm New Password
+                      </label>
+                      <input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                        required
+                      />
+                      {/* Show Password Checkbox */}
+                      <div className="flex items-center mt-1">
+                        <input
+                          id="showConfirmPassword"
+                          type="checkbox"
+                          checked={showConfirmPassword}
+                          onChange={() => setShowConfirmPassword((prev) => !prev)}
+                          className="mr-2"
+                        />
+                        <label htmlFor="showConfirmPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                      </div>
+                      {confirmPassword && newPassword !== confirmPassword && (
+                        <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
+                      )}
                     </div>
-                  </form>
-                </div>
-                
-                {/* Account Actions */}
-                <div className="border border-gray-200 rounded-lg p-5">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-                    <span className="text-red-600">⚠️</span> Account Actions
-                  </h2>
-                  
-                  <div className="space-y-4">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                      </svg>
-                      Logout
-                    </button>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
+              
+              <div>
+                <button
+                  type="submit"
+                  disabled={!isFormValid()}
+                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
+                    ${isFormValid() 
+                      ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
+                      : 'bg-gray-400 cursor-not-allowed'} 
+                    focus:outline-none focus:ring-2 focus:ring-offset-2`}
+                >
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+          
+          {/* Account Actions */}
+          <div className="border border-gray-200 rounded-lg p-5">
+            <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
+              <span className="text-red-600">⚠️</span> Account Actions
+            </h2>
+            
+            <div className="space-y-4">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Logout
+              </button>
             </div>
+          </div>
+        </div>
+      </div>
           )}
         </div>
       </div>
       {/* Version Information Section (moved to bottom) */}
       <div className="bg-white p-2 sm:p-4 rounded-xl shadow-md mb-4 border border-gray-200 overflow-x-auto w-fit mx-auto">
         <div className="flex items-center justify-center gap-2 text-[0.625rem] text-gray-600 whitespace-nowrap sm:text-sm">
-          <span className="font-medium">Version: {versionInfo.version}</span>
+            <span className="font-medium">Version: {versionInfo.version}</span>
           <span>|</span>
-          <span className="font-medium">Build: {new Date(versionInfo.buildDate).toLocaleString()}</span>
+            <span className="font-medium">Build: {new Date(versionInfo.buildDate).toLocaleString()}</span>
           <span>|</span>
           <span className={`px-1 py-0.5 rounded text-xs font-medium ${
-            versionInfo.environment === 'production' 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-yellow-100 text-yellow-800'
-          }`}>
-            {versionInfo.environment}
-          </span>
+              versionInfo.environment === 'production' 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {versionInfo.environment}
+            </span>
         </div>
       </div>
       

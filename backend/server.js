@@ -10,8 +10,6 @@ const discountRoutes = require('./routes/discountRoutes');
 const pendingOrderRoutes = require('./routes/pendingOrderRoutes');
 const upiRoutes = require('./routes/upiRoutes');
 const authRoutes = require('./routes/authRoutes');
-const { restoreAdminIfMissing, backupAdminCredentials } = require('./scripts/admin-recovery-service');
-const Admin = require('./models/Admin');
 
 dotenv.config();
 
@@ -64,43 +62,11 @@ io.on('connection', (socket) => {
   });
 });
 
-// Admin Recovery Functions
-async function checkAndRecoverAdminCollection() {
-  try {
-    const adminCount = await Admin.countDocuments().catch(err => {
-      console.warn('Error checking admin count:', err.message);
-      return 0;
-    });
-
-    if (adminCount === 0) {
-      console.log('No admin users found. Restoring admin account...');
-      await restoreAdminIfMissing();
-    } else {
-      console.log(`Found ${adminCount} admin users.`);
-      await backupAdminCredentials();
-    }
-  } catch (error) {
-    console.error('Error in admin recovery process:', error);
-  }
-}
-
-function setupCollectionWatchdog() {
-  const interval = 1000 * 60 * 60; // 1 hour
-  setInterval(checkAndRecoverAdminCollection, interval);
-
-  mongoose.connection.on('reconnected', () => {
-    console.log('MongoDB reconnected. Checking admin collection...');
-    checkAndRecoverAdminCollection();
-  });
-}
-
 // Database Connection and Server Start
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(async () => {
+  .then(() => {
     console.log('MongoDB connected.');
-    await checkAndRecoverAdminCollection();
-    setupCollectionWatchdog();
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
