@@ -480,4 +480,29 @@ router.put('/devices/:id', adminAuth, async (req, res) => {
   }
 });
 
+// Admin: Delete a user
+router.delete('/users/:id', auth, adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent an admin from deleting their own account
+    if (req.user.userId === id) {
+      return res.status(403).json({ message: 'You cannot delete your own account.' });
+    }
+
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Also delete any associated device tokens for the deleted user
+    await Device.deleteMany({ userId: id });
+
+    res.status(200).json({ message: 'User and associated devices deleted successfully.' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router; 
