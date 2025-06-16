@@ -524,6 +524,11 @@ router.post('/secret-code/initialize', adminAuth, async (req, res) => {
       existingSecretCode.updatedBy = currentUserId;
       existingSecretCode.lastUsedAt = getISTDate(); // Update last used time to current time for clarity
       existingSecretCode.lastUsedBy = currentUserId;
+      
+      // Ensure auditTrail is an array before pushing
+      if (!existingSecretCode.auditTrail || !Array.isArray(existingSecretCode.auditTrail)) {
+        existingSecretCode.auditTrail = [];
+      }
       existingSecretCode.auditTrail.push({
         timestamp: getISTDate(),
         action: 'Secret code updated',
