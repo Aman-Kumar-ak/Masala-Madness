@@ -21,18 +21,22 @@ router.post('/login', async (req, res) => {
     const { username, password, rememberDevice, deviceToken } = req.body;
 
     // Find user by username (mobile number for workers/new admins, or specific username for main admin)
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       $or: [
         { username: username },
         { mobileNumber: username }
-      ],
-      isActive: true 
+      ]
     });
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
     
+    // Check if account is active
+    if (!user.isActive) {
+      return res.status(403).json({ message: 'Your account is disabled.' });
+    }
+
     // Verify password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
