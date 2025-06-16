@@ -19,7 +19,7 @@ const Login = () => {
   const [rememberDevice, setRememberDevice] = useState(true);
   const [initialCheckComplete, setInitialCheckComplete] = useState(false);
   
-  const { login, isAuthenticated, logout } = useAuth();
+  const { login, isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
   const initialCheckRef = useRef(false);
@@ -59,12 +59,17 @@ const Login = () => {
   useEffect(() => {
     if (isAuthenticated) {
       console.log('Login page: User is authenticated, redirecting to home');
+      // Check user role and navigate accordingly
+      if (user?.role === 'worker') {
+        navigate('/worker-home');
+      } else {
       navigate('/home');
+      }
     } else if (initialCheckComplete) {
       console.log('Login page: Initial check complete, user not authenticated');
       setIsLoading(false);
     }
-  }, [isAuthenticated, navigate, initialCheckComplete]);
+  }, [isAuthenticated, navigate, initialCheckComplete, user]);
   
   // Show logout success notification if redirected from logout
   useEffect(() => {
@@ -91,10 +96,6 @@ const Login = () => {
       const deviceToken = rememberDevice ? localStorage.getItem('deviceToken') : null;
       const result = await login(username, password, rememberDevice, deviceToken);
       
-      if (!result.success) {
-        console.log('Login failed with message:', result.message); // Added for debugging
-      }
-      
       if (result.success) {
         if (result.deviceToken && rememberDevice) {
           localStorage.setItem('deviceToken', result.deviceToken);
@@ -102,7 +103,12 @@ const Login = () => {
         
         // Delay navigation slightly to allow notification to be seen
         setTimeout(() => {
+          // Check user role and navigate accordingly
+          if (result.user && result.user.role === 'worker') {
+            navigate('/worker-home');
+          } else {
           navigate('/home');
+          }
         }, 800);
       } else {
         if (result.message.toLowerCase().includes('disabled')) {
@@ -110,8 +116,8 @@ const Login = () => {
           setShowDisabledAccountDialog(true);
         } else if (result.message.toLowerCase().includes('invalid') || result.message.toLowerCase().includes('credentials')) {
           setError('Invalid credentials. Please try again.');
-        } else {
-          setError(result.message);
+      } else {
+        setError(result.message);
         }
         // Show recovery instructions if we get an indication that admin user doesn't exist
         if (result.message.includes('credentials') || result.message.includes('not found')) {
@@ -162,30 +168,6 @@ const Login = () => {
       }
     }
   };
-  
-  // If still in initial loading state, show a loading spinner
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading Masala Madness...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // If still in initial loading state, show a loading spinner
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading Masala Madness...</p>
-        </div>
-      </div>
-    );
-  }
 
   // If still in initial loading state, show a loading spinner
   if (isLoading) {

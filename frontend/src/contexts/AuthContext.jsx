@@ -143,9 +143,11 @@ export const AuthProvider = ({ children }) => {
     }
     
     const verifyUser = async () => {
+      console.log('verifyUser: Checking authentication status...');
       try {
         setLoading(true);
         if (!checkSessionExpiry()) {
+          console.log('verifyUser: Session expired or invalid, logging out.');
           setLoading(false);
           return;
         }
@@ -153,17 +155,21 @@ export const AuthProvider = ({ children }) => {
         if (jwtVerified === 'true') {
           const userData = sessionStorage.getItem('user');
           if (userData) {
-            setUser(JSON.parse(userData)); // user will contain role
+            const parsedUser = JSON.parse(userData);
+            setUser(parsedUser); // user will contain role
             setIsAuthenticated(true);
             updateLastActivityTime();
+            console.log('verifyUser: JWT verified, user from sessionStorage:', parsedUser);
           }
           setLoading(false);
           return;
         }
         const token = sessionStorage.getItem('token');
+        console.log('verifyUser: Token from sessionStorage:', token ? token.substring(0, 10) + '...' : 'No token');
         if (token) {
           try {
             const data = await api.get('/auth/verify');
+            console.log('verifyUser: Data from /auth/verify API:', data);
             // Check only for successful response as backend no longer sends status: 'success'
             if (data.user) { // Backend returns data.user directly on success
               setUser(data.user); // user will contain role
@@ -171,24 +177,30 @@ export const AuthProvider = ({ children }) => {
               updateLastActivityTime();
               sessionStorage.setItem('jwtVerified', 'true');
               sessionStorage.setItem('user', JSON.stringify(data.user));
+              console.log('verifyUser: User authenticated via API, user data:', data.user);
               setLoading(false);
               return;
             } else {
               sessionStorage.removeItem('token');
               sessionStorage.removeItem('user');
+              console.log('verifyUser: API verification failed, removing token.');
             }
           } catch (jwtError) {
+            console.error('verifyUser: JWT verification error during API call:', jwtError);
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('user');
           }
         }
         // If no valid JWT, try to restore session from device token
+        console.log('verifyUser: Attempting to restore session from device token.');
         await restoreSession();
         setLoading(false);
       } catch (error) {
-        console.error('Authentication verification failed:', error);
+        console.error('verifyUser: Authentication verification failed:', error);
         logoutUser();
         setLoading(false);
+      } finally {
+        console.log('verifyUser: Final isAuthenticated:', isAuthenticated, 'user:', user);
       }
     };
     verifyUser();
@@ -235,6 +247,7 @@ export const AuthProvider = ({ children }) => {
         console.log('Login successful');
         sessionStorage.setItem('token', data.token);
         sessionStorage.setItem('user', JSON.stringify(data.user));
+        console.log('Login success - User data:', data.user);
         if (rememberDevice) {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));

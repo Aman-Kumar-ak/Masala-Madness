@@ -20,7 +20,7 @@ import WorkerPendingOrders from './pages/worker/WorkerPendingOrders';
 
 // Component to redirect based on authentication
 const RedirectBasedOnAuth = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   
   if (loading) {
     // Show loading state while checking authentication
@@ -34,7 +34,16 @@ const RedirectBasedOnAuth = () => {
     );
   }
   
-  return isAuthenticated ? <Navigate to="/home" /> : <Navigate to="/login" />;
+  // Redirect based on authentication and user role
+  if (isAuthenticated) {
+    if (user?.role === 'worker') {
+      return <Navigate to="/worker-home" />;
+    } else {
+      return <Navigate to="/home" />;
+    }
+  } else {
+    return <Navigate to="/login" />;
+  }
 };
 
 const App = () => {
@@ -52,38 +61,65 @@ const App = () => {
               
               {/* Protected Routes */}
               <Route path="/home" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <Home />
                 </ProtectedRoute>
               } />
               <Route path="/cart" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <Cart />
                 </ProtectedRoute>
               } />
               <Route path="/orders" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <Orders />
                 </ProtectedRoute>
               } />
               <Route path="/pending-orders" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <PendingOrders />
                 </ProtectedRoute>
               } />
               <Route path="/qr" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <Qr />
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <Settings />
                 </ProtectedRoute>
               } />
               <Route path="/admin" element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="admin">
                   <Admin />
+                </ProtectedRoute>
+              } />
+              
+              {/* Worker Protected Routes */}
+              <Route path="/worker-home" element={
+                <ProtectedRoute requiredRole="worker">
+                  <WorkerHome />
+                </ProtectedRoute>
+              } />
+              <Route path="/worker-cart" element={
+                <ProtectedRoute requiredRole="worker">
+                  <WorkerCart />
+                </ProtectedRoute>
+              } />
+              <Route path="/worker-orders" element={
+                <ProtectedRoute requiredRole="worker">
+                  <WorkerOrders />
+                </ProtectedRoute>
+              } />
+              <Route path="/worker-pending-orders" element={
+                <ProtectedRoute requiredRole="worker">
+                  <WorkerPendingOrders />
+                </ProtectedRoute>
+              } />
+              <Route path="/worker-settings" element={
+                <ProtectedRoute requiredRole="worker">
+                  <WorkerSettings />
                 </ProtectedRoute>
               } />
               

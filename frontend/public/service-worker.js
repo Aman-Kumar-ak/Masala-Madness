@@ -247,16 +247,10 @@ async function updateCacheInBackground(request) {
     // Add cache-busting parameter to force fresh content
     const url = new URL(request.url);
     url.searchParams.set('_cache', Date.now());
-    
-    const networkRequest = new Request(url.toString(), {
-      method: request.method,
-      headers: request.headers,
-      mode: request.mode,
-      credentials: request.credentials,
-      cache: 'no-store' // Force validation with the server
-    });
-    
-    const response = await fetch(networkRequest);
+
+    console.log('Attempting to update cache for URL:', url.toString());
+
+    const response = await fetch(url.toString());
     if (response.ok) {
       const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);
       if (cache) {

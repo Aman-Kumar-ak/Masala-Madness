@@ -163,7 +163,7 @@ export default function WorkerHome() {
                   height={36}
                 />
               </div>
-              <div>
+              <div className="text-left">
                 <h1 className="text-2xl font-bold text-gray-800 bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent whitespace-nowrap max-[380px]:text-xl max-[320px]:text-lg">Masala Madness</h1>
                 <p className="text-xs text-gray-500 -mt-1">Authentic Chinese Cuisine</p>
               </div>
@@ -172,7 +172,7 @@ export default function WorkerHome() {
             {/* Navigation */}
             <nav className="flex items-center gap-5">
               <Link
-                to="/cart"
+                to="/worker-cart"
                 className="p-0 m-0 flex items-center justify-center relative bg-transparent hover:bg-transparent group"
                 aria-label={`Cart with ${cartItems.reduce((total, item) => total + item.quantity, 0)} items`}
               >
@@ -193,7 +193,7 @@ export default function WorkerHome() {
               </Link>
 
               <Link
-                to="/pending-orders"
+                to="/worker-pending-orders"
                 className="p-0 m-0 flex items-center justify-center relative bg-transparent hover:bg-transparent group"
                 aria-label={`Pending Orders: ${pendingOrdersCount}`}
               >
@@ -253,7 +253,7 @@ export default function WorkerHome() {
             {/* Settings and Orders Links */}
             <div className="flex items-center gap-2">
               <Link
-                to="/settings"
+                to="/worker-settings"
                 className="w-10 h-10 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors duration-200 flex items-center justify-center shadow-sm"
                 title="Settings"
               >
@@ -266,7 +266,7 @@ export default function WorkerHome() {
                 />
               </Link>
               <Link
-                to="/orders"
+                to="/worker-orders"
                 className="rounded-full bg-green-50 hover:bg-green-100 transition-colors duration-200 flex items-center justify-center shadow-sm px-3 py-1.5"
                 title="Orders"
               >
@@ -276,7 +276,7 @@ export default function WorkerHome() {
           </div>
         </div>
       </div>
-      
+
       {/* Floating Cart */}
       {cartItems.length > 0 && (
         <div className="fixed bottom-4 right-4 left-4 z-50 flex justify-center">
@@ -315,7 +315,7 @@ export default function WorkerHome() {
 
             {/* View Cart Button */}
             <Link
-              to="/cart"
+              to="/worker-cart"
               className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white h-full px-2 min-[400px]:px-3 sm:px-4 py-2 min-[400px]:py-2.5 sm:py-3 flex items-center justify-center gap-1 min-[400px]:gap-1.5 sm:gap-2 whitespace-nowrap transition-all duration-200 font-medium text-sm min-[400px]:text-base sm:text-lg"
             >
               <span>Cart</span>

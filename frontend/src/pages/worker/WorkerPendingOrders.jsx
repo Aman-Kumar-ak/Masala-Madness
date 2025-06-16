@@ -44,6 +44,8 @@ export default function WorkerPendingOrders() {
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
+  const [showCashPaymentConfirm, setShowCashPaymentConfirm] = useState(false); // New state for Cash payment confirmation
+  const [currentOrderForCashConfirm, setCurrentOrderForCashConfirm] = useState(null); // To store order for cash confirmation
 
   // Add manual discount state for each order
   const [manualDiscounts, setManualDiscounts] = useState({});
@@ -257,9 +259,11 @@ export default function WorkerPendingOrders() {
     setPaymentOptionOrderId(null); 
     setPaymentMethodToConfirm(null);
     
+    // Show splash screen
+    setShowSplashScreen(true);
+
     // Update local state immediately to remove the confirmed order
     const newPendingOrders = pendingOrders.filter(order => order.orderId !== orderId);
-    setPendingOrders(newPendingOrders);
     
     let isOnline = paymentMethod === 'Online';
     
@@ -311,9 +315,15 @@ export default function WorkerPendingOrders() {
       // Trigger manual refresh to ensure all components update
       triggerRefresh();
       
-      if (newPendingOrders.length === 0) {
-        setTimeout(() => navigate('/'), 1500); // Delay navigation to allow notification to be displayed
-      }
+      // Delay navigation and notification removal to synchronize with splash screen
+      setTimeout(() => {
+        if (newPendingOrders.length === 0) {
+          setConfirmDialog(null);
+          navigate('/worker-home');
+        }
+        // Dismiss the notification will be handled by Notification component itself
+      }, 1500); // Match splash screen duration
+
     } catch (error) {
       console.error('Error confirming payment:', error);
       
@@ -328,9 +338,7 @@ export default function WorkerPendingOrders() {
       setPendingOrders(revertedOrders);
       setPaymentConfirmedOrderId(null);
     } finally {
-      if (isOnline || paymentMethod === "Custom") {
-        setShowSplashScreen(false);
-      }
+      setShowSplashScreen(false); // Hide splash screen regardless of success or failure
     }
   };
 
@@ -571,8 +579,10 @@ export default function WorkerPendingOrders() {
       }
     } else if (method === "Custom") {
       setShowCustomPaymentDialog(true);
-    } else { // Cash
-      setCashConfirmDialog({ isOpen: true, orderId: order.orderId, isLoading: false });
+    } else {
+      // Open new cash confirmation dialog
+      setShowCashPaymentConfirm(true);
+      setCurrentOrderForCashConfirm(order); // Store the current order
     }
     // Close the payment options dialog after selection
     setPaymentOptionOrderId(null);
@@ -611,8 +621,16 @@ export default function WorkerPendingOrders() {
                 <p className="text-xl text-gray-600 mb-2">No pending orders found</p>
                 <p className="text-gray-500 mb-6">All orders have been processed</p>
                 <Link
-                  to="/"
+                  to="/worker-home"
+                  tabIndex={0}
+                  onClick={() => navigate("/worker-home")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      navigate("/worker-home");
+                    }
+                  }}
                   className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-lg font-medium shadow-sm transition-all duration-200"
+                  aria-label="Return to Worker Home"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
@@ -815,6 +833,7 @@ export default function WorkerPendingOrders() {
                         {/* Payment Options Dialog */}
                         {paymentOptionOrderId && (
                           <ConfirmationDialog
+                            key={paymentOptionOrderId}
                             isOpen={!!paymentOptionOrderId}
                             onClose={() => setPaymentOptionOrderId(null)}
                             title="Select Payment Method"
@@ -953,25 +972,26 @@ export default function WorkerPendingOrders() {
         type="info"
       />
 
-      {cashConfirmDialog.isOpen && (
+      {/* Cash Payment Confirmation Dialog for Pending Orders */}
+      {showCashPaymentConfirm && currentOrderForCashConfirm && (
         <ConfirmationDialog
-          isOpen={cashConfirmDialog.isOpen}
-          onClose={() => setCashConfirmDialog({ isOpen: false, orderId: null, isLoading: false })}
+          isOpen={showCashPaymentConfirm}
+          onClose={() => setShowCashPaymentConfirm(false)}
+          onConfirm={() => {
+            setShowCashPaymentConfirm(false); // Close this dialog
+            handleConfirmPayment(currentOrderForCashConfirm.orderId, 'Cash');
+          }}
           title="Confirm Cash Payment"
-          message="Are you sure you received the cash payment for this order?"
+          message={`Confirm cash payment of ₹${(currentOrderForCashConfirm.subtotal - calculateOrderDiscount(currentOrderForCashConfirm).totalDiscount).toFixed(2)}?`}
           confirmText="Yes, Payment Received"
           cancelText="Cancel"
           type="warning"
-          isLoading={false}
-          onConfirm={async () => {
-            setCashConfirmDialog({ isOpen: false, orderId: null, isLoading: false });
-            await handleCashConfirmPayment(cashConfirmDialog.orderId);
-          }}
+          isLoading={false} // Adjust based on your loading state
         />
       )}
 
       {showSplashScreen && (
-        <div className="fixed inset-0 bg-white bg-opacity-80 backdrop-blur-sm z-[100] flex items-center justify-center flex-col">
+        <div className="fixed inset-0 bg-white bg-opacity-80 backdrop-blur-sm z-[100] flex items-center justify-center flex-col pointer-events-auto">
           <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
           <p className="text-gray-700 text-xl font-medium">Confirming Order Payment...</p>
         </div>

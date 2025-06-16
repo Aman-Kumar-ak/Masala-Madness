@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
         { mobileNumber: username }
       ]
     });
-
+    
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -36,7 +36,7 @@ router.post('/login', async (req, res) => {
     if (!user.isActive) {
       return res.status(403).json({ message: 'Your account is disabled.' });
     }
-
+    
     // Verify password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {

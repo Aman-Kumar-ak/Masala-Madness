@@ -27,6 +27,7 @@ export default function WorkerCart() {
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
+  const [showCashConfirmDialog, setShowCashConfirmDialog] = useState(false);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -104,16 +105,18 @@ export default function WorkerCart() {
       if (defaultUpiAddress) {
         generateQRCode();
       } else {
-        // If no UPI addresses are set up, just show regular confirmation
-        setShowPaymentConfirm(true);
+        // If no UPI addresses are set up, just process payment directly
+        setShowPaymentOptions(false); // Close payment options dialog
+        processPayment(true, 'Online'); // Process as online payment
       }
     } else if (method === "Custom") {
       setShowCustomPaymentDialog(true);
-    } else {
-      // For Cash payments, show the regular confirmation
-      setShowPaymentConfirm(true);
+    } else if (method === "Cash") {
+      // For Cash payments, show the new confirmation dialog
+      setShowCashConfirmDialog(true); // Open cash confirmation dialog
     }
     
+    // Close the payment options dialog regardless of the method selected
     setShowPaymentOptions(false);
   };
 
@@ -241,13 +244,16 @@ export default function WorkerCart() {
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
           clearCart();
           setTimeout(() => {
-            navigate("/");
+            navigate("/worker-home");
           }, 1500);
         } else {
           throw new Error(data.message || "Failed to process order");
         }
       } else {
         // Add to pending logic
+        setShowPendingConfirm(false);
+        setShowSplashScreen(true);
+
         const res = await fetch(`${API_URL}/api/pending-orders`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -256,12 +262,10 @@ export default function WorkerCart() {
 
         const data = await res.json();
         if (res.ok) {
-          // Handle adding to pending
-          showInfo(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
+          showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
           clearCart();
-          // The dialog (showPendingConfirm) will be closed by confirmAddToPending after this
           setTimeout(() => {
-            navigate("/");
+            navigate("/worker-home");
           }, 1500);
         } else {
           throw new Error(data.message || "Failed to add order to pending");
@@ -324,7 +328,7 @@ export default function WorkerCart() {
             <h2 className="text-2xl font-semibold text-gray-700 mb-2">Your cart is empty</h2>
             <p className="text-gray-500 mb-6 text-lg">Add some delicious items from the menu!</p>
             <button 
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/worker-home')}
               className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-lg rounded-lg shadow-md transition-colors duration-200"
             >
               Browse Menu
@@ -596,6 +600,22 @@ export default function WorkerCart() {
         isLoading={isProcessing}
       />
 
+      {/* Cash Payment Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showCashConfirmDialog}
+        onClose={() => setShowCashConfirmDialog(false)}
+        onConfirm={() => {
+          setShowCashConfirmDialog(false); // Close this dialog
+          processPayment(true, 'Cash'); // Process the cash payment
+        }}
+        title="Confirm Cash Payment"
+        message={`Confirm cash payment of ₹${totalAmount.toFixed(2)}?`}
+        confirmText="Yes, Payment Received"
+        cancelText="Cancel"
+        type="warning"
+        isLoading={isProcessing}
+      />
+
       {/* Custom Payment Dialog */}
       <ConfirmationDialog
         isOpen={showCustomPaymentDialog}
@@ -714,7 +734,7 @@ export default function WorkerCart() {
 
       {/* Full-screen Loading Splash Screen */}
       {showSplashScreen && (
-        <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col">
+        <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col pointer-events-auto">
           <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
           <p className="text-gray-700 text-xl font-medium">Confirming Order Payment...</p>
         </div>

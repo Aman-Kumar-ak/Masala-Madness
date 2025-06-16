@@ -223,10 +223,10 @@ export default function WorkerOrders() {
                 role="button"
                 tabIndex={0}
                 className="bg-gradient-to-br from-orange-50 to-yellow-100 p-4 rounded-lg shadow-sm border border-yellow-200 transition-all duration-300 hover:shadow-md cursor-pointer"
-                onClick={() => navigate("/pending-orders")}
+                onClick={() => navigate("/worker-pending-orders")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
-                    navigate("/pending-orders");
+                    navigate("/worker-pending-orders");
                   }
                 }}
                 aria-label={`Pending Orders: ${pendingOrdersCount}`}
