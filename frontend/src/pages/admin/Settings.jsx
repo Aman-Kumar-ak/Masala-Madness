@@ -6,11 +6,10 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
 import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
-import PasswordVerificationDialog from '../../components/PasswordVerificationDialog';
 
 const Settings = () => {
   useKeyboardScrollAdjustment();
-  const { user, isAuthenticated, logout, getUserDevices, revokeDevice } = useAuth();
+  const { user, isAuthenticated, logout, getUserDevices, revokeDevice, setAuthOperationInProgress, clearAuthOperationInProgress } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
   
@@ -40,7 +39,6 @@ const Settings = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // State for secret code management (for QR and Admin Control)
-  const [showSecretCodeDialog, setShowSecretCodeDialog] = useState(false);
   const [isSecretCodeAuthenticated, setIsSecretCodeAuthenticated] = useState(false);
   const [secretCodeTimeLeft, setSecretCodeTimeLeft] = useState(null);
   const [currentSecretCode, setCurrentSecretCode] = useState('');
@@ -56,6 +54,11 @@ const Settings = () => {
   const [showCurrentSecretCode, setShowCurrentSecretCode] = useState(false);
   const [showNewSecretCode, setShowNewSecretCode] = useState(false);
   const [showConfirmNewSecretCode, setShowConfirmNewSecretCode] = useState(false);
+  
+  // Add state for secret code attempt tracking
+  const [secretCodeAttempts, setSecretCodeAttempts] = useState(0);
+  const [secretCodeLockoutTime, setSecretCodeLockoutTime] = useState(null);
+  const [lockoutRemainingTime, setLockoutRemainingTime] = useState(null);
   
   // State for confirmation dialogs
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -188,6 +191,7 @@ const Settings = () => {
 
     setIsVerifying(true);
     setPasswordError('');
+    setAuthOperationInProgress(); // Indicate that an auth operation is in progress
 
     try {
       let token = sessionStorage.getItem('token');
@@ -196,76 +200,38 @@ const Settings = () => {
         if (!user || !user.username) {
           setPasswordError('User information missing. Please log in again.');
           setIsVerifying(false);
+          clearAuthOperationInProgress(); // Ensure cleared on early exit
           return;
         }
-        // Attempt login
-        const loginResponse = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: user.username, password: currentPassword, rememberDevice: true })
-        });
-        let loginData = {};
-        try {
-          loginData = await loginResponse.json();
-        } catch (jsonErr) {
-          setPasswordError('Server error during login. Please try again later.');
-          console.error('Login: Failed to parse JSON response', jsonErr);
-          setIsVerifying(false);
-          return;
-        }
-        if (loginResponse.ok && loginData.status === 'success' && loginData.token) {
-          // Set token and user in sessionStorage
-          sessionStorage.setItem('token', loginData.token);
-          sessionStorage.setItem('user', JSON.stringify(loginData.user));
-          token = loginData.token;
-          // Optionally update context if needed (if you have a setUser/setIsAuthenticated function)
+        // Attempt login using api utility with suppressAuthRedirect
+        const loginResponse = await api.post('/auth/login', 
+          { username: user.username, password: currentPassword, rememberDevice: true },
+          true // suppressAuthRedirect
+        );
+        
+        if (loginResponse.status === 'success' && loginResponse.token) {
+          sessionStorage.setItem('token', loginResponse.token);
+          sessionStorage.setItem('user', JSON.stringify(loginResponse.user));
+          token = loginResponse.token;
           setPasswordError('');
           setIsCurrentPasswordValid(true);
           setShowNewPasswordFields(true);
-          setIsVerifying(false);
-          return;
         } else {
-          setPasswordError('Incorrect password. Please try again.');
-          setIsVerifying(false);
-          return;
+          setPasswordError(loginResponse.message || 'Incorrect password. Please try again.');
+          setIsCurrentPasswordValid(false);
+          setShowNewPasswordFields(false);
         }
-      }
-      // If token exists, proceed as before
-      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ password: currentPassword })
-      });
-
-      let data = {};
-      try {
-        data = await response.json();
-      } catch (jsonErr) {
-        setPasswordError('Server error. Please try again later.');
-        console.error('Password verification: Failed to parse JSON response', jsonErr);
         setIsVerifying(false);
+        clearAuthOperationInProgress(); // Ensure cleared after this block
         return;
       }
+      // If token exists, proceed as before using api utility with suppressAuthRedirect
+      const response = await api.post('/auth/verify-password', 
+        { password: currentPassword },
+        true // suppressAuthRedirect
+      );
 
-      if (response.status === 401) {
-        setIsCurrentPasswordValid(false);
-        setShowNewPasswordFields(false);
-        setPasswordError('Current password is incorrect.');
-        console.warn('Password verification: Incorrect password.');
-      } else if (response.status === 500) {
-        setIsCurrentPasswordValid(false);
-        setShowNewPasswordFields(false);
-        setPasswordError('Server error. Please try again later.');
-        console.error('Password verification: Server error.', data);
-      } else if (!response.ok) {
-        setIsCurrentPasswordValid(false);
-        setShowNewPasswordFields(false);
-        setPasswordError('Unexpected error. Please try again.');
-        console.error('Password verification: Unexpected error.', data);
-      } else if (response.ok && data.status === 'success') {
+      if (response.status === 'success') {
         setIsCurrentPasswordValid(true);
         setShowNewPasswordFields(true);
         setPasswordError('');
@@ -273,21 +239,17 @@ const Settings = () => {
       } else {
         setIsCurrentPasswordValid(false);
         setShowNewPasswordFields(false);
-        setPasswordError(data.message || 'Failed to verify current password.');
-        console.error(`User ${user?.username || 'Admin'} entered incorrect password`, data);
+        setPasswordError(response.message || 'Failed to verify current password.');
+        console.error(`User ${user?.username || 'Admin'} entered incorrect password`, response);
       }
     } catch (error) {
       setIsCurrentPasswordValid(false);
       setShowNewPasswordFields(false);
-      if (error.name === 'TypeError') {
-        setPasswordError('Network error. Please check your connection.');
-        console.error('Password verification: Network error.', error);
-      } else {
-        setPasswordError('Failed to verify current password. Please try again.');
-        console.error('Password verification error:', error);
-      }
+      setPasswordError(error.response?.data?.message || 'Failed to verify current password. Network error.');
+      console.error('Password verification error:', error);
     } finally {
       setIsVerifying(false);
+      clearAuthOperationInProgress(); // Clear auth operation in progress
     }
   };
   
@@ -311,23 +273,13 @@ const Settings = () => {
     }
     
     try {
-      // Use fetch directly instead of api utility to avoid automatic redirect on 401
-      const token = sessionStorage.getItem('token');
-      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword
-        })
-      });
+      // Use api utility with suppressAuthRedirect
+      const response = await api.post('/auth/change-password', {
+        currentPassword,
+        newPassword
+      }, true); // Pass true for suppressAuthRedirect
       
-      const data = await response.json();
-      
-      if (response.ok && data.status === 'success') {
+      if (response.status === 'success') {
         setPasswordSuccess('Password changed successfully');
         // Clear form and reset states
         setCurrentPassword('');
@@ -337,11 +289,11 @@ const Settings = () => {
         setShowNewPasswordFields(false);
         console.log(`User ${user?.username || 'Admin'} successfully changed password`);
       } else {
-        setPasswordError(data.message || 'Failed to change password');
-        console.error(`User ${user?.username || 'Admin'} failed to change password:`, data.message);
+        setPasswordError(response.message || 'Failed to change password');
+        console.error(`User ${user?.username || 'Admin'} failed to change password:`, response.message);
       }
     } catch (error) {
-      setPasswordError('Error changing password. Please try again.');
+      setPasswordError(error.response?.data?.message || 'Error changing password. Please try again.');
       console.error('Password change error:', error);
     }
   };
@@ -367,9 +319,15 @@ const Settings = () => {
     try {
       logout();
       sessionStorage.setItem('logoutSuccess', 'true');
+      // No need to navigate here, AuthContext useEffect will handle it
     } catch (error) {
-      console.error("Logout failed:", error);
-      setShowLogoutDeleteSplash(false);
+      console.error('Logout failed:', error);
+    } finally {
+      // The splash screen will be dismissed by AuthContext's navigation
+      // If navigation fails, we ensure the splash is hidden
+      setTimeout(() => {
+          setShowLogoutDeleteSplash(false);
+      }, 2000);
     }
   };
   
@@ -571,7 +529,6 @@ const Settings = () => {
   
   // Handle successful secret code verification for Admin Control access
   const handleSecretCodeSuccess = async () => {
-    setShowSecretCodeDialog(false);
     setIsSecretCodeAuthenticated(true);
     // Set a timestamp for 15 minutes from now
     const expiryTime = new Date().getTime() + (15 * 60 * 1000); // 15 minutes
@@ -595,148 +552,136 @@ const Settings = () => {
     }
   };
 
-  // Handle secret code dialog close (e.g., user cancels)
-  const handleSecretCodeDialogClose = () => {
-    setShowSecretCodeDialog(false);
-  };
-
-  // Handle change secret code
-  const handleChangeSecretCode = async (e) => {
-    e.preventDefault();
-
-    setSecretCodeError('');
-    setSecretCodeSuccess('');
-
-    if (!currentSecretCode.trim()) {
-      setSecretCodeError('Please enter your current secret code.');
-      return;
-    }
-
-    if (newSecretCode.length < 8) {
-      setSecretCodeError('New secret code must be at least 8 characters.');
-      return;
-    }
-
-    if (newSecretCode !== confirmNewSecretCode) {
-      setSecretCodeError('New secret codes do not match.');
-      return;
-    }
-
-    setIsSecretCodeChanging(true);
-    try {
-      const response = await api.put('/auth/secret-code/change', {
-        currentSecretCode,
-        newSecretCode
-      });
-
-      if (response.status === 200) {
-        setSecretCodeSuccess('Secret access code changed successfully!');
-        setCurrentSecretCode('');
-        setNewSecretCode('');
-        setConfirmNewSecretCode('');
-        setIsCurrentSecretCodeValid(false); // Invalidate current secret code validation
-        setShowNewSecretCodeFields(false);
-      } else {
-        setSecretCodeError(response.message || 'Failed to change secret access code.');
-      }
-    } catch (error) {
-      setSecretCodeError(error.message || 'Error changing secret access code.');
-      console.error('Error changing secret access code:', error);
-    } finally {
-      setIsSecretCodeChanging(false);
-    }
-  };
-
-  // Verify current secret code
+  // Handle secret code verification
   const verifyCurrentSecretCode = async () => {
     if (!currentSecretCode.trim()) {
-      setSecretCodeError('Please enter your current secret code.');
+      setSecretCodeError('Please enter your current secret access code.');
+      return;
+    }
+  
+    // Check if locked out
+    if (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) {
+      setSecretCodeError(`Too many failed attempts. Please try again after ${lockoutRemainingTime}.`);
       return;
     }
 
-    setIsSecretCodeChanging(true);
+    setIsSecretCodeChanging(true); // Reusing this for verification loading state
     setSecretCodeError('');
+    setAuthOperationInProgress(); // Indicate that an auth operation is in progress
+  
     try {
       const response = await api.post('/auth/secret-code/verify', {
         secretCode: currentSecretCode,
-        usedWhere: "Settings Secret Code Change Verification",
-        currentUserId: user?._id,
-      });
-      if (response.status === 200) {
+      }, true); // Pass true for suppressAuthRedirect
+
+      if (response.status === 'success') {
         setIsCurrentSecretCodeValid(true);
-        setShowNewSecretCodeFields(true);
         setSecretCodeError('');
-        showSuccess('Current secret code verified.');
+        showSuccess('Secret code verified. You can now change it.');
+        setSecretCodeAttempts(0); // Reset attempts on success
+        localStorage.removeItem('secretCodeAttempts');
+        localStorage.removeItem('secretCodeLockoutTime');
+        setSecretCodeLockoutTime(null);
+        setLockoutRemainingTime(null);
       } else {
+        const newAttempts = secretCodeAttempts + 1;
+        setSecretCodeAttempts(newAttempts);
+        localStorage.setItem('secretCodeAttempts', newAttempts.toString());
+
+        if (newAttempts >= 3) {
+          const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours from now
+          setSecretCodeLockoutTime(lockoutEnd);
+          localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
+          setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
+          showError('Too many failed secret code attempts. Access disabled for 24 hours.');
+        } else {
+          setSecretCodeError(response.message || 'Incorrect secret code.');
+          showError(`Incorrect secret code. ${3 - newAttempts} attempts remaining.`);
+        }
         setIsCurrentSecretCodeValid(false);
-        setShowNewSecretCodeFields(false);
-        setSecretCodeError(response.message || 'Invalid current secret code.');
       }
     } catch (error) {
+      console.error('Error verifying secret code:', error);
+      const newAttempts = secretCodeAttempts + 1;
+      setSecretCodeAttempts(newAttempts);
+      localStorage.setItem('secretCodeAttempts', newAttempts.toString());
+
+      if (newAttempts >= 3) {
+        const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours from now
+        setSecretCodeLockoutTime(lockoutEnd);
+        localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
+        setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
+        showError('Too many failed secret code attempts. Access disabled for 24 hours.');
+      } else {
+        setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
+        showError(`Failed to verify secret code. ${3 - newAttempts} attempts remaining.`);
+      }
       setIsCurrentSecretCodeValid(false);
-      setShowNewSecretCodeFields(false);
-      setSecretCodeError(error.message || 'Failed to verify current secret code.');
-      console.error('Secret code verification error:', error);
     } finally {
       setIsSecretCodeChanging(false);
+      clearAuthOperationInProgress(); // Clear auth operation in progress
     }
   };
 
   const isSecretCodeFormValid = () => {
-  return (
+    return (
       isCurrentSecretCodeValid &&
       newSecretCode.length >= 8 &&
       newSecretCode === confirmNewSecretCode
     );
   };
 
-  // New function to handle setting/generating secret code
-  const handleGenerateSecretCode = async () => {
-    if (!newSecretCode.trim()) {
-      setSecretCodeError('Please enter a new secret access code.');
-      return;
-    }
-    if (newSecretCode !== confirmNewSecretCode) {
-      setSecretCodeError('New secret codes do not match.');
-      return;
-    }
-    if (newSecretCode.length < 6) { // Minimum length for security
-      setSecretCodeError('Secret code must be at least 6 characters long.');
-      return;
-    }
+  // Use effect to load secret code attempts and lockout from localStorage on mount
+  useEffect(() => {
+    const storedAttempts = parseInt(localStorage.getItem('secretCodeAttempts') || '0', 10);
+    const storedLockoutTime = localStorage.getItem('secretCodeLockoutTime');
 
-    setIsSecretCodeChanging(true);
-    setSecretCodeError('');
-    setSecretCodeSuccess('');
-
-    try {
-      const response = await api.post('/auth/secret-code/initialize', {
-        secretCode: newSecretCode,
-      });
-
-      if (response.data.status === 'success') {
-        showSuccess(response.data.message);
-        setSecretCodeSuccess(response.data.message);
-        setNewSecretCode('');
-        setConfirmNewSecretCode('');
-        // No need to clear local storage expiry, as the code itself has changed.
-        // The next verification attempt will use the new code.
+    setSecretCodeAttempts(storedAttempts);
+    if (storedLockoutTime) {
+      const lockoutMs = parseInt(storedLockoutTime, 10);
+      const currentTime = new Date().getTime();
+      if (currentTime < lockoutMs) {
+        setSecretCodeLockoutTime(lockoutMs);
       } else {
-        showError(response.data.message || 'Failed to set new secret code.');
-        setSecretCodeError(response.data.message || 'Failed to set new secret code.');
+        // Lockout time has passed, clear stored values
+        localStorage.removeItem('secretCodeLockoutTime');
+        localStorage.removeItem('secretCodeAttempts');
+        setSecretCodeAttempts(0);
+        setSecretCodeLockoutTime(null);
       }
-    } catch (error) {
-      console.error('Error setting new secret code:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to set new secret code. Server error.';
-      showError(errorMessage);
-      setSecretCodeError(errorMessage);
-    } finally {
-      setIsSecretCodeChanging(false);
     }
-  };
+  }, []);
+
+  // Effect to handle lockout timer countdown
+  useEffect(() => {
+    let timer;
+    if (secretCodeLockoutTime) {
+      timer = setInterval(() => {
+        const currentTime = new Date().getTime();
+        const remainingMs = secretCodeLockoutTime - currentTime;
+
+        if (remainingMs > 0) {
+          const minutes = Math.floor(remainingMs / (1000 * 60));
+          const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+          setLockoutRemainingTime(`${minutes}m ${seconds}s`);
+        } else {
+          // Lockout expired
+          clearInterval(timer);
+          setSecretCodeLockoutTime(null);
+          setSecretCodeAttempts(0);
+          setLockoutRemainingTime(null);
+          localStorage.removeItem('secretCodeLockoutTime');
+          localStorage.removeItem('secretCodeAttempts');
+          showSuccess('Secret code access re-enabled. You can try again now.');
+        }
+      }, 1000);
+    }
+
+    return () => clearInterval(timer);
+  }, [secretCodeLockoutTime, showSuccess]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-100">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-900">
       <BackButton />
       
           <div className="p-4 pt-16 max-w-7xl mx-auto">
@@ -773,15 +718,44 @@ const Settings = () => {
                   <p className="text-gray-500 mb-4 text-sm">
                     Once verified, you'll have access for 10 minutes without re-entering the code.
                   </p>
-                  <button
-                    onClick={() => setShowSecretCodeDialog(true)}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-lg"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    Unlock Admin
-                  </button>
+                  <form onSubmit={(e) => { e.preventDefault(); verifyCurrentSecretCode(); }} className="space-y-4">
+                    <div>
+                      <label htmlFor="secretCodeAdminUnlock" className="sr-only">Secret Access Code</label>
+                      <div className="mt-1 relative rounded-md shadow-sm">
+                        <input
+                          type={showCurrentSecretCode ? 'text' : 'password'}
+                          id="secretCodeAdminUnlock"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-2 pr-10"
+                          placeholder="Enter secret access code to unlock"
+                          value={currentSecretCode}
+                          onChange={(e) => setCurrentSecretCode(e.target.value)}
+                          required
+                        />
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
+                          <button type="button" onClick={() => setShowCurrentSecretCode(!showCurrentSecretCode)} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showCurrentSecretCode ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showCurrentSecretCode ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {secretCodeError && <p className="text-red-500 text-sm mt-1 text-center">{secretCodeError}</p>}
+                    {secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime && (
+                      <p className="text-red-500 text-sm mt-2 text-center">Too many failed attempts. Try again after {lockoutRemainingTime}.</p>
+                    )}
+                    <button
+                      type="submit"
+                      className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-lg"
+                      disabled={isSecretCodeChanging || (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      {isSecretCodeChanging ? 'Unlocking...' : (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) ? `Locked` : 'Unlock Admin'}
+                    </button>
+                  </form>
                 </div>
               ) : (
                 <div className="w-full">
@@ -798,7 +772,7 @@ const Settings = () => {
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Devices</h3>
                     {loadingDevices ? (
                       <div className="flex items-center justify-center h-64">
-                        <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+                        <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-500 mr-4"></div>
                         <p className="text-gray-700 text-xl font-medium">Loading devices...</p>
                       </div>
                     ) : (
@@ -1197,134 +1171,152 @@ const Settings = () => {
             </form>
           </div>
           
-                {/* Generate/Set New Secret Access Code Section */}
-                <div className="bg-yellow-50 rounded-lg p-6 shadow mb-6 border border-yellow-200">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Generate/Set New Secret Access Code</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Use this to set or update the master secret code for admin access to QR and Devices & Roles sections.
-                    This does not require the old secret code to change.
-                  </p>
+                {/* Change Secret Access Code Section */}
+                <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">Change Secret Access Code</h3>
+                  <p className="text-gray-600 mb-6">Update the master secret code for admin access to QR and Devices & Roles sections. This requires verifying your current secret code first.</p>
 
-                  {secretCodeSuccess && (
-                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg text-sm mb-4" role="alert">
-                      <span className="block sm:inline">{secretCodeSuccess}</span>
-                    </div>
-                  )}
-                  {secretCodeError && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm mb-4" role="alert">
-                      <span className="block sm:inline">{secretCodeError}</span>
-                    </div>
-                  )}
-
-                  <div className="mb-4">
-                    <label htmlFor="newSecretCodeToSet" className="block text-sm font-semibold text-gray-800 mb-2">
-                      New Secret Access Code
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="newSecretCodeToSet"
-                        type={showNewSecretCode ? "text" : "password"}
-                        value={newSecretCode}
-                        onChange={(e) => setNewSecretCode(e.target.value)}
-                        className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base"
-                        placeholder="Enter new secret access code"
-                        disabled={isSecretCodeChanging}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewSecretCode(!showNewSecretCode)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700"
-                      >
-                        {showNewSecretCode ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.122m3.153-3.153A9.973 9.973 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.782 5.562M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <label htmlFor="confirmNewSecretCodeToSet" className="block text-sm font-semibold text-gray-800 mb-2">
-                      Confirm New Secret Access Code
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="confirmNewSecretCodeToSet"
-                        type={showConfirmNewSecretCode ? "text" : "password"}
-                        value={confirmNewSecretCode}
-                        onChange={(e) => setConfirmNewSecretCode(e.target.value)}
-                        className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base"
-                        placeholder="Confirm new secret access code"
-                        disabled={isSecretCodeChanging}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmNewSecretCode(!showConfirmNewSecretCode)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700"
-                      >
-                        {showConfirmNewSecretCode ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.122m3.153-3.153A9.973 9.973 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.782 5.562M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={handleGenerateSecretCode}
-                      className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center"
-                      disabled={isSecretCodeChanging}
-                    >
-                      {isSecretCodeChanging ? (
-                        <div className="flex items-center">
-                          <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Setting...
+                  {!isCurrentSecretCodeValid ? (
+                    <form onSubmit={(e) => { e.preventDefault(); verifyCurrentSecretCode(); }} className="space-y-4">
+                      <div>
+                        <label htmlFor="currentSecretCode" className="block text-sm font-medium text-gray-700">Current Secret Access Code</label>
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                          <input
+                            type={showCurrentSecretCode ? 'text' : 'password'}
+                            id="currentSecretCode"
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-2 pr-10"
+                            placeholder="Enter current secret access code"
+                            value={currentSecretCode}
+                            onChange={(e) => setCurrentSecretCode(e.target.value)}
+                            required
+                          />
+                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
+                            <button type="button" onClick={() => setShowCurrentSecretCode(!showCurrentSecretCode)} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showCurrentSecretCode ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showCurrentSecretCode ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
-                      ) : (
-                        'Set New Secret Code'
+                      </div>
+                      {secretCodeError && <p className="text-red-500 text-sm mt-1">{secretCodeError}</p>}
+                      <button
+                        type="submit"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-200"
+                        disabled={isSecretCodeChanging || (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime)}
+                      >
+                        {isSecretCodeChanging ? 'Verifying...' : (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) ? `Locked for ${lockoutRemainingTime}` : 'Verify Current Secret Code'}
+                      </button>
+                      {secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime && (
+                        <p className="text-red-500 text-sm mt-2 text-center">Too many failed attempts. Try again after {lockoutRemainingTime}.</p>
                       )}
+                    </form>
+                  ) : (
+                    <form onSubmit={handleChangeSecretCode} className="space-y-4">
+                      <div>
+                        <label htmlFor="newSecretCode" className="block text-sm font-medium text-gray-700">New Secret Access Code</label>
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                          <input
+                            type={showNewSecretCode ? 'text' : 'password'}
+                            id="newSecretCode"
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-2 pr-10"
+                            placeholder="Enter new secret access code"
+                            value={newSecretCode}
+                            onChange={(e) => setNewSecretCode(e.target.value)}
+                            required
+                          />
+                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
+                            <button type="button" onClick={() => setShowNewSecretCode(!showNewSecretCode)} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showNewSecretCode ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showNewSecretCode ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <label htmlFor="confirmNewSecretCode" className="block text-sm font-medium text-gray-700">Confirm New Secret Access Code</label>
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                          <input
+                            type={showConfirmNewSecretCode ? 'text' : 'password'}
+                            id="confirmNewSecretCode"
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-2 pr-10"
+                            placeholder="Confirm new secret access code"
+                            value={confirmNewSecretCode}
+                            onChange={(e) => setConfirmNewSecretCode(e.target.value)}
+                            required
+                          />
+                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
+                            <button type="button" onClick={() => setShowConfirmNewSecretCode(!showConfirmNewSecretCode)} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showConfirmNewSecretCode ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showConfirmNewSecretCode ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {secretCodeError && <p className="text-red-500 text-sm mt-1">{secretCodeError}</p>}
+                      {secretCodeSuccess && <p className="text-green-500 text-sm mt-1">{secretCodeSuccess}</p>}
+                      <button
+                        type="submit"
+                        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-200"
+                        disabled={isSecretCodeChanging || !isSecretCodeFormValid()}
+                      >
+                        {isSecretCodeChanging ? 'Changing...' : 'Change Secret Code'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCurrentSecretCodeValid(false);
+                          setSecretCodeError('');
+                          setSecretCodeSuccess('');
+                          setCurrentSecretCode('');
+                          setNewSecretCode('');
+                          setConfirmNewSecretCode('');
+                        }}
+                        className="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded-md shadow-sm transition duration-200 mt-2"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  )}
+                </div>
+
+                {/* Logout and Delete Account Section */}
+                <div className="bg-red-50 rounded-lg p-6 shadow mb-6 border border-red-200">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
+                    <span className="text-red-600">⚠️</span> Account Actions
+                  </h2>
+                  
+                  <div className="space-y-4">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Logout
+                    </button>
+
+                    {/* Delete Account Button */}
+                    <button
+                      onClick={handleDeleteAccount}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-400 rounded-md shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete My Account
                     </button>
                   </div>
                 </div>
-                
-                {/* Logout and Delete Account Section */}
-                <div className="bg-red-50 rounded-lg p-6 shadow mb-6 border border-red-200">
-            <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-              <span className="text-red-600">⚠️</span> Account Actions
-            </h2>
-            
-            <div className="space-y-4">
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Logout
-              </button>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
-              )}
+          )}
             </div>
           </div>
           {/* Version Information Section (moved to bottom) */}
@@ -1351,8 +1343,8 @@ const Settings = () => {
         onConfirm={confirmLogout}
         title="Confirm Logout"
         message="Are you sure you want to log out?"
-        confirmText="Yes, Logout"
-        isLoading={isLoggingOut}
+        confirmText="Yes, Log Out"
+        cancelText="Cancel"
       />
       
       <ConfirmationDialog
@@ -1402,18 +1394,6 @@ const Settings = () => {
         type="danger"
         isLoading={false}
       />
-
-      {/* Secret Code Verification Dialog */}
-      {showSecretCodeDialog && (
-        <PasswordVerificationDialog
-          isOpen={showSecretCodeDialog}
-          onClose={handleSecretCodeDialogClose}
-          onSuccess={handleSecretCodeSuccess}
-          verificationType="secretCode"
-          usedWhere="Settings Admin Control Access"
-          currentUserId={user?._id}
-        />
-      )}
 
     </div>
   );

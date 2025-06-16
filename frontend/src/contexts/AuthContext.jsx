@@ -13,7 +13,17 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthOperationInProgress, setIsAuthOperationInProgress] = useState(false);
   const navigate = useNavigate();
+  
+  // Functions to manage auth operation in progress state
+  const setAuthOperationInProgress = useCallback(() => {
+    setIsAuthOperationInProgress(true);
+  }, []);
+
+  const clearAuthOperationInProgress = useCallback(() => {
+    setIsAuthOperationInProgress(false);
+  }, []);
   
   // Check if session has expired
   const checkSessionExpiry = () => {
@@ -44,6 +54,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('qr_verification_expiry'); // Invalidate QR/Settings secret code access on logout
+      localStorage.removeItem('secretCodeAttempts'); // Clear attempts on logout
+      localStorage.removeItem('secretCodeLockoutTime'); // Clear lockout on logout
     } catch (error) {
       console.error('Error in logout process:', error);
     } finally {
@@ -102,6 +114,7 @@ export const AuthProvider = ({ children }) => {
         if (!response.ok) {
           console.warn('restoreSession: Device token verification failed (response not ok). Status:', response.status);
           logoutUser();
+          setLoading(false); // Ensure loading is false before navigating on error
           navigate('/login'); // Force redirect
           return;
         }
@@ -116,11 +129,13 @@ export const AuthProvider = ({ children }) => {
         } else {
           console.warn('restoreSession: Device token verification successful but no user data. Logging out.');
           logoutUser();
+          setLoading(false); // Ensure loading is false before navigating on error
           navigate('/login');
         }
       } catch (err) {
         console.error('restoreSession: Device token verification error:', err);
         logoutUser();
+        setLoading(false); // Ensure loading is false before navigating on error
         navigate('/login');
       } finally {
         setLoading(false);
@@ -141,11 +156,17 @@ export const AuthProvider = ({ children }) => {
     }
     
     const verifyUser = async () => {
-      setLoading(true); // Ensure loading is true at the start of every verification attempt
+      if (isAuthOperationInProgress) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
 
       try {
         if (!checkSessionExpiry()) {
           logoutUser();
+          setLoading(false);
           navigate('/login');
           return;
         }
@@ -155,11 +176,12 @@ export const AuthProvider = ({ children }) => {
           const userData = sessionStorage.getItem('user');
           if (userData) {
             const parsedUser = JSON.parse(userData);
-            setUser(parsedUser); // user will contain role
+            setUser(parsedUser);
             setIsAuthenticated(true);
             updateLastActivityTime();
           } else {
             logoutUser();
+            setLoading(false);
             navigate('/login');
           }
           return;
@@ -169,42 +191,44 @@ export const AuthProvider = ({ children }) => {
         if (token) {
           try {
             const data = await api.get('/auth/verify');
-            if (data.user) { // Backend returns data.user directly on success
-              setUser(data.user); // user will contain role
+            if (data.user) {
+              setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
               sessionStorage.setItem('jwtVerified', 'true');
               sessionStorage.setItem('user', JSON.stringify(data.user));
             } else {
               logoutUser();
+              setLoading(false);
               navigate('/login');
             }
           } catch (jwtError) {
             logoutUser();
+            setLoading(false);
             navigate('/login');
           }
         } else {
-          await restoreSession(); // restoreSession will handle its own loading/logout/navigate
+          await restoreSession();
         }
       } catch (error) {
         logoutUser();
+        setLoading(false);
         navigate('/login');
       } finally {
-        setLoading(false); // Ensure loading is always set to false
+        setLoading(false);
       }
     };
     verifyUser();
-    // Set up periodic checks for session expiry
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
         logoutUser();
         navigate('/login');
       }
-    }, 60000); // Check every minute
+    }, 60000);
     return () => {
       clearInterval(sessionCheckInterval);
     };
-  }, [navigate, isAuthenticated]);
+  }, [navigate, isAuthenticated, isAuthOperationInProgress]);
   
   // Login function
   const login = async (username, password, rememberDevice = true, deviceToken = null) => {
@@ -315,7 +339,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     getUserDevices,
     revokeDevice,
-    restoreSession // Expose restoreSession for external use if needed
+    setAuthOperationInProgress,
+    clearAuthOperationInProgress,
+    restoreSession
   };
   
   return (

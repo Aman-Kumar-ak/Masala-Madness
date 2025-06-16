@@ -23,14 +23,14 @@ const getHeaders = (includeAuth = true) => {
 // API methods
 const api = {
   // GET request
-  async get(endpoint, authenticated = true) {
+  async get(endpoint, authenticated = true, suppressAuthRedirect = false) {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'GET',
         headers: getHeaders(authenticated)
       });
       
-      return await handleResponse(response);
+      return await handleResponse(response, suppressAuthRedirect);
     } catch (error) {
       handleError(error);
       throw error;
@@ -38,7 +38,7 @@ const api = {
   },
   
   // POST request
-  async post(endpoint, data, authenticated = true) {
+  async post(endpoint, data, authenticated = true, suppressAuthRedirect = false) {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
@@ -46,7 +46,7 @@ const api = {
         body: JSON.stringify(data)
       });
       
-      return await handleResponse(response);
+      return await handleResponse(response, suppressAuthRedirect);
     } catch (error) {
       handleError(error);
       throw error;
@@ -54,7 +54,7 @@ const api = {
   },
   
   // PUT request
-  async put(endpoint, data, authenticated = true) {
+  async put(endpoint, data, authenticated = true, suppressAuthRedirect = false) {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'PUT',
@@ -62,7 +62,7 @@ const api = {
         body: JSON.stringify(data)
       });
       
-      return await handleResponse(response);
+      return await handleResponse(response, suppressAuthRedirect);
     } catch (error) {
       handleError(error);
       throw error;
@@ -70,14 +70,14 @@ const api = {
   },
   
   // DELETE request
-  async delete(endpoint, authenticated = true) {
+  async delete(endpoint, authenticated = true, suppressAuthRedirect = false) {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'DELETE',
         headers: getHeaders(authenticated)
       });
       
-      return await handleResponse(response);
+      return await handleResponse(response, suppressAuthRedirect);
     } catch (error) {
       handleError(error);
       throw error;
@@ -86,7 +86,7 @@ const api = {
 };
 
 // Handle API responses
-async function handleResponse(response) {
+async function handleResponse(response, suppressAuthRedirect = false) {
   let data;
   let isJson = true;
   try {
@@ -98,8 +98,8 @@ async function handleResponse(response) {
 
   // If response is not ok, handle error
   if (!response.ok) {
-    // If unauthorized, redirect to login
-    if (response.status === 401) {
+    // If unauthorized AND not suppressing redirect, redirect to login
+    if (response.status === 401 && !suppressAuthRedirect) {
       sessionStorage.removeItem('token'); // Clear invalid token
       sessionStorage.removeItem('user'); // Clear user data
       window.location.href = '/login'; // Redirect to login
