@@ -36,10 +36,10 @@ export const AuthProvider = ({ children }) => {
   };
   
   // Function to handle logout
-  const logoutUser = async (keepDeviceToken = false) => {
+  const logoutUser = async (keepDeviceToken = false, isSilentLogout = false) => {
     try {
       if (!keepDeviceToken) {
-        localStorage.removeItem('deviceToken');
+          localStorage.removeItem('deviceToken');
       }
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -52,7 +52,9 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.removeItem('jwtVerified');
       setUser(null);
       setIsAuthenticated(false);
-      sessionStorage.setItem('logoutSuccess', 'true');
+      if (!isSilentLogout) {
+        sessionStorage.setItem('logoutSuccess', 'true');
+      }
     }
   };
   
@@ -265,7 +267,7 @@ export const AuthProvider = ({ children }) => {
   
   // Logout function
   const logout = async (options = {}) => {
-    await logoutUser(options.keepDeviceToken);
+    await logoutUser(options.keepDeviceToken, options.isSilentLogout);
   };
   
   // Device management functions (assuming they interact with backend)

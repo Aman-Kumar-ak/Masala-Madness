@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import BackButton from '../../components/BackButton';
@@ -41,7 +41,7 @@ const Settings = () => {
   // State for confirmation dialogs
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showSplashScreen, setShowSplashScreen] = useState(false);
+  const [showLogoutDeleteSplash, setShowLogoutDeleteSplash] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
 
   // State for device management
@@ -73,6 +73,10 @@ const Settings = () => {
   const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   
+  // New state for initial full-page content loading
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [pageLoadingMessage, setPageLoadingMessage] = useState("Loading settings...");
+  
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -80,45 +84,60 @@ const Settings = () => {
     }
   }, [isAuthenticated, navigate]);
   
-  // Fetch version information
+  // Unified useEffect for initial data fetching
   useEffect(() => {
-    const fetchVersionInfo = async () => {
-      try {
-        const response = await fetch('/version.json');
-        const data = await response.json();
-        setVersionInfo({
-          ...data,
-          environment: process.env.NODE_ENV || 'development'
-        });
-      } catch (error) {
+    const loadAllInitialData = async () => {
+      setIsPageLoading(true);
+      setPageLoadingMessage("Loading settings...");
+
+      const initialPromises = [];
+
+      // Fetch version information
+      initialPromises.push(
+        fetch('/version.json')
+          .then(response => response.json())
+          .then(data => setVersionInfo({ ...data, environment: process.env.NODE_ENV || 'development' }))
+          .catch(error => {
         console.error('Error fetching version info:', error);
-        setVersionInfo({
-          version: 'Unknown',
-          buildDate: 'Unknown',
-          environment: process.env.NODE_ENV || 'development'
-        });
+            setVersionInfo({ version: 'Unknown', buildDate: 'Unknown', environment: process.env.NODE_ENV || 'development' });
+          })
+      );
+
+      // Fetch user devices (if authenticated and admin)
+      if (isAuthenticated && user?.role === 'admin') {
+        setPageLoadingMessage("Loading your device sessions...");
+        initialPromises.push(
+          getUserDevices()
+            .then(setDevices)
+            .catch(error => {
+              console.error('Error loading devices:', error);
+              setRevokeError('Failed to load devices.');
+            })
+        );
+
+        // Fetch users and all devices if admin (as adminControl is default tab)
+        setPageLoadingMessage("Loading");
+        initialPromises.push(
+          api.get('/auth/users')
+            .then(setUsers)
+            .catch(err => setUserError('Failed to load users.'))
+        );
+        initialPromises.push(
+          api.get('/auth/devices/all')
+            .then(setAllDevices)
+            .catch(err => setDeviceError('Failed to load all devices.'))
+        );
       }
+
+      await Promise.allSettled(initialPromises);
+      setIsPageLoading(false);
     };
 
-    fetchVersionInfo();
-  }, []);
-
-  // Fetch user devices when component mounts or user changes
-  useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin') {
-      const loadDevices = async () => {
-        try {
-          setRevokeError('');
-          const userDevices = await getUserDevices();
-          setDevices(userDevices);
-        } catch (error) {
-          console.error('Error loading devices:', error);
-          setRevokeError('Failed to load devices.');
-        }
-      };
-      loadDevices();
+    // Only attempt to load if authentication status is known
+    if (isAuthenticated !== undefined && user !== undefined) {
+      loadAllInitialData();
     }
-  }, [isAuthenticated, user, getUserDevices]);
+  }, [isAuthenticated, user, getUserDevices]); // Dependencies to re-run if auth status changes
   
   // Verify current password
   const verifyCurrentPassword = async () => {
@@ -303,14 +322,14 @@ const Settings = () => {
   
   const confirmLogout = async () => {
     setShowLogoutConfirm(false);
-    setShowSplashScreen(true);
+    setShowLogoutDeleteSplash(true);
 
     try {
       logout();
       sessionStorage.setItem('logoutSuccess', 'true');
     } catch (error) {
       console.error("Logout failed:", error);
-      setShowSplashScreen(false);
+      setShowLogoutDeleteSplash(false);
     }
   };
   
@@ -321,7 +340,7 @@ const Settings = () => {
   
   const confirmDeleteAccount = async () => {
     setShowDeleteAccountConfirm(false);
-    setShowSplashScreen(true);
+    setShowLogoutDeleteSplash(true);
 
     try {
       const response = await api.delete(`/auth/delete-account/${user.username}`);
@@ -335,7 +354,7 @@ const Settings = () => {
       console.error("Account deletion failed:", error);
       showError("Failed to delete account: " + error.message);
     } finally {
-      setShowSplashScreen(false);
+      setShowLogoutDeleteSplash(false);
     }
   };
 
@@ -375,8 +394,8 @@ const Settings = () => {
     setDeviceToRevoke(null);
   };
 
-  // Fetch users (admins & workers)
-  const fetchUsers = async () => {
+  // Fetch users (admins & workers) - now memoized using useCallback
+  const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
     setUserError('');
     try {
@@ -387,15 +406,29 @@ const Settings = () => {
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, []);
 
-  // Fetch users when Devices and Roles tab is active
-  useEffect(() => {
-    if (activeTab === 'adminControl' && user?.role === 'admin') {
-      fetchUsers();
+  // Fetch all devices for admin - now memoized using useCallback
+  const fetchAllDevices = useCallback(async () => {
+    setLoadingDevices(true);
+    setDeviceError('');
+    try {
+      const res = await api.get('/auth/devices/all');
+      setAllDevices(res);
+    } catch (err) {
+      setDeviceError('Failed to load devices.');
+    } finally {
+      setLoadingDevices(false);
     }
-    // eslint-disable-next-line
-  }, [activeTab, user]);
+  }, []);
+
+  // Refactor existing useEffects to only trigger on tab change, and not if `isPageLoading` is true
+  useEffect(() => {
+    if (activeTab === 'adminControl' && user?.role === 'admin' && !isPageLoading) {
+      fetchUsers();
+      fetchAllDevices();
+    }
+  }, [activeTab, user, isPageLoading, fetchUsers, fetchAllDevices]); // Add fetchUsers, fetchAllDevices as dependencies
 
   // Add user handler
   const handleAddUser = async (e) => {
@@ -460,20 +493,6 @@ const Settings = () => {
     setShowEditUserModal(true);
   };
 
-  // Fetch all devices for admin
-  const fetchAllDevices = async () => {
-    setLoadingDevices(true);
-    setDeviceError('');
-    try {
-      const res = await api.get('/auth/devices/all'); // You may need to implement this endpoint in backend
-      setAllDevices(res);
-    } catch (err) {
-      setDeviceError('Failed to load devices.');
-    } finally {
-      setLoadingDevices(false);
-    }
-  };
-
   // Toggle device active status
   const handleToggleDeviceActive = async (deviceObj) => {
     try {
@@ -484,14 +503,6 @@ const Settings = () => {
       showError('Failed to update device status.');
     }
   };
-
-  // Fetch all devices when Devices and Roles tab is active
-  useEffect(() => {
-    if (activeTab === 'adminControl' && user?.role === 'admin') {
-      fetchAllDevices();
-    }
-    // eslint-disable-next-line
-  }, [activeTab, user]);
 
   // Delete user handler
   const handleDeleteUser = async (userObj) => {
@@ -520,280 +531,291 @@ const Settings = () => {
   
   return (
     <div className="min-h-screen bg-orange-50">
+      {/* Full-page Loading Splash Screen for initial content load */}
+      {isPageLoading && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col pointer-events-none cursor-wait">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+          <p className="text-gray-700 text-xl font-medium">{pageLoadingMessage}</p>
+        </div>
+      )}
+
+      {/* Main content, conditionally rendered when not page loading */}
+      {!isPageLoading && (
+        <>
       <BackButton />
       
-      <div className="p-4 pt-16 max-w-7xl mx-auto">
-        <div>
-          {/* Tab Buttons */}
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 border border-gray-200 shadow-sm">
-            <button
-              className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
-                ${activeTab === 'adminControl' ? 'bg-white text-blue-700 shadow-sm' : ''}`}
-              onClick={() => setActiveTab('adminControl')}
-            >
-               Devices and Roles
-            </button>
-            <button
-              className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
-                ${activeTab === 'personalSettings' ? 'bg-white text-blue-700 shadow-sm' : ''}`}
-              onClick={() => setActiveTab('personalSettings')}
-            >
-              Personal Settings
-            </button>
-          </div>
-
-          {/* Content based on active tab */}
-          {activeTab === 'adminControl' && (
-            <div className="space-y-8">
-              {/* Device Management Card - Show unique users only */}
-              <div className="bg-white shadow-lg rounded-xl p-6 border border-blue-200">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
-                    <i className="fas fa-tablet-alt"></i>
-                  </span>
-                  <h2 className="text-2xl font-bold text-blue-700">User Devices & Status</h2>
-                </div>
-                {/* Unique Users Table */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm border rounded-xl">
-                    <thead>
-                      <tr className="bg-blue-50">
-                        <th className="px-2 py-2 border"></th>
-                        <th className="px-4 py-2 border">User Name</th>
-                        <th className="px-4 py-2 border">Mobile Number</th>
-                        <th className="px-4 py-2 border">Role</th>
-                        <th className="px-4 py-2 border">Status</th>
-                        <th className="px-4 py-2 border">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users && users.length > 0 ? users.map(u => (
-                        <tr key={u._id} className="border-b hover:bg-blue-50 transition">
-                          <td className="px-2 py-2 border text-center">
-                            <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                          </td>
-                          <td className="px-4 py-2 border">{u.name}</td>
-                          <td className="px-4 py-2 border">{u.mobileNumber}</td>
-                          <td className="px-4 py-2 border capitalize">{u.role}</td>
-                          <td className="px-2 py-1 border text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                className="focus:outline-none"
-                                onClick={() => handleToggleActive(u)}
-                                aria-label={u.isActive ? 'Disable account' : 'Enable account'}
-                                type="button"
-                              >
-                                <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
-                                  style={{ position: 'relative' }}>
-                                  <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
-                                </span>
-                              </button>
-                              <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
-                            </div>
-                          </td>
-                          <td className="px-2 py-1 border text-center">
-                            <div className="inline-flex items-center gap-1">
-                              <button
-                                className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
-                                onClick={() => openEditUserModal(u)}
-                                title="Edit User"
-                                aria-label="Edit User"
-                              >
-                                <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
-                                Edit
-                              </button>
-                              <button
-                                className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
-                                onClick={() => handleDeleteUser(u)}
-                                title="Delete User"
-                                aria-label="Delete User"
-                              >
-                                <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )) : (
-                        <tr><td colSpan={6} className="text-center text-gray-400 py-6">No users found.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+          <div className="p-4 pt-16 max-w-7xl mx-auto">
+            <div>
+              {/* Tab Buttons */}
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 border border-gray-200 shadow-sm">
+                <button
+                  className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
+                    ${activeTab === 'adminControl' ? 'bg-white text-blue-700 shadow-sm' : ''}`}
+                  onClick={() => setActiveTab('adminControl')}
+                >
+                   Devices and Roles
+                </button>
+                <button
+                  className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
+                    ${activeTab === 'personalSettings' ? 'bg-white text-blue-700 shadow-sm' : ''}`}
+                  onClick={() => setActiveTab('personalSettings')}
+                >
+                  Personal Settings
+                </button>
               </div>
 
-              {/* User Management Card */}
-              <div className="bg-white shadow-lg rounded-xl p-6 border border-emerald-200">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
-                    <i className="fas fa-users-cog"></i>
-                  </span>
-                  <h2 className="text-2xl font-bold text-emerald-700">User Management</h2>
-                </div>
-                {/* Add User Form */}
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  setAddUserLoading(true);
-                  setUserError('');
-                  try {
-                    await api.post('/auth/register', addUserForm);
-                    showSuccess('User added successfully!');
-                    setShowAddUserModal(false);
-                    setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
-                    await fetchUsers();
-                    window.location.reload(); // Force reload to ensure new user can log in
-                  } catch (err) {
-                    showError(err.message || 'Failed to add user.');
-                  } finally {
-                    setAddUserLoading(false);
-                  }
-                }} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Name</label>
-                    <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
+              {/* Content based on active tab */}
+              {activeTab === 'adminControl' && (
+                <div className="space-y-8">
+                  {/* Device Management Card - Show unique users only */}
+                  <div className="bg-white shadow-lg rounded-xl p-6 border border-blue-200">
+                    <div className="flex items-center gap-3 mb-6">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
+                        <i className="fas fa-tablet-alt"></i>
+                      </span>
+                      <h2 className="text-2xl font-bold text-blue-700">User Devices & Status</h2>
+                    </div>
+                    {/* Unique Users Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm border rounded-xl">
+                        <thead>
+                          <tr className="bg-blue-50">
+                            <th className="px-2 py-2 border"></th>
+                            <th className="px-4 py-2 border">User Name</th>
+                            <th className="px-4 py-2 border">Mobile Number</th>
+                            <th className="px-4 py-2 border">Role</th>
+                            <th className="px-4 py-2 border">Status</th>
+                            <th className="px-4 py-2 border">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users && users.length > 0 ? users.map(u => (
+                            <tr key={u._id} className="border-b hover:bg-blue-50 transition">
+                              <td className="px-2 py-2 border text-center">
+                                <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                              </td>
+                              <td className="px-4 py-2 border">{u.name}</td>
+                              <td className="px-4 py-2 border">{u.mobileNumber}</td>
+                              <td className="px-4 py-2 border capitalize">{u.role}</td>
+                              <td className="px-2 py-1 border text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    className="focus:outline-none"
+                                    onClick={() => handleToggleActive(u)}
+                                    aria-label={u.isActive ? 'Disable account' : 'Enable account'}
+                                    type="button"
+                                  >
+                                    <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
+                                      style={{ position: 'relative' }}>
+                                      <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
+                                    </span>
+                                  </button>
+                                  <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1 border text-center">
+                                <div className="inline-flex items-center gap-1">
+                                  <button
+                                    className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
+                                    onClick={() => openEditUserModal(u)}
+                                    title="Edit User"
+                                    aria-label="Edit User"
+                                  >
+                                    <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
+                                    Edit
+                                  </button>
+                                  <button
+                                    className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
+                                    onClick={() => handleDeleteUser(u)}
+                                    title="Delete User"
+                                    aria-label="Delete User"
+                                  >
+                                    <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )) : (
+                            <tr><td colSpan={6} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Mobile Number</label>
-                    <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.mobileNumber} onChange={e => setAddUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Password</label>
-                    <input type="password" className="w-full border rounded px-3 py-2" required value={addUserForm.password} onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Role</label>
-                    <select className="w-full border rounded px-3 py-2" value={addUserForm.role} onChange={e => setAddUserForm(f => ({ ...f, role: e.target.value }))}>
-                      <option value="admin">Admin</option>
-                      <option value="worker">Worker</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-4 flex justify-end mt-2">
-                    <button type="submit" className="px-6 py-2 rounded bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
-                  </div>
-                </form>
-                {/* User Table */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm border rounded-xl">
-                    <thead>
-                      <tr className="bg-emerald-50">
-                        <th className="px-2 py-2 border"></th>
-                        <th className="px-4 py-2 border">Name</th>
-                        <th className="px-4 py-2 border">Mobile Number</th>
-                        <th className="px-4 py-2 border">Role</th>
-                        <th className="px-4 py-2 border">Active</th>
-                        <th className="px-4 py-2 border">Last Login</th>
-                        <th className="px-4 py-2 border">Created</th>
-                        <th className="px-4 py-2 border">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users && users.length > 0 ? users.map(u => (
-                        <tr key={u._id} className="border-b hover:bg-emerald-50 transition">
-                          <td className="px-2 py-2 border text-center">
-                            <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                          </td>
-                          <td className="px-4 py-2 border">{u.name}</td>
-                          <td className="px-4 py-2 border">{u.mobileNumber}</td>
-                          <td className="px-4 py-2 border capitalize">{u.role}</td>
-                          <td className="px-2 py-1 border text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                className="focus:outline-none"
-                                onClick={() => handleToggleActive(u)}
-                                aria-label={u.isActive ? 'Disable account' : 'Enable account'}
-                                type="button"
-                              >
-                                <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
-                                  style={{ position: 'relative' }}>
-                                  <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
-                                </span>
-                              </button>
-                              <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2 border">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '-'}</td>
-                          <td className="px-4 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
-                          <td className="px-2 py-1 border text-center">
-                            <div className="inline-flex items-center gap-1">
-                              <button
-                                className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
-                                onClick={() => openEditUserModal(u)}
-                                title="Edit User"
-                                aria-label="Edit User"
-                              >
-                                <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
-                                Edit
-                              </button>
-                              <button
-                                className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
-                                onClick={() => handleDeleteUser(u)}
-                                title="Delete User"
-                                aria-label="Delete User"
-                              >
-                                <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )) : (
-                        <tr><td colSpan={8} className="text-center text-gray-400 py-6">No users found.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
 
-              {/* Edit User Modal (reuse ConfirmationDialog) */}
-              <ConfirmationDialog
-                isOpen={showEditUserModal}
-                onClose={() => setShowEditUserModal(false)}
-                title="Edit User"
-                confirmText={null}
-                cancelText={null}
-                customContent={(
-                  <form onSubmit={handleEditUser} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Name</label>
-                      <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
+                  {/* User Management Card */}
+                  <div className="bg-white shadow-lg rounded-xl p-6 border border-emerald-200">
+                    <div className="flex items-center gap-3 mb-6">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
+                        <i className="fas fa-users-cog"></i>
+                      </span>
+                      <h2 className="text-2xl font-bold text-emerald-700">User Management</h2>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Mobile Number</label>
-                      <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                    {/* Add User Form */}
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      setAddUserLoading(true);
+                      setUserError('');
+                      try {
+                        await api.post('/auth/register', addUserForm);
+                        showSuccess('User added successfully!');
+                        setShowAddUserModal(false);
+                        setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
+                        await fetchUsers();
+                        window.location.reload(); // Force reload to ensure new user can log in
+                      } catch (err) {
+                        showError(err.message || 'Failed to add user.');
+                      } finally {
+                        setAddUserLoading(false);
+                      }
+                    }} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Name</label>
+                        <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Mobile Number</label>
+                        <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.mobileNumber} onChange={e => setAddUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Password</label>
+                        <input type="password" className="w-full border rounded px-3 py-2" required value={addUserForm.password} onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Role</label>
+                        <select className="w-full border rounded px-3 py-2" value={addUserForm.role} onChange={e => setAddUserForm(f => ({ ...f, role: e.target.value }))}>
+                          <option value="admin">Admin</option>
+                          <option value="worker">Worker</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-4 flex justify-end mt-2">
+                        <button type="submit" className="px-6 py-2 rounded bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
+                      </div>
+                    </form>
+                    {/* User Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm border rounded-xl">
+                        <thead>
+                          <tr className="bg-emerald-50">
+                            <th className="px-2 py-2 border"></th>
+                            <th className="px-4 py-2 border">Name</th>
+                            <th className="px-4 py-2 border">Mobile Number</th>
+                            <th className="px-4 py-2 border">Role</th>
+                            <th className="px-4 py-2 border">Active</th>
+                            <th className="px-4 py-2 border">Last Login</th>
+                            <th className="px-4 py-2 border">Created</th>
+                            <th className="px-4 py-2 border">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users && users.length > 0 ? users.map(u => (
+                            <tr key={u._id} className="border-b hover:bg-emerald-50 transition">
+                              <td className="px-2 py-2 border text-center">
+                                <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                              </td>
+                              <td className="px-4 py-2 border">{u.name}</td>
+                              <td className="px-4 py-2 border">{u.mobileNumber}</td>
+                              <td className="px-4 py-2 border capitalize">{u.role}</td>
+                              <td className="px-2 py-1 border text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    className="focus:outline-none"
+                                    onClick={() => handleToggleActive(u)}
+                                    aria-label={u.isActive ? 'Disable account' : 'Enable account'}
+                                    type="button"
+                                  >
+                                    <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
+                                      style={{ position: 'relative' }}>
+                                      <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
+                                    </span>
+                                  </button>
+                                  <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 border">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '-'}</td>
+                              <td className="px-4 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
+                              <td className="px-2 py-1 border text-center">
+                                <div className="inline-flex items-center gap-1">
+                                  <button
+                                    className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
+                                    onClick={() => openEditUserModal(u)}
+                                    title="Edit User"
+                                    aria-label="Edit User"
+                                  >
+                                    <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
+                                    Edit
+                                  </button>
+                                  <button
+                                    className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
+                                    onClick={() => handleDeleteUser(u)}
+                                    title="Delete User"
+                                    aria-label="Delete User"
+                                  >
+                                    <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )) : (
+                            <tr><td colSpan={8} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Password (leave blank to keep unchanged)</label>
-                      <input type="password" className="w-full border rounded px-3 py-2" value={editUserForm.password} onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Role</label>
-                      <select className="w-full border rounded px-3 py-2" value={editUserForm.role} onChange={e => setEditUserForm(f => ({ ...f, role: e.target.value }))}>
-                        <option value="admin">Admin</option>
-                        <option value="worker">Worker</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
-                      <label htmlFor="isActive" className="text-sm">Active</label>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
-                      <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
-                    </div>
-                  </form>
-                )}
+                  </div>
+
+                  {/* Edit User Modal (reuse ConfirmationDialog) */}
+                  <ConfirmationDialog
+                    isOpen={showEditUserModal}
+                    onClose={() => setShowEditUserModal(false)}
+                    title="Edit User"
+                    confirmText={null}
+                    cancelText={null}
+                    customContent={(
+                      <form onSubmit={handleEditUser} className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Name</label>
+                          <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Mobile Number</label>
+                          <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Password (leave blank to keep unchanged)</label>
+                          <input type="password" className="w-full border rounded px-3 py-2" value={editUserForm.password} onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Role</label>
+                          <select className="w-full border rounded px-3 py-2" value={editUserForm.role} onChange={e => setEditUserForm(f => ({ ...f, role: e.target.value }))}>
+                            <option value="admin">Admin</option>
+                            <option value="worker">Worker</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
+                          <label htmlFor="isActive" className="text-sm">Active</label>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
+                          <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
+                        </div>
+                      </form>
+                    )}
               />
             </div>
-          )}
+              )}
 
-          {activeTab === 'personalSettings' && (
-            <div className="space-y-6">
-              <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200 mb-6 min-h-[calc(100vh-220px)] overflow-y-auto">
-                <div className="flex items-center gap-4 mb-6">
-                  
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
-                    Personal Settings
-                  </h1>
+              {activeTab === 'personalSettings' && (
+                <div className="space-y-6">
+                  <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200 mb-6 min-h-[calc(100vh-220px)] overflow-y-auto">
+                    <div className="flex items-center gap-4 mb-6">
+                      
+                      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
+                        Personal Settings
+                      </h1>
           </div>
           
           {user && (
@@ -970,25 +992,27 @@ const Settings = () => {
           </div>
         </div>
       </div>
-          )}
-        </div>
-      </div>
-      {/* Version Information Section (moved to bottom) */}
-      <div className="bg-white p-2 sm:p-4 rounded-xl shadow-md mb-4 border border-gray-200 overflow-x-auto w-fit mx-auto">
-        <div className="flex items-center justify-center gap-2 text-[0.625rem] text-gray-600 whitespace-nowrap sm:text-sm">
+              )}
+            </div>
+          </div>
+          {/* Version Information Section (moved to bottom) */}
+          <div className="bg-white p-2 sm:p-4 rounded-xl shadow-md mb-4 border border-gray-200 overflow-x-auto w-fit mx-auto">
+            <div className="flex items-center justify-center gap-2 text-[0.625rem] text-gray-600 whitespace-nowrap sm:text-sm">
             <span className="font-medium">Version: {versionInfo.version}</span>
-          <span>|</span>
+              <span>|</span>
             <span className="font-medium">Build: {new Date(versionInfo.buildDate).toLocaleString()}</span>
-          <span>|</span>
-          <span className={`px-1 py-0.5 rounded text-xs font-medium ${
+              <span>|</span>
+              <span className={`px-1 py-0.5 rounded text-xs font-medium ${
               versionInfo.environment === 'production' 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-yellow-100 text-yellow-800'
             }`}>
               {versionInfo.environment}
             </span>
+          </div>
         </div>
-      </div>
+        </>
+      )}
       
       {/* Confirmation Dialogs */}
       <ConfirmationDialog
@@ -1012,7 +1036,7 @@ const Settings = () => {
         type="danger"
         isLoading={false}
       />
-
+      
       {/* Revoke Device Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showRevokeConfirm}
@@ -1028,10 +1052,10 @@ const Settings = () => {
         isLoading={isRevoking}
       />
       
-      {/* Full-screen Loading Splash Screen */}
-      {showSplashScreen && (
+      {/* Full-screen Loading Splash Screen for Logout/Delete */}
+      {showLogoutDeleteSplash && (
         <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-orange-500 mb-4"></div>
           <p className="text-gray-700 text-xl font-medium">Logging you out...</p>
         </div>
       )}

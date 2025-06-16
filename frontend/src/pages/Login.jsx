@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotification } from '../components/NotificationContext';
 import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
+import ConfirmationDialog from "../components/ConfirmationDialog";
 
 const Login = () => {
   useKeyboardScrollAdjustment();
@@ -18,10 +19,14 @@ const Login = () => {
   const [rememberDevice, setRememberDevice] = useState(true);
   const [initialCheckComplete, setInitialCheckComplete] = useState(false);
   
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
   const initialCheckRef = useRef(false);
+  
+  // New states for disabled account dialog
+  const [showDisabledAccountDialog, setShowDisabledAccountDialog] = useState(false);
+  const [disabledAccountMessage, setDisabledAccountMessage] = useState('');
   
   // Initial check for tokens to prevent login page flash
   useEffect(() => {
@@ -76,7 +81,6 @@ const Login = () => {
     // Basic validation
     if (!username.trim() || !password.trim()) {
       setError('Please enter both username and password');
-      showError('Please enter both username and password');
       return;
     }
     
@@ -87,10 +91,11 @@ const Login = () => {
       const deviceToken = rememberDevice ? localStorage.getItem('deviceToken') : null;
       const result = await login(username, password, rememberDevice, deviceToken);
       
+      if (!result.success) {
+        console.log('Login failed with message:', result.message); // Added for debugging
+      }
+      
       if (result.success) {
-        // Show success notification
-        showSuccess(`Welcome to Masala Madness!`, 3000);
-        
         if (result.deviceToken && rememberDevice) {
           localStorage.setItem('deviceToken', result.deviceToken);
         }
@@ -100,13 +105,13 @@ const Login = () => {
           navigate('/home');
         }, 800);
       } else {
-        setError(result.message);
         if (result.message.toLowerCase().includes('disabled')) {
-          showError('Your account is disabled. Please contact the administrator.');
+          setDisabledAccountMessage('Your account is disabled. Please contact the administrator.');
+          setShowDisabledAccountDialog(true);
         } else if (result.message.toLowerCase().includes('invalid') || result.message.toLowerCase().includes('credentials')) {
-          showError('Invalid credentials. Please try again.');
+          setError('Invalid credentials. Please try again.');
         } else {
-          showError(result.message);
+          setError(result.message);
         }
         // Show recovery instructions if we get an indication that admin user doesn't exist
         if (result.message.includes('credentials') || result.message.includes('not found')) {
@@ -115,7 +120,6 @@ const Login = () => {
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
-      showError('An unexpected error occurred. Please try again.');
       setShowRecovery(true);
     } finally {
       setIsLoading(false);
@@ -674,6 +678,25 @@ const Login = () => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Disabled Account Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDisabledAccountDialog}
+        onClose={() => {
+          setShowDisabledAccountDialog(false);
+          setDisabledAccountMessage('');
+          logout({ isSilentLogout: true }); // Silent logout on dialog close
+        }}
+        onConfirm={() => {
+          setShowDisabledAccountDialog(false);
+          setDisabledAccountMessage('');
+          logout({ isSilentLogout: true }); // Silent logout on dialog confirm
+        }}
+        title="Account Disabled"
+        message={disabledAccountMessage}
+        confirmText="Ok, I understand"
+        cancelText={null} // No cancel button as logout is automatic
+      />
     </div>
   );
 };
