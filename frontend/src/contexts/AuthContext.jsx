@@ -83,13 +83,6 @@ export const AuthProvider = ({ children }) => {
   
   // Expose a function to restore session from device token
   const restoreSession = async () => {
-    // Try JWT first
-    const token = sessionStorage.getItem('token');
-    if (token) {
-      // Already handled by useEffect, nothing to do
-      return;
-    }
-    // Try device token
     const deviceToken = localStorage.getItem('deviceToken');
     if (deviceToken) {
       try {
@@ -104,53 +97,60 @@ export const AuthProvider = ({ children }) => {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          console.warn('restoreSession: Device token verification failed (response not ok). Status:', response.status);
+          logoutUser();
+          navigate('/login'); // Force redirect
+          return;
+        }
+
         const data = await response.json();
-        // Check only response.ok as backend no longer sends status: 'success'
-        if (response.ok) {
+        if (data.user) {
           setUser(data.user); // data.user will contain role
           setIsAuthenticated(true);
           updateLastActivityTime();
           sessionStorage.setItem('user', JSON.stringify(data.user));
           sessionStorage.setItem('jwtVerified', 'true');
-          // Optionally, you could request a new JWT here if your backend supports it
         } else {
-          localStorage.removeItem('deviceToken');
-          setIsAuthenticated(false);
-          setUser(null);
+          console.warn('restoreSession: Device token verification successful but no user data. Logging out.');
+          logoutUser();
+          navigate('/login');
         }
       } catch (err) {
-        localStorage.removeItem('deviceToken');
-        setIsAuthenticated(false);
-        setUser(null);
+        console.error('restoreSession: Device token verification error:', err);
+        logoutUser();
+        navigate('/login');
       } finally {
         setLoading(false);
       }
     } else {
       setIsAuthenticated(false);
       setUser(null);
+      setLoading(false); // Set loading to false if no device token to begin with
     }
   };
   
   // Check if user is already logged in (via token in sessionStorage or deviceToken in localStorage)
   useEffect(() => {
-    // Create a refresh token flag to track page refreshes
     const pageRefreshFlag = sessionStorage.getItem('pageRefreshFlag');
     if (!pageRefreshFlag) {
-      // This is a page refresh or initial load, set the flag
       sessionStorage.setItem('pageRefreshFlag', 'true');
-      // Clear the jwtVerified flag to force re-verification after refresh
       sessionStorage.removeItem('jwtVerified');
     }
     
     const verifyUser = async () => {
       console.log('verifyUser: Checking authentication status...');
+      setLoading(true); // Ensure loading is true at the start of every verification attempt
+
       try {
-        setLoading(true);
         if (!checkSessionExpiry()) {
           console.log('verifyUser: Session expired or invalid, logging out.');
-          setLoading(false);
+          logoutUser();
+          navigate('/login');
           return;
         }
+
         const jwtVerified = sessionStorage.getItem('jwtVerified');
         if (jwtVerified === 'true') {
           const userData = sessionStorage.getItem('user');
@@ -160,17 +160,19 @@ export const AuthProvider = ({ children }) => {
             setIsAuthenticated(true);
             updateLastActivityTime();
             console.log('verifyUser: JWT verified, user from sessionStorage:', parsedUser);
+          } else {
+            console.warn('verifyUser: JWT verified flag present but no user data in sessionStorage. Logging out.');
+            logoutUser();
+            navigate('/login');
           }
-          setLoading(false);
           return;
         }
+
         const token = sessionStorage.getItem('token');
         console.log('verifyUser: Token from sessionStorage:', token ? token.substring(0, 10) + '...' : 'No token');
         if (token) {
           try {
             const data = await api.get('/auth/verify');
-            console.log('verifyUser: Data from /auth/verify API:', data);
-            // Check only for successful response as backend no longer sends status: 'success'
             if (data.user) { // Backend returns data.user directly on success
               setUser(data.user); // user will contain role
               setIsAuthenticated(true);
@@ -178,28 +180,26 @@ export const AuthProvider = ({ children }) => {
               sessionStorage.setItem('jwtVerified', 'true');
               sessionStorage.setItem('user', JSON.stringify(data.user));
               console.log('verifyUser: User authenticated via API, user data:', data.user);
-              setLoading(false);
-              return;
             } else {
-              sessionStorage.removeItem('token');
-              sessionStorage.removeItem('user');
-              console.log('verifyUser: API verification failed, removing token.');
+              console.warn('verifyUser: API verification succeeded but no user data. Logging out.');
+              logoutUser();
+              navigate('/login');
             }
           } catch (jwtError) {
             console.error('verifyUser: JWT verification error during API call:', jwtError);
-            sessionStorage.removeItem('token');
-            sessionStorage.removeItem('user');
+            logoutUser();
+            navigate('/login');
           }
+        } else {
+          console.log('verifyUser: No JWT found, attempting to restore session from device token.');
+          await restoreSession(); // restoreSession will handle its own loading/logout/navigate
         }
-        // If no valid JWT, try to restore session from device token
-        console.log('verifyUser: Attempting to restore session from device token.');
-        await restoreSession();
-        setLoading(false);
       } catch (error) {
-        console.error('verifyUser: Authentication verification failed:', error);
+        console.error('verifyUser: General authentication verification failed:', error);
         logoutUser();
-        setLoading(false);
+        navigate('/login');
       } finally {
+        setLoading(false); // Ensure loading is always set to false
         console.log('verifyUser: Final isAuthenticated:', isAuthenticated, 'user:', user);
       }
     };
@@ -216,7 +216,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       clearInterval(sessionCheckInterval);
     };
-  }, [navigate]);
+  }, [navigate, isAuthenticated]);
   
   // Login function
   const login = async (username, password, rememberDevice = true, deviceToken = null) => {

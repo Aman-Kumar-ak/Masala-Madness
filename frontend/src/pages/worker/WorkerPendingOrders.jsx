@@ -321,7 +321,6 @@ export default function WorkerPendingOrders() {
           setConfirmDialog(null);
           navigate('/worker-home');
         }
-        // Dismiss the notification will be handled by Notification component itself
       }, 1500); // Match splash screen duration
 
     } catch (error) {
