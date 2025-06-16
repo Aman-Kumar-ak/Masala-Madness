@@ -506,100 +506,136 @@ router.delete('/users/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
-// Secret Code Routes
-
-// Initialize the secret code (admin only, only once)
-router.post('/secret-code/initialize', auth, adminAuth, async (req, res) => {
+// Secret Code Initialization/Update route (Admin only, can be used to set or reset)
+router.post('/secret-code/initialize', adminAuth, async (req, res) => {
   try {
     const { secretCode } = req.body;
+    const currentUserId = req.user._id; // User initiating the action
+
     if (!secretCode) {
       return res.status(400).json({ message: 'Secret code is required.' });
     }
 
     let existingSecretCode = await SecretCode.findOne();
-    if (existingSecretCode) {
-      return res.status(409).json({ message: 'Secret code already initialized.' });
-    }
 
-    const newSecretCode = new SecretCode({
-      secretCode,
-      createdBy: req.user.userId,
-      lastUsedAt: Date.now(), // Set initial usage timestamp
-      lastUsedBy: req.user.userId,
-      lastUsedWhere: 'Initialization', 
-    });
-    await newSecretCode.save();
-    res.status(201).json({ message: 'Secret code initialized successfully.' });
+    if (existingSecretCode) {
+      // If code exists, update it
+      existingSecretCode.secretCode = secretCode; // Mongoose pre-save hook will hash this
+      existingSecretCode.updatedBy = currentUserId;
+      existingSecretCode.lastUsedAt = getISTDate(); // Update last used time to current time for clarity
+      existingSecretCode.lastUsedBy = currentUserId;
+      existingSecretCode.auditTrail.push({
+        timestamp: getISTDate(),
+        action: 'Secret code updated',
+        changedBy: currentUserId,
+      });
+      await existingSecretCode.save();
+      return res.status(200).json({
+        status: 'success',
+        message: 'Secret access code updated successfully.',
+      });
+    } else {
+      // If no code exists, create a new one
+      const newSecretCode = new SecretCode({
+        secretCode: secretCode, // Mongoose pre-save hook will hash this
+        createdBy: currentUserId,
+        lastUsedAt: getISTDate(),
+        lastUsedBy: currentUserId,
+        auditTrail: [
+          {
+            timestamp: getISTDate(),
+            action: 'Secret code initialized',
+            changedBy: currentUserId,
+          },
+        ],
+      });
+      await newSecretCode.save();
+      return res.status(201).json({
+        status: 'success',
+        message: 'Secret access code initialized successfully.',
+      });
+    }
   } catch (error) {
-    console.error('Secret code initialization error:', error);
+    console.error('Error initializing/updating secret code:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Verify the secret code
-router.post('/secret-code/verify', auth, async (req, res) => {
+// Secret Code Verification route
+router.post('/secret-code/verify', authenticateToken, async (req, res) => {
   try {
-    const { secretCode, usedWhere } = req.body;
+    const { secretCode, usedWhere, currentUserId } = req.body;
+
     if (!secretCode) {
       return res.status(400).json({ message: 'Secret code is required.' });
     }
 
-    const storedSecret = await SecretCode.findOne();
-    if (!storedSecret) {
+    const secretCodeDoc = await SecretCode.findOne();
+
+    if (!secretCodeDoc) {
       return res.status(404).json({ message: 'Secret code not set up. Please initialize it.' });
     }
 
-    const isMatch = await storedSecret.compareSecretCode(secretCode);
+    const isMatch = await secretCodeDoc.compareSecretCode(secretCode);
+
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid secret code.' });
+      return res.status(401).json({ message: 'Incorrect secret code. Please try again.' });
     }
 
-    // Update last used info
-    storedSecret.lastUsedAt = Date.now();
-    storedSecret.lastUsedBy = req.user.userId;
-    storedSecret.lastUsedWhere = usedWhere || 'Unknown';
-    await storedSecret.save();
+    // Update lastUsedAt, lastUsedBy, and lastUsedWhere
+    secretCodeDoc.lastUsedAt = getISTDate();
+    secretCodeDoc.lastUsedBy = currentUserId; // Store the user who used it
+    secretCodeDoc.lastUsedWhere = usedWhere; // Store where it was used (e.g., QR, Settings)
+    await secretCodeDoc.save();
 
-    res.status(200).json({ message: 'Secret code verified successfully.' });
+    return res.status(200).json({
+      status: 'success',
+      message: 'Secret code verified successfully.',
+    });
   } catch (error) {
-    console.error('Secret code verification error:', error);
+    console.error('Error verifying secret code:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Change the secret code (admin only)
-router.put('/secret-code/change', auth, adminAuth, async (req, res) => {
+// Secret Code Change route (requires current secret code verification)
+router.put('/secret-code/change', adminAuth, async (req, res) => {
   try {
     const { currentSecretCode, newSecretCode } = req.body;
+    const currentUserId = req.user._id;
+
     if (!currentSecretCode || !newSecretCode) {
       return res.status(400).json({ message: 'Current and new secret codes are required.' });
     }
 
-    const storedSecret = await SecretCode.findOne();
-    if (!storedSecret) {
-      return res.status(404).json({ message: 'Secret code not set up. Please initialize it.' });
+    const secretCodeDoc = await SecretCode.findOne();
+
+    if (!secretCodeDoc) {
+      return res.status(404).json({ message: 'Secret code not set up. Please initialize it first.' });
     }
 
-    const isMatch = await storedSecret.compareSecretCode(currentSecretCode);
+    // Verify current secret code
+    const isMatch = await secretCodeDoc.compareSecretCode(currentSecretCode);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid current secret code.' });
+      return res.status(401).json({ message: 'Incorrect current secret code.' });
     }
 
-    // Add current secret to history
-    storedSecret.passwordHistory.push({
-      secretCode: storedSecret.secretCode, // This is already hashed
-      changedBy: req.user.userId,
-      timestamp: Date.now(),
+    // Update the secret code
+    secretCodeDoc.secretCode = newSecretCode; // Mongoose pre-save hook will hash this
+    secretCodeDoc.updatedBy = currentUserId;
+    secretCodeDoc.auditTrail.push({
+      timestamp: getISTDate(),
+      action: 'Secret code changed',
+      changedBy: currentUserId,
     });
-    
-    // Update the secret code and set updatedBy
-    storedSecret.secretCode = newSecretCode; // pre-save hook will hash this
-    storedSecret.updatedBy = req.user.userId;
-    await storedSecret.save();
+    await secretCodeDoc.save();
 
-    res.status(200).json({ message: 'Secret code changed successfully.' });
+    return res.status(200).json({
+      status: 'success',
+      message: 'Secret code changed successfully.',
+    });
   } catch (error) {
-    console.error('Secret code change error:', error);
+    console.error('Error changing secret code:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

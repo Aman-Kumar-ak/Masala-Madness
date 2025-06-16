@@ -690,6 +690,51 @@ const Settings = () => {
     );
   };
 
+  // New function to handle setting/generating secret code
+  const handleGenerateSecretCode = async () => {
+    if (!newSecretCode.trim()) {
+      setSecretCodeError('Please enter a new secret access code.');
+      return;
+    }
+    if (newSecretCode !== confirmNewSecretCode) {
+      setSecretCodeError('New secret codes do not match.');
+      return;
+    }
+    if (newSecretCode.length < 6) { // Minimum length for security
+      setSecretCodeError('Secret code must be at least 6 characters long.');
+      return;
+    }
+
+    setIsSecretCodeChanging(true);
+    setSecretCodeError('');
+    setSecretCodeSuccess('');
+
+    try {
+      const response = await api.post('/auth/secret-code/initialize', {
+        secretCode: newSecretCode,
+      });
+
+      if (response.data.status === 'success') {
+        showSuccess(response.data.message);
+        setSecretCodeSuccess(response.data.message);
+        setNewSecretCode('');
+        setConfirmNewSecretCode('');
+        // No need to clear local storage expiry, as the code itself has changed.
+        // The next verification attempt will use the new code.
+      } else {
+        showError(response.data.message || 'Failed to set new secret code.');
+        setSecretCodeError(response.data.message || 'Failed to set new secret code.');
+      }
+    } catch (error) {
+      console.error('Error setting new secret code:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to set new secret code. Server error.';
+      showError(errorMessage);
+      setSecretCodeError(errorMessage);
+    } finally {
+      setIsSecretCodeChanging(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-100">
       <BackButton />
@@ -1152,150 +1197,115 @@ const Settings = () => {
                   </form>
                 </div>
                 
-                {user?.role === 'admin' && ( // Only show this section if the logged-in user is an admin
-                  <div className="border border-gray-200 rounded-lg p-5 mb-6">
-                    <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-                      <span className="text-purple-600">🔑</span> Change Secret Access Code
-                    </h2>
+                {/* Generate/Set New Secret Access Code Section */}
+                <div className="bg-yellow-50 rounded-lg p-6 shadow mb-6 border border-yellow-200">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Generate/Set New Secret Access Code</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Use this to set or update the master secret code for admin access to QR and Devices & Roles sections.
+                    This does not require the old secret code to change.
+                  </p>
 
-                    {secretCodeError && (
-                      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                        <span className="block sm:inline">{secretCodeError}</span>
-                      </div>
-                    )}
+                  {secretCodeSuccess && (
+                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg text-sm mb-4" role="alert">
+                      <span className="block sm:inline">{secretCodeSuccess}</span>
+                    </div>
+                  )}
+                  {secretCodeError && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm mb-4" role="alert">
+                      <span className="block sm:inline">{secretCodeError}</span>
+                    </div>
+                  )}
 
-                    {secretCodeSuccess && (
-                      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-                        <span className="block sm:inline">{secretCodeSuccess}</span>
-                      </div>
-                    )}
-
-                    <form onSubmit={handleChangeSecretCode} className="space-y-4">
-                      <div className="space-y-4">
-                        <div>
-                          <label htmlFor="currentSecretCode" className="block text-sm font-medium text-gray-700 mb-1">
-                            Current Secret Access Code
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              id="currentSecretCode"
-                              type={showCurrentSecretCode ? "text" : "password"}
-                              value={currentSecretCode}
-                              onChange={(e) => {
-                                setCurrentSecretCode(e.target.value);
-                                setIsCurrentSecretCodeValid(false);
-                                setShowNewSecretCodeFields(false);
-                              }}
-                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                              required
-                              disabled={isSecretCodeChanging}
-                            />
-                            <button 
-                              type="button"
-                              onClick={verifyCurrentSecretCode}
-                              disabled={!currentSecretCode || isSecretCodeChanging || isCurrentSecretCodeValid}
-                              className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
-                                ${isCurrentSecretCodeValid 
-                                  ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
-                                  : 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'}`}
-                            >
-                              {isSecretCodeChanging ? 'Verifying...' : isCurrentSecretCodeValid ? 'Verified' : 'Verify'}
-                            </button>
-                          </div>
-                          {isCurrentSecretCodeValid && (
-                            <p className="mt-1 text-sm text-green-600">Current secret code verified</p>
-                          )}
-                        </div>
-                        <div className="flex items-center mt-1">
-                          <input
-                            id="showCurrentSecretCode"
-                            type="checkbox"
-                            checked={showCurrentSecretCode}
-                            onChange={() => setShowCurrentSecretCode((prev) => !prev)}
-                            className="mr-2"
-                          />
-                          <label htmlFor="showCurrentSecretCode" className="text-xs text-gray-600 select-none">Show Secret Code</label>
-                        </div>
-
-                        {showNewSecretCodeFields && (
-                          <>
-                            <div>
-                              <label htmlFor="newSecretCode" className="block text-sm font-medium text-gray-700 mb-1">
-                                New Secret Access Code
-                              </label>
-                              <input
-                                id="newSecretCode"
-                                type={showNewSecretCode ? "text" : "password"}
-                                value={newSecretCode}
-                                onChange={(e) => setNewSecretCode(e.target.value)}
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                                required
-                                minLength={8}
-                              />
-                              <div className="flex items-center mt-1">
-                                <input
-                                  id="showNewSecretCode"
-                                  type="checkbox"
-                                  checked={showNewSecretCode}
-                                  onChange={() => setShowNewSecretCode((prev) => !prev)}
-                                  className="mr-2"
-                                />
-                                <label htmlFor="showNewSecretCode" className="text-xs text-gray-600 select-none">Show Secret Code</label>
-                              </div>
-                              {newSecretCode && newSecretCode.length < 8 && (
-                                <p className="mt-1 text-sm text-red-600">Secret code must be at least 8 characters</p>
-                              )}
-                            </div>
-
-                            <div>
-                              <label htmlFor="confirmNewSecretCode" className="block text-sm font-medium text-gray-700 mb-1">
-                                Confirm New Secret Access Code
-                              </label>
-                              <input
-                                id="confirmNewSecretCode"
-                                type={showConfirmNewSecretCode ? "text" : "password"}
-                                value={confirmNewSecretCode}
-                                onChange={(e) => setConfirmNewSecretCode(e.target.value)}
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                                required
-                              />
-                              <div className="flex items-center mt-1">
-                                <input
-                                  id="showConfirmNewSecretCode"
-                                  type="checkbox"
-                                  checked={showConfirmNewSecretCode}
-                                  onChange={() => setShowConfirmNewSecretCode((prev) => !prev)}
-                                  className="mr-2"
-                                />
-                                <label htmlFor="showConfirmNewSecretCode" className="text-xs text-gray-600 select-none">Show Secret Code</label>
-                              </div>
-                              {confirmNewSecretCode && newSecretCode !== confirmNewSecretCode && (
-                                <p className="mt-1 text-sm text-red-600">Secret codes do not match</p>
-                              )}
-                            </div>
-                          </>
+                  <div className="mb-4">
+                    <label htmlFor="newSecretCodeToSet" className="block text-sm font-semibold text-gray-800 mb-2">
+                      New Secret Access Code
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="newSecretCodeToSet"
+                        type={showNewSecretCode ? "text" : "password"}
+                        value={newSecretCode}
+                        onChange={(e) => setNewSecretCode(e.target.value)}
+                        className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base"
+                        placeholder="Enter new secret access code"
+                        disabled={isSecretCodeChanging}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewSecretCode(!showNewSecretCode)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700"
+                      >
+                        {showNewSecretCode ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.122m3.153-3.153A9.973 9.973 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.782 5.562M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                         )}
-                      </div>
-
-                      <div>
-                        <button
-                          type="submit"
-                          disabled={!isSecretCodeFormValid() || isSecretCodeChanging}
-                          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
-                            ${isSecretCodeFormValid() 
-                              ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500' 
-                              : 'bg-gray-400 cursor-not-allowed'} 
-                            focus:outline-none focus:ring-2 focus:ring-offset-2`}
-                        >
-                          {isSecretCodeChanging ? 'Updating...' : 'Update Secret Code'}
-                        </button>
-                      </div>
-                    </form>
+                      </button>
+                    </div>
                   </div>
-                )}
+
+                  <div className="mb-6">
+                    <label htmlFor="confirmNewSecretCodeToSet" className="block text-sm font-semibold text-gray-800 mb-2">
+                      Confirm New Secret Access Code
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="confirmNewSecretCodeToSet"
+                        type={showConfirmNewSecretCode ? "text" : "password"}
+                        value={confirmNewSecretCode}
+                        onChange={(e) => setConfirmNewSecretCode(e.target.value)}
+                        className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base"
+                        placeholder="Confirm new secret access code"
+                        disabled={isSecretCodeChanging}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmNewSecretCode(!showConfirmNewSecretCode)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700"
+                      >
+                        {showConfirmNewSecretCode ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.122m3.153-3.153A9.973 9.973 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.782 5.562M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleGenerateSecretCode}
+                      className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center"
+                      disabled={isSecretCodeChanging}
+                    >
+                      {isSecretCodeChanging ? (
+                        <div className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Setting...
+                        </div>
+                      ) : (
+                        'Set New Secret Code'
+                      )}
+                    </button>
+                  </div>
+                </div>
                 
-                {/* Account Actions */}
-                <div className="border border-gray-200 rounded-lg p-5">
+                {/* Logout and Delete Account Section */}
+                <div className="bg-red-50 rounded-lg p-6 shadow mb-6 border border-red-200">
                   <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
                     <span className="text-red-600">⚠️</span> Account Actions
                   </h2>
