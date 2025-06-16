@@ -494,8 +494,6 @@ router.delete('/users/:id', auth, adminAuth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
     }
-
-    // Also delete any associated device tokens for the deleted user
     await Device.deleteMany({ userId: id });
 
     res.status(200).json({ message: 'User and associated devices deleted successfully.' });
