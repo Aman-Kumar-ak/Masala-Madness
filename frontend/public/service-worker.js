@@ -247,9 +247,9 @@ async function updateCacheInBackground(request) {
     // Add cache-busting parameter to force fresh content
     const url = new URL(request.url);
     url.searchParams.set('_cache', Date.now());
-
+    
     console.log('Attempting to update cache for URL:', url.toString());
-
+    
     const response = await fetch(url.toString());
     if (response.ok) {
       const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);

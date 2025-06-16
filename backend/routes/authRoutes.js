@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
 const { auth, adminAuth } = require('../middleware/authMiddleware');
+const SecretCode = require('../models/SecretCode');
 
 // Helper to get current IST date
 function getISTDate() {
@@ -494,11 +495,111 @@ router.delete('/users/:id', auth, adminAuth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
     }
+
+    // Also delete any associated device tokens for the deleted user
     await Device.deleteMany({ userId: id });
 
     res.status(200).json({ message: 'User and associated devices deleted successfully.' });
   } catch (error) {
     console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Secret Code Routes
+
+// Initialize the secret code (admin only, only once)
+router.post('/secret-code/initialize', auth, adminAuth, async (req, res) => {
+  try {
+    const { secretCode } = req.body;
+    if (!secretCode) {
+      return res.status(400).json({ message: 'Secret code is required.' });
+    }
+
+    let existingSecretCode = await SecretCode.findOne();
+    if (existingSecretCode) {
+      return res.status(409).json({ message: 'Secret code already initialized.' });
+    }
+
+    const newSecretCode = new SecretCode({
+      secretCode,
+      createdBy: req.user.userId,
+      lastUsedAt: Date.now(), // Set initial usage timestamp
+      lastUsedBy: req.user.userId,
+      lastUsedWhere: 'Initialization', 
+    });
+    await newSecretCode.save();
+    res.status(201).json({ message: 'Secret code initialized successfully.' });
+  } catch (error) {
+    console.error('Secret code initialization error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Verify the secret code
+router.post('/secret-code/verify', auth, async (req, res) => {
+  try {
+    const { secretCode, usedWhere } = req.body;
+    if (!secretCode) {
+      return res.status(400).json({ message: 'Secret code is required.' });
+    }
+
+    const storedSecret = await SecretCode.findOne();
+    if (!storedSecret) {
+      return res.status(404).json({ message: 'Secret code not set up. Please initialize it.' });
+    }
+
+    const isMatch = await storedSecret.compareSecretCode(secretCode);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid secret code.' });
+    }
+
+    // Update last used info
+    storedSecret.lastUsedAt = Date.now();
+    storedSecret.lastUsedBy = req.user.userId;
+    storedSecret.lastUsedWhere = usedWhere || 'Unknown';
+    await storedSecret.save();
+
+    res.status(200).json({ message: 'Secret code verified successfully.' });
+  } catch (error) {
+    console.error('Secret code verification error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Change the secret code (admin only)
+router.put('/secret-code/change', auth, adminAuth, async (req, res) => {
+  try {
+    const { currentSecretCode, newSecretCode } = req.body;
+    if (!currentSecretCode || !newSecretCode) {
+      return res.status(400).json({ message: 'Current and new secret codes are required.' });
+    }
+
+    const storedSecret = await SecretCode.findOne();
+    if (!storedSecret) {
+      return res.status(404).json({ message: 'Secret code not set up. Please initialize it.' });
+    }
+
+    const isMatch = await storedSecret.compareSecretCode(currentSecretCode);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid current secret code.' });
+    }
+
+    // Add current secret to history
+    storedSecret.passwordHistory.push({
+      secretCode: storedSecret.secretCode, // This is already hashed
+      changedBy: req.user.userId,
+      timestamp: Date.now(),
+    });
+    
+    // Update the secret code and set updatedBy
+    storedSecret.secretCode = newSecretCode; // pre-save hook will hash this
+    storedSecret.updatedBy = req.user.userId;
+    await storedSecret.save();
+
+    res.status(200).json({ message: 'Secret code changed successfully.' });
+  } catch (error) {
+    console.error('Secret code change error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

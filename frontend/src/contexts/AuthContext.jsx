@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }) => {
       }
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('qr_verification_expiry'); // Invalidate QR/Settings secret code access on logout
     } catch (error) {
       console.error('Error in logout process:', error);
     } finally {
@@ -140,12 +141,10 @@ export const AuthProvider = ({ children }) => {
     }
     
     const verifyUser = async () => {
-      console.log('verifyUser: Checking authentication status...');
       setLoading(true); // Ensure loading is true at the start of every verification attempt
 
       try {
         if (!checkSessionExpiry()) {
-          console.log('verifyUser: Session expired or invalid, logging out.');
           logoutUser();
           navigate('/login');
           return;
@@ -159,9 +158,7 @@ export const AuthProvider = ({ children }) => {
             setUser(parsedUser); // user will contain role
             setIsAuthenticated(true);
             updateLastActivityTime();
-            console.log('verifyUser: JWT verified, user from sessionStorage:', parsedUser);
           } else {
-            console.warn('verifyUser: JWT verified flag present but no user data in sessionStorage. Logging out.');
             logoutUser();
             navigate('/login');
           }
@@ -169,7 +166,6 @@ export const AuthProvider = ({ children }) => {
         }
 
         const token = sessionStorage.getItem('token');
-        console.log('verifyUser: Token from sessionStorage:', token ? token.substring(0, 10) + '...' : 'No token');
         if (token) {
           try {
             const data = await api.get('/auth/verify');
@@ -179,36 +175,28 @@ export const AuthProvider = ({ children }) => {
               updateLastActivityTime();
               sessionStorage.setItem('jwtVerified', 'true');
               sessionStorage.setItem('user', JSON.stringify(data.user));
-              console.log('verifyUser: User authenticated via API, user data:', data.user);
             } else {
-              console.warn('verifyUser: API verification succeeded but no user data. Logging out.');
               logoutUser();
               navigate('/login');
             }
           } catch (jwtError) {
-            console.error('verifyUser: JWT verification error during API call:', jwtError);
             logoutUser();
             navigate('/login');
           }
         } else {
-          console.log('verifyUser: No JWT found, attempting to restore session from device token.');
           await restoreSession(); // restoreSession will handle its own loading/logout/navigate
         }
       } catch (error) {
-        console.error('verifyUser: General authentication verification failed:', error);
         logoutUser();
         navigate('/login');
       } finally {
         setLoading(false); // Ensure loading is always set to false
-        console.log('verifyUser: Final isAuthenticated:', isAuthenticated, 'user:', user);
       }
     };
     verifyUser();
     // Set up periodic checks for session expiry
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
-        console.log('Session expired during periodic check');
-        // Force navigation to login if session expired
         logoutUser();
         navigate('/login');
       }

@@ -2,49 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api';
 
-const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess }) => {
+const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationType = "personalPassword", usedWhere = "Unknown", currentUserId }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(''); // For personal password verification
   const navigate = useNavigate();
   
   // Get the username from sessionStorage when component mounts or isOpen changes
   useEffect(() => {
     if (isOpen) { // Only fetch username when dialog is open
-      try {
-        const user = JSON.parse(sessionStorage.getItem('user'));
-        if (user && user.username) {
-          setUsername(user.username);
-        } else {
-          // If user data is missing, maybe redirect or show an error
-          console.error('User data missing in session storage. Cannot verify password.');
-          setError('User data missing. Please log in again.');
-          // Optionally navigate away or disable verification
+      if (verificationType === "personalPassword") {
+        try {
+          const user = JSON.parse(sessionStorage.getItem('user'));
+          if (user && user.username) {
+            setUsername(user.username);
+          } else {
+            console.error('User data missing in session storage for personal password verification.');
+            setError('User data missing. Please log in again.');
+          }
+        } catch (error) {
+          console.error('Error getting username from session storage:', error);
+          setError('Error accessing user data. Please try again.');
         }
-      } catch (error) {
-        console.error('Error getting username from session storage:', error);
-        setError('Error accessing user data. Please try again.');
       }
     } else {
-      // Reset username and error when dialog is closed
+      // Reset states when dialog is closed
       setUsername('');
       setError('');
-      setPassword(''); // Also clear password on close
+      setPassword('');
     }
-  }, [isOpen]); // Depend on isOpen
+  }, [isOpen, verificationType]);
   
   const handleVerify = async (e) => {
     e.preventDefault();
     
     if (!password.trim()) {
-      setError('Please enter your password');
-      return;
-    }
-    
-    if (!username) {
-      setError('User data missing. Cannot verify.');
-      console.error('Username is not set. Cannot proceed with verification.');
+      setError('Please enter the password');
       return;
     }
     
@@ -54,166 +48,205 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess }) => {
     try {
       let token = sessionStorage.getItem('token');
       
-      // Fallback: If no session token, attempt mini-login to get one
       if (!token) {
-        console.log('No session token found, attempting mini-login for verification...');
-        const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          // Pass rememberDevice: false to avoid creating new device tokens during verification
-          body: JSON.stringify({ username: username, password: password, rememberDevice: false })
-        });
+        // Fallback: If no session token, attempt mini-login to get one
+        // This part is primarily for personal password verification where a user might have a stale session.
+        // For secret code, the user is already logged in, so a token should exist.
+        if (verificationType === "personalPassword") {
+          console.log('No session token found, attempting mini-login for verification...');
+          if (!username) {
+            setError('User data missing. Cannot proceed with verification.');
+            setIsVerifying(false);
+            return;
+          }
+          const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, password: password, rememberDevice: false })
+          });
 
-        let loginData = {};
-        try {
-          loginData = await loginResponse.json();
-        } catch (jsonErr) {
-          console.error('Mini-login: Failed to parse JSON response', jsonErr);
-          throw new Error('Server error during verification login. Please try again later.');
-        }
+          let loginData = {};
+          try {
+            loginData = await loginResponse.json();
+          } catch (jsonErr) {
+            console.error('Mini-login: Failed to parse JSON response', jsonErr);
+            throw new Error('Server error during verification login. Please try again later.');
+          }
 
-        if (!loginResponse.ok || loginData.status !== 'success' || !loginData.token) {
-          console.warn('Mini-login failed during verification', loginData.message);
-          // If login fails, it means the password was likely incorrect
-          setError(loginData.message || 'Incorrect password. Please try again.');
+          if (!loginResponse.ok || loginData.status !== 'success' || !loginData.token) {
+            console.warn('Mini-login failed during verification', loginData.message);
+            setError(loginData.message || 'Incorrect password. Please try again.');
+            setIsVerifying(false);
+            return;
+          }
+          token = loginData.token;
+          console.log('Mini-login successful, proceeding with verification using new token.');
+        } else {
+          setError('Authentication token missing. Please log in.');
           setIsVerifying(false);
-          return; // Stop here if mini-login fails
+          return;
         }
-
-        // Mini-login successful, use the new token for verification
-        token = loginData.token;
-        console.log('Mini-login successful, proceeding with verification using new token.');
-        // Optionally store the new token in sessionStorage if you want to extend the session
-        // sessionStorage.setItem('token', token);
       }
       
-      // Proceed with password verification using the obtained token
-      console.log('Attempting to verify password...');
-      const response = await fetch(`${API_BASE_URL}/auth/verify-password`, {
+      let apiUrl;
+      let bodyData = {};
+
+      if (verificationType === "secretCode") {
+        apiUrl = `${API_BASE_URL}/auth/secret-code/verify`;
+        bodyData = { secretCode: password, usedWhere: usedWhere };
+        if (currentUserId) { // Add currentUserId to body for backend audit trail
+          bodyData.currentUserId = currentUserId;
+        }
+      } else { // Default to personalPassword
+        apiUrl = `${API_BASE_URL}/auth/verify-password`;
+        bodyData = { password: password };
+      }
+
+      console.log(`Attempting to verify ${verificationType}...`);
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // Use the token (session or new from mini-login)
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ password: password })
+        body: JSON.stringify(bodyData)
       });
       
       const data = await response.json();
       
-      if (response.ok && data.status === 'success') {
-        console.log(`Password successfully verified for user ${username}`);
+      if (response.ok && data.message.includes('successfully')) {
+        console.log(`${verificationType} successfully verified.`);
         
-        // Set the verification timestamp in localStorage with 10-minute expiry
-        const expiryTime = new Date().getTime() + (10 * 60 * 1000); // Current time + 10 minutes
-        localStorage.setItem('qr_verification_expiry', expiryTime.toString());
+        // Set the verification timestamp in localStorage with 10-minute expiry for QR/Settings access
+        if (verificationType === "secretCode") {
+          const expiryTime = new Date().getTime() + (10 * 60 * 1000); // Current time + 10 minutes
+          localStorage.setItem('qr_verification_expiry', expiryTime.toString()); // Reusing the same key for both QR and Settings secret access
+        }
         
-        // Clear password and call success callback
         setPassword('');
-        setError(''); // Clear any previous error
+        setError('');
         onSuccess();
       } else {
-        // If verify-password endpoint returns an error (e.g., token invalid somehow)
-        console.error(`Password verification failed for user ${username}:`, data.message);
-        // Show error but don't redirect to login page
-        setError(data.message || 'Incorrect password. Please try again.');
-        // Clear potentially bad token if verification failed after mini-login
-        if (!sessionStorage.getItem('token')) { // Only remove if we didn't store the new token from mini-login
-             // Consider adding logic here if you decide to store the mini-login token
-        }
+        console.error(`${verificationType} verification failed:`, data.message);
+        setError(data.message || `Incorrect ${verificationType === "secretCode" ? "secret code" : "password"}. Please try again.`);
       }
     } catch (error) {
-      console.error(`Password verification process failed for user ${username}:`, error);
-      setError('Failed to verify password. Please try again.');
+      console.error(`${verificationType} verification process failed:`, error);
+      setError(`Failed to verify ${verificationType === "secretCode" ? "secret code" : "password"}. Please try again.`);
     } finally {
       setIsVerifying(false);
     }
   };
   
   const handleCancel = () => {
-    // Clear password field and error
     setPassword('');
     setError('');
-    // Navigate away when cancel button is explicitly clicked
-    console.log(`User ${username || 'Admin'} cancelled password verification`);
-    // Use onClose to handle closing behavior defined in parent (Qr.jsx)
+    console.log(`User ${username || currentUserId || 'Admin'} cancelled verification for ${usedWhere}`);
     onClose();
-    // Optionally navigate home if needed, but Qr.jsx might handle this based on state
-     navigate('/');
+    navigate('/'); // Navigate back to home if cancelled from QR/Settings
   };
   
   const handleOverlayClick = () => {
-    // Clear password field and error
     setPassword('');
     setError('');
-    // Use onClose to handle closing behavior defined in parent (Qr.jsx)
-    console.log(`User ${username || 'Admin'} closed password verification dialog`);
+    console.log(`User ${username || currentUserId || 'Admin'} closed verification dialog for ${usedWhere}`);
     onClose();
-    // Optionally navigate home if needed, but Qr.jsx might handle this based on state
+    // Do not navigate on overlay click by default unless explicitly needed
     // navigate('/');
   };
+  
+  // Add/remove no-scroll class to body to prevent background scrolling
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('no-scroll');
+    } else {
+      document.body.classList.remove('no-scroll');
+    }
+    return () => {
+      document.body.classList.remove('no-scroll'); // Cleanup on unmount
+    };
+  }, [isOpen]);
   
   // Prevent dialog from rendering if not open
   if (!isOpen) return null;
   
+  const dialogTitle = verificationType === "secretCode" ? "Admin Secret Access Required" : "Admin Verification Required";
+  const dialogMessage = verificationType === "secretCode" 
+    ? "Please enter the secret access code to proceed." 
+    : "Please enter your admin password to access this section.";
+  const passwordLabel = verificationType === "secretCode" ? "Secret Access Code" : "Admin Password";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black opacity-50" onClick={handleOverlayClick}></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-orange-100 to-orange-200 opacity-90 pointer-events-auto" onClick={handleOverlayClick}></div>
       
       {/* Dialog */}
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 z-10 overflow-hidden">
-        <div className="bg-red-500 px-6 py-4">
-          <h2 className="text-xl font-semibold text-white flex items-center">
-            <span className="mr-2">🔐</span>
-            Admin Verification Required
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 z-10 overflow-hidden border border-orange-200">
+        <div className="bg-gradient-to-r from-red-500 to-orange-500 px-6 py-4">
+          <h2 className="text-2xl font-bold text-white flex items-center justify-center">
+            <span className="mr-3 text-3xl">🔐</span>
+            {dialogTitle}
           </h2>
         </div>
         
-        <form onSubmit={handleVerify} className="p-6">
-          <p className="text-gray-600 mb-4">
-            Please enter your admin password to access the QR settings.
+        <form onSubmit={handleVerify} className="p-6 space-y-5">
+          <p className="text-gray-700 text-center text-base leading-relaxed">
+            {dialogMessage}
           </p>
           
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm mb-4" role="alert">
               <span className="block sm:inline">{error}</span>
             </div>
           )}
           
-          <div className="mb-6">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Admin Password
+          <div>
+            <label htmlFor="password" className="block text-sm font-semibold text-gray-800 mb-2">
+              {passwordLabel}
             </label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-              placeholder="Enter your password"
+              className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base"
+              placeholder={verificationType === "secretCode" ? "Enter secret code" : "Enter your password"}
+              autoComplete={verificationType === "secretCode" ? "off" : "current-password"}
               autoFocus
               disabled={isVerifying}
             />
           </div>
           
-          <div className="mt-2 text-sm text-red-600">
+          <div className="text-sm text-gray-500 text-center">
             <p>Your verification will be valid for 10 minutes</p>
           </div>
           
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
               onClick={handleCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors duration-200"
+              disabled={isVerifying}
             >
               Cancel
             </button>
             <button
               type="submit"
+              className="px-6 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg hover:from-red-700 hover:to-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors duration-200"
               disabled={isVerifying}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
-              {isVerifying ? 'Verifying...' : 'Verify'}
+              {isVerifying ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Verifying...
+                </div>
+              ) : (
+                'Verify'
+              )}
             </button>
           </div>
         </form>

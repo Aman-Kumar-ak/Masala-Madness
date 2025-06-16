@@ -6,6 +6,7 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
 import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
+import PasswordVerificationDialog from '../../components/PasswordVerificationDialog';
 
 const Settings = () => {
   useKeyboardScrollAdjustment();
@@ -37,6 +38,24 @@ const Settings = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // State for secret code management (for QR and Admin Control)
+  const [showSecretCodeDialog, setShowSecretCodeDialog] = useState(false);
+  const [isSecretCodeAuthenticated, setIsSecretCodeAuthenticated] = useState(false);
+  const [secretCodeTimeLeft, setSecretCodeTimeLeft] = useState(null);
+  const [currentSecretCode, setCurrentSecretCode] = useState('');
+  const [newSecretCode, setNewSecretCode] = useState('');
+  const [confirmNewSecretCode, setConfirmNewSecretCode] = useState('');
+  const [secretCodeError, setSecretCodeError] = useState('');
+  const [secretCodeSuccess, setSecretCodeSuccess] = useState('');
+  const [isSecretCodeChanging, setIsSecretCodeChanging] = useState(false);
+  const [showNewSecretCodeFields, setShowNewSecretCodeFields] = useState(false);
+  const [isCurrentSecretCodeValid, setIsCurrentSecretCodeValid] = useState(false);
+
+  // Add state for secret code password visibility
+  const [showCurrentSecretCode, setShowCurrentSecretCode] = useState(false);
+  const [showNewSecretCode, setShowNewSecretCode] = useState(false);
+  const [showConfirmNewSecretCode, setShowConfirmNewSecretCode] = useState(false);
   
   // State for confirmation dialogs
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -72,10 +91,9 @@ const Settings = () => {
   // Add state for delete confirmation
   const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
-  
-  // New state for initial full-page content loading
-  const [isPageLoading, setIsPageLoading] = useState(true);
-  const [pageLoadingMessage, setPageLoadingMessage] = useState("Loading settings...");
+
+  // New state for localized loading in Admin Control section
+  const [isAdminControlLoading, setIsAdminControlLoading] = useState(false);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -84,12 +102,9 @@ const Settings = () => {
     }
   }, [isAuthenticated, navigate]);
   
-  // Unified useEffect for initial data fetching
+  // Unified useEffect for initial data fetching and secret code authentication check
   useEffect(() => {
     const loadAllInitialData = async () => {
-      setIsPageLoading(true);
-      setPageLoadingMessage("Loading settings...");
-
       const initialPromises = [];
 
       // Fetch version information
@@ -103,41 +118,66 @@ const Settings = () => {
           })
       );
 
-      // Fetch user devices (if authenticated and admin)
-      if (isAuthenticated && user?.role === 'admin') {
-        setPageLoadingMessage("Loading your device sessions...");
-        initialPromises.push(
-          getUserDevices()
-            .then(setDevices)
-            .catch(error => {
-              console.error('Error loading devices:', error);
-              setRevokeError('Failed to load devices.');
-            })
-        );
-
-        // Fetch users and all devices if admin (as adminControl is default tab)
-        setPageLoadingMessage("Loading");
-        initialPromises.push(
-          api.get('/auth/users')
-            .then(setUsers)
-            .catch(err => setUserError('Failed to load users.'))
-        );
-        initialPromises.push(
-          api.get('/auth/devices/all')
-            .then(setAllDevices)
-            .catch(err => setDeviceError('Failed to load all devices.'))
-        );
+      // Check secret code authentication status if admin - but don't block page load
+      if (user?.role === 'admin') {
+        const verificationExpiry = localStorage.getItem('qr_verification_expiry');
+        if (verificationExpiry) {
+          const expiryTime = parseInt(verificationExpiry);
+          const currentTime = new Date().getTime();
+          if (currentTime < expiryTime) {
+            setIsSecretCodeAuthenticated(true);
+            const remainingMs = expiryTime - currentTime;
+            const remainingMinutes = Math.floor(remainingMs / 60000);
+            const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+            setSecretCodeTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
+            // Admin data will be fetched when the section is unlocked, not on initial load
+          } else {
+            localStorage.removeItem('qr_verification_expiry');
+            setSecretCodeTimeLeft(null);
+            setIsSecretCodeAuthenticated(false);
+          }
+        } else {
+          setIsSecretCodeAuthenticated(false);
+        }
       }
 
       await Promise.allSettled(initialPromises);
-      setIsPageLoading(false);
     };
 
-    // Only attempt to load if authentication status is known
+    // Only attempt to load if authentication status is known and user data is available
     if (isAuthenticated !== undefined && user !== undefined) {
       loadAllInitialData();
     }
-  }, [isAuthenticated, user, getUserDevices]); // Dependencies to re-run if auth status changes
+  }, [isAuthenticated, user]); // Removed getUserDevices as a dependency since its call is moved
+
+  // Periodically check secret code verification expiry
+  useEffect(() => {
+    if (isSecretCodeAuthenticated) {
+      const timer = setInterval(() => {
+        const verificationExpiry = localStorage.getItem('qr_verification_expiry');
+        if (verificationExpiry) {
+          const expiryTime = parseInt(verificationExpiry);
+          const currentTime = new Date().getTime();
+          if (currentTime < expiryTime) {
+            const remainingMs = expiryTime - currentTime;
+            const remainingMinutes = Math.floor(remainingMs / 60000);
+            const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+            setSecretCodeTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
+          } else {
+            localStorage.removeItem('qr_verification_expiry');
+            setSecretCodeTimeLeft(null);
+            setIsSecretCodeAuthenticated(false);
+            showError('Secret code verification expired. Please re-verify.');
+          }
+        } else {
+          setIsSecretCodeAuthenticated(false);
+          setSecretCodeTimeLeft(null);
+        }
+      }, 1000); // Check every second
+      
+      return () => clearInterval(timer);
+    }
+  }, [isSecretCodeAuthenticated, showError]);
   
   // Verify current password
   const verifyCurrentPassword = async () => {
@@ -424,11 +464,11 @@ const Settings = () => {
 
   // Refactor existing useEffects to only trigger on tab change, and not if `isPageLoading` is true
   useEffect(() => {
-    if (activeTab === 'adminControl' && user?.role === 'admin' && !isPageLoading) {
+    if (activeTab === 'adminControl' && user?.role === 'admin' && isSecretCodeAuthenticated) {
       fetchUsers();
       fetchAllDevices();
     }
-  }, [activeTab, user, isPageLoading, fetchUsers, fetchAllDevices]); // Add fetchUsers, fetchAllDevices as dependencies
+  }, [activeTab, user, isSecretCodeAuthenticated, fetchUsers, fetchAllDevices]); // Add fetchUsers, fetchAllDevices as dependencies
 
   // Add user handler
   const handleAddUser = async (e) => {
@@ -528,491 +568,771 @@ const Settings = () => {
     setShowDeleteUserConfirm(false);
     setUserToDelete(null);
   };
-  
-  return (
-    <div className="min-h-screen bg-orange-50">
-      {/* Full-page Loading Splash Screen for initial content load */}
-      {isPageLoading && (
-        <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm z-[100] flex items-center justify-center flex-col pointer-events-none cursor-wait">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-orange-500 mb-4"></div>
-          <p className="text-gray-700 text-xl font-medium">{pageLoadingMessage}</p>
-        </div>
-      )}
 
-      {/* Main content, conditionally rendered when not page loading */}
-      {!isPageLoading && (
-        <>
+  // Handle successful secret code verification for Admin Control access
+  const handleSecretCodeSuccess = async () => {
+    setShowSecretCodeDialog(false);
+    setIsSecretCodeAuthenticated(true);
+    // Set a timestamp for 15 minutes from now
+    const expiryTime = new Date().getTime() + (15 * 60 * 1000); // 15 minutes
+    localStorage.setItem('qr_verification_expiry', expiryTime.toString());
+    showSuccess('Secret access granted for 15 minutes.');
+    
+    // Start loading admin data specific to this section
+    setIsAdminControlLoading(true);
+    try {
+      // Fetch users
+      await fetchUsers();
+      // Fetch all devices
+      await fetchAllDevices();
+      // Fetch user's own devices for device management (if not already loaded by initial load)
+      await getUserDevices().then(setDevices);
+    } catch (err) {
+      showError('Failed to load admin data.');
+      console.error('Error fetching admin data:', err);
+    } finally {
+      setIsAdminControlLoading(false);
+    }
+  };
+
+  // Handle secret code dialog close (e.g., user cancels)
+  const handleSecretCodeDialogClose = () => {
+    setShowSecretCodeDialog(false);
+  };
+
+  // Handle change secret code
+  const handleChangeSecretCode = async (e) => {
+    e.preventDefault();
+
+    setSecretCodeError('');
+    setSecretCodeSuccess('');
+
+    if (!currentSecretCode.trim()) {
+      setSecretCodeError('Please enter your current secret code.');
+      return;
+    }
+
+    if (newSecretCode.length < 8) {
+      setSecretCodeError('New secret code must be at least 8 characters.');
+      return;
+    }
+
+    if (newSecretCode !== confirmNewSecretCode) {
+      setSecretCodeError('New secret codes do not match.');
+      return;
+    }
+
+    setIsSecretCodeChanging(true);
+    try {
+      const response = await api.put('/auth/secret-code/change', {
+        currentSecretCode,
+        newSecretCode
+      });
+
+      if (response.status === 200) {
+        setSecretCodeSuccess('Secret access code changed successfully!');
+        setCurrentSecretCode('');
+        setNewSecretCode('');
+        setConfirmNewSecretCode('');
+        setIsCurrentSecretCodeValid(false); // Invalidate current secret code validation
+        setShowNewSecretCodeFields(false);
+      } else {
+        setSecretCodeError(response.message || 'Failed to change secret access code.');
+      }
+    } catch (error) {
+      setSecretCodeError(error.message || 'Error changing secret access code.');
+      console.error('Error changing secret access code:', error);
+    } finally {
+      setIsSecretCodeChanging(false);
+    }
+  };
+
+  // Verify current secret code
+  const verifyCurrentSecretCode = async () => {
+    if (!currentSecretCode.trim()) {
+      setSecretCodeError('Please enter your current secret code.');
+      return;
+    }
+
+    setIsSecretCodeChanging(true);
+    setSecretCodeError('');
+    try {
+      const response = await api.post('/auth/secret-code/verify', {
+        secretCode: currentSecretCode,
+        usedWhere: "Settings Secret Code Change Verification",
+        currentUserId: user?._id,
+      });
+      if (response.status === 200) {
+        setIsCurrentSecretCodeValid(true);
+        setShowNewSecretCodeFields(true);
+        setSecretCodeError('');
+        showSuccess('Current secret code verified.');
+      } else {
+        setIsCurrentSecretCodeValid(false);
+        setShowNewSecretCodeFields(false);
+        setSecretCodeError(response.message || 'Invalid current secret code.');
+      }
+    } catch (error) {
+      setIsCurrentSecretCodeValid(false);
+      setShowNewSecretCodeFields(false);
+      setSecretCodeError(error.message || 'Failed to verify current secret code.');
+      console.error('Secret code verification error:', error);
+    } finally {
+      setIsSecretCodeChanging(false);
+    }
+  };
+
+  const isSecretCodeFormValid = () => {
+    return (
+      isCurrentSecretCodeValid &&
+      newSecretCode.length >= 8 &&
+      newSecretCode === confirmNewSecretCode
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-100">
       <BackButton />
       
-          <div className="p-4 pt-16 max-w-7xl mx-auto">
-            <div>
-              {/* Tab Buttons */}
-              <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 border border-gray-200 shadow-sm">
-                <button
-                  className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
-                    ${activeTab === 'adminControl' ? 'bg-white text-blue-700 shadow-sm' : ''}`}
-                  onClick={() => setActiveTab('adminControl')}
-                >
-                   Devices and Roles
-                </button>
-                <button
-                  className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
-                    ${activeTab === 'personalSettings' ? 'bg-white text-blue-700 shadow-sm' : ''}`}
-                  onClick={() => setActiveTab('personalSettings')}
-                >
-                  Personal Settings
-                </button>
-              </div>
-
-              {/* Content based on active tab */}
-              {activeTab === 'adminControl' && (
-                <div className="space-y-8">
-                  {/* Device Management Card - Show unique users only */}
-                  <div className="bg-white shadow-lg rounded-xl p-6 border border-blue-200">
-                    <div className="flex items-center gap-3 mb-6">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
-                        <i className="fas fa-tablet-alt"></i>
-                      </span>
-                      <h2 className="text-2xl font-bold text-blue-700">User Devices & Status</h2>
-                    </div>
-                    {/* Unique Users Table */}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm border rounded-xl">
-                        <thead>
-                          <tr className="bg-blue-50">
-                            <th className="px-2 py-2 border"></th>
-                            <th className="px-4 py-2 border">User Name</th>
-                            <th className="px-4 py-2 border">Mobile Number</th>
-                            <th className="px-4 py-2 border">Role</th>
-                            <th className="px-4 py-2 border">Status</th>
-                            <th className="px-4 py-2 border">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users && users.length > 0 ? users.map(u => (
-                            <tr key={u._id} className="border-b hover:bg-blue-50 transition">
-                              <td className="px-2 py-2 border text-center">
-                                <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                              </td>
-                              <td className="px-4 py-2 border">{u.name}</td>
-                              <td className="px-4 py-2 border">{u.mobileNumber}</td>
-                              <td className="px-4 py-2 border capitalize">{u.role}</td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    className="focus:outline-none"
-                                    onClick={() => handleToggleActive(u)}
-                                    aria-label={u.isActive ? 'Disable account' : 'Enable account'}
-                                    type="button"
-                                  >
-                                    <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
-                                      style={{ position: 'relative' }}>
-                                      <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
-                                    </span>
-                                  </button>
-                                  <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
-                                </div>
-                              </td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="inline-flex items-center gap-1">
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
-                                    onClick={() => openEditUserModal(u)}
-                                    title="Edit User"
-                                    aria-label="Edit User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
-                                    Edit
-                                  </button>
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
-                                    onClick={() => handleDeleteUser(u)}
-                                    title="Delete User"
-                                    aria-label="Delete User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )) : (
-                            <tr><td colSpan={6} className="text-center text-gray-400 py-6">No users found.</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* User Management Card */}
-                  <div className="bg-white shadow-lg rounded-xl p-6 border border-emerald-200">
-                    <div className="flex items-center gap-3 mb-6">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
-                        <i className="fas fa-users-cog"></i>
-                      </span>
-                      <h2 className="text-2xl font-bold text-emerald-700">User Management</h2>
-                    </div>
-                    {/* Add User Form */}
-                    <form onSubmit={async (e) => {
-                      e.preventDefault();
-                      setAddUserLoading(true);
-                      setUserError('');
-                      try {
-                        await api.post('/auth/register', addUserForm);
-                        showSuccess('User added successfully!');
-                        setShowAddUserModal(false);
-                        setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
-                        await fetchUsers();
-                        window.location.reload(); // Force reload to ensure new user can log in
-                      } catch (err) {
-                        showError(err.message || 'Failed to add user.');
-                      } finally {
-                        setAddUserLoading(false);
-                      }
-                    }} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Name</label>
-                        <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Mobile Number</label>
-                        <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.mobileNumber} onChange={e => setAddUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Password</label>
-                        <input type="password" className="w-full border rounded px-3 py-2" required value={addUserForm.password} onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Role</label>
-                        <select className="w-full border rounded px-3 py-2" value={addUserForm.role} onChange={e => setAddUserForm(f => ({ ...f, role: e.target.value }))}>
-                          <option value="admin">Admin</option>
-                          <option value="worker">Worker</option>
-                        </select>
-                      </div>
-                      <div className="md:col-span-4 flex justify-end mt-2">
-                        <button type="submit" className="px-6 py-2 rounded bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
-                      </div>
-                    </form>
-                    {/* User Table */}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm border rounded-xl">
-                        <thead>
-                          <tr className="bg-emerald-50">
-                            <th className="px-2 py-2 border"></th>
-                            <th className="px-4 py-2 border">Name</th>
-                            <th className="px-4 py-2 border">Mobile Number</th>
-                            <th className="px-4 py-2 border">Role</th>
-                            <th className="px-4 py-2 border">Active</th>
-                            <th className="px-4 py-2 border">Last Login</th>
-                            <th className="px-4 py-2 border">Created</th>
-                            <th className="px-4 py-2 border">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users && users.length > 0 ? users.map(u => (
-                            <tr key={u._id} className="border-b hover:bg-emerald-50 transition">
-                              <td className="px-2 py-2 border text-center">
-                                <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                              </td>
-                              <td className="px-4 py-2 border">{u.name}</td>
-                              <td className="px-4 py-2 border">{u.mobileNumber}</td>
-                              <td className="px-4 py-2 border capitalize">{u.role}</td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    className="focus:outline-none"
-                                    onClick={() => handleToggleActive(u)}
-                                    aria-label={u.isActive ? 'Disable account' : 'Enable account'}
-                                    type="button"
-                                  >
-                                    <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
-                                      style={{ position: 'relative' }}>
-                                      <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
-                                    </span>
-                                  </button>
-                                  <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-2 border">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '-'}</td>
-                              <td className="px-4 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="inline-flex items-center gap-1">
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
-                                    onClick={() => openEditUserModal(u)}
-                                    title="Edit User"
-                                    aria-label="Edit User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
-                                    Edit
-                                  </button>
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
-                                    onClick={() => handleDeleteUser(u)}
-                                    title="Delete User"
-                                    aria-label="Delete User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )) : (
-                            <tr><td colSpan={8} className="text-center text-gray-400 py-6">No users found.</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Edit User Modal (reuse ConfirmationDialog) */}
-                  <ConfirmationDialog
-                    isOpen={showEditUserModal}
-                    onClose={() => setShowEditUserModal(false)}
-                    title="Edit User"
-                    confirmText={null}
-                    cancelText={null}
-                    customContent={(
-                      <form onSubmit={handleEditUser} className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Name</label>
-                          <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Mobile Number</label>
-                          <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Password (leave blank to keep unchanged)</label>
-                          <input type="password" className="w-full border rounded px-3 py-2" value={editUserForm.password} onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Role</label>
-                          <select className="w-full border rounded px-3 py-2" value={editUserForm.role} onChange={e => setEditUserForm(f => ({ ...f, role: e.target.value }))}>
-                            <option value="admin">Admin</option>
-                            <option value="worker">Worker</option>
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
-                          <label htmlFor="isActive" className="text-sm">Active</label>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
-                          <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
-                        </div>
-                      </form>
-                    )}
-              />
-            </div>
-              )}
-
-              {activeTab === 'personalSettings' && (
-                <div className="space-y-6">
-                  <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200 mb-6 min-h-[calc(100vh-220px)] overflow-y-auto">
-                    <div className="flex items-center gap-4 mb-6">
-                      
-                      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
-                        Personal Settings
-                      </h1>
+      <div className="p-4 pt-16 max-w-7xl mx-auto">
+        <div>
+          {/* Tab Buttons */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 border border-gray-200 shadow-sm">
+            <button
+              className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
+                ${activeTab === 'adminControl' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-800'}`}
+              onClick={() => setActiveTab('adminControl')}
+            >
+              Devices and Roles
+            </button>
+            <button
+              className={`w-1/2 py-2 px-4 text-center rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 
+                ${activeTab === 'personalSettings' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-800'}`}
+              onClick={() => setActiveTab('personalSettings')}
+            >
+              Personal Settings
+            </button>
           </div>
-          
-          {user && (
-            <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-              <h2 className="text-lg font-semibold text-blue-800 mb-2">Current User</h2>
-              <p className="text-gray-700">
-                Logged in as: <span className="font-medium">{user.username}</span>
-              </p>
+
+          {/* Content based on active tab */}
+          {activeTab === 'adminControl' && user?.role === 'admin' && (
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 md:p-8 border border-gray-200 relative min-h-[300px] flex items-center justify-center">
+              {/* Conditional content for Admin Controls */}
+              {!isSecretCodeAuthenticated ? (
+                <div className="text-center">
+                  <div className="text-6xl mb-5">🔒</div>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-3">Admin Controls Locked</h2>
+                  <p className="text-gray-600 mb-6 text-lg">
+                    A secret access code is required to manage devices and user roles.
+                  </p>
+                  <p className="text-gray-500 mb-4 text-sm">
+                    Once verified, you'll have access for 10 minutes without re-entering the code.
+                  </p>
+                  <button
+                    onClick={() => setShowSecretCodeDialog(true)}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-lg"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Unlock Admin
+                  </button>
+                </div>
+              ) : (
+                <div className="w-full">
+                  {/* Actual Admin Controls content */}
+                  <h2 className="text-xl font-bold text-gray-800 mb-6">Device and Roles Management</h2>
+                  {secretCodeTimeLeft && (
+                    <div className="text-center mb-4 p-2 bg-blue-50 rounded-lg text-sm text-blue-800 border border-blue-200">
+                      Secret access session expires in: <span className="font-semibold">{secretCodeTimeLeft}</span>
+                    </div>
+                  )}
+
+                  {/* Devices Section */}
+                  <div className="bg-white rounded-lg p-6 shadow mb-6 border border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Devices</h3>
+                    {loadingDevices ? (
+                      <div className="flex items-center justify-center h-64">
+                        <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+                        <p className="text-gray-700 text-xl font-medium">Loading devices...</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Device Management Card - Show unique users only */}
+                        <div className="bg-white shadow-lg rounded-xl p-6 border border-blue-200 mb-6">
+                          <div className="flex items-center gap-3 mb-6">
+                            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
+                              <i className="fas fa-tablet-alt"></i>
+                            </span>
+                            <h2 className="text-2xl font-bold text-blue-700">User Devices & Status</h2>
+                          </div>
+                          {/* Unique Users Table */}
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm border rounded-xl">
+                              <thead>
+                                <tr className="bg-blue-50">
+                                  <th className="px-2 py-2 border"></th>
+                                  <th className="px-4 py-2 border">User Name</th>
+                                  <th className="px-4 py-2 border">Mobile Number</th>
+                                  <th className="px-4 py-2 border">Role</th>
+                                  <th className="px-4 py-2 border">Status</th>
+                                  <th className="px-4 py-2 border">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {users && users.length > 0 ? users.map(u => (
+                                  <tr key={u._id} className="border-b hover:bg-blue-50 transition">
+                                    <td className="px-2 py-2 border text-center">
+                                      <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                    </td>
+                                    <td className="px-4 py-2 border">{u.name}</td>
+                                    <td className="px-4 py-2 border">{u.mobileNumber}</td>
+                                    <td className="px-4 py-2 border capitalize">{u.role}</td>
+                                    <td className="px-2 py-1 border text-center">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <button
+                                          className="focus:outline-none"
+                                          onClick={() => handleToggleActive(u)}
+                                          aria-label={u.isActive ? 'Disable account' : 'Enable account'}
+                                          type="button"
+                                        >
+                                          <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
+                                            style={{ position: 'relative' }}>
+                                            <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
+                                          </span>
+                                        </button>
+                                        <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1 border text-center">
+                                      <div className="inline-flex items-center gap-1">
+                                        <button
+                                          className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
+                                          onClick={() => openEditUserModal(u)}
+                                          title="Edit User"
+                                          aria-label="Edit User"
+                                        >
+                                          <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
+                                          Edit
+                                        </button>
+                                        <button
+                                          className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
+                                          onClick={() => handleDeleteUser(u)}
+                                          title="Delete User"
+                                          aria-label="Delete User"
+                                        >
+                                          <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )) : (
+                                  <tr><td colSpan={6} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* User Management Card */}
+                        <div className="bg-white shadow-lg rounded-xl p-6 border border-emerald-200">
+                          <div className="flex items-center gap-3 mb-6">
+                            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
+                              <i className="fas fa-users-cog"></i>
+                            </span>
+                            <h2 className="text-2xl font-bold text-emerald-700">User Management</h2>
+                          </div>
+                          {/* Add User Form */}
+                          <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Name</label>
+                              <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Mobile Number</label>
+                              <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.mobileNumber} onChange={e => setAddUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Password</label>
+                              <input type="password" className="w-full border rounded px-3 py-2" required value={addUserForm.password} onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Role</label>
+                              <select className="w-full border rounded px-3 py-2" value={addUserForm.role} onChange={e => setAddUserForm(f => ({ ...f, role: e.target.value }))}>
+                                <option value="admin">Admin</option>
+                                <option value="worker">Worker</option>
+                              </select>
+                            </div>
+                            <div className="md:col-span-4 flex justify-end mt-2">
+                              <button type="submit" className="px-6 py-2 rounded bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
+                            </div>
+                          </form>
+                          {/* User Table */}
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm border rounded-xl">
+                              <thead>
+                                <tr className="bg-emerald-50">
+                                  <th className="px-2 py-2 border"></th>
+                                  <th className="px-4 py-2 border">Name</th>
+                                  <th className="px-4 py-2 border">Mobile Number</th>
+                                  <th className="px-4 py-2 border">Role</th>
+                                  <th className="px-4 py-2 border">Active</th>
+                                  <th className="px-4 py-2 border">Last Login</th>
+                                  <th className="px-4 py-2 border">Created</th>
+                                  <th className="px-4 py-2 border">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {users && users.length > 0 ? users.map(u => (
+                                  <tr key={u._id} className="border-b hover:bg-emerald-50 transition">
+                                    <td className="px-2 py-2 border text-center">
+                                      <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                    </td>
+                                    <td className="px-4 py-2 border">{u.name}</td>
+                                    <td className="px-4 py-2 border">{u.mobileNumber}</td>
+                                    <td className="px-4 py-2 border capitalize">{u.role}</td>
+                                    <td className="px-2 py-1 border text-center">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <button
+                                          className="focus:outline-none"
+                                          onClick={() => handleToggleActive(u)}
+                                          aria-label={u.isActive ? 'Disable account' : 'Enable account'}
+                                          type="button"
+                                        >
+                                          <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
+                                            style={{ position: 'relative' }}>
+                                            <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
+                                          </span>
+                                        </button>
+                                        <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 border">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '-'}</td>
+                                    <td className="px-4 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
+                                    <td className="px-2 py-1 border text-center">
+                                      <div className="inline-flex items-center gap-1">
+                                        <button
+                                          className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
+                                          onClick={() => openEditUserModal(u)}
+                                          title="Edit User"
+                                          aria-label="Edit User"
+                                        >
+                                          <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
+                                          Edit
+                                        </button>
+                                        <button
+                                          className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
+                                          onClick={() => handleDeleteUser(u)}
+                                          title="Delete User"
+                                          aria-label="Delete User"
+                                        >
+                                          <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )) : (
+                                  <tr><td colSpan={8} className="text-center text-gray-400 py-6">No users found.</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Edit User Modal (reuse ConfirmationDialog) */}
+                        <ConfirmationDialog
+                          isOpen={showEditUserModal}
+                          onClose={() => setShowEditUserModal(false)}
+                          title="Edit User"
+                          confirmText={null}
+                          cancelText={null}
+                          customContent={(
+                            <form onSubmit={handleEditUser} className="space-y-4">
+                              <div>
+                                <label className="block text-sm font-medium mb-1">Name</label>
+                                <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium mb-1">Mobile Number</label>
+                                <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium mb-1">Password (leave blank to keep unchanged)</label>
+                                <input type="password" className="w-full border rounded px-3 py-2" value={editUserForm.password} onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium mb-1">Role</label>
+                                <select className="w-full border rounded px-3 py-2" value={editUserForm.role} onChange={e => setEditUserForm(f => ({ ...f, role: e.target.value }))}>
+                                  <option value="admin">Admin</option>
+                                  <option value="worker">Worker</option>
+                                </select>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
+                                <label htmlFor="isActive" className="text-sm">Active</label>
+                              </div>
+                              <div className="flex justify-end gap-2">
+                                <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
+                                <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
+                              </div>
+                            </form>
+                          )}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          
-          {/* Password Change Section */}
-          <div className="border border-gray-200 rounded-lg p-5 mb-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-              <span className="text-orange-600">🔐</span> Change Password
-            </h2>
-            
-            {passwordError && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <span className="block sm:inline">{passwordError}</span>
-              </div>
-            )}
-            
-            {passwordSuccess && (
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <span className="block sm:inline">{passwordSuccess}</span>
-              </div>
-            )}
-            
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                    Current Password
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="currentPassword"
-                      type={showCurrentPassword ? "text" : "password"}
-                      value={currentPassword}
-                      onChange={(e) => {
-                        setCurrentPassword(e.target.value);
-                        setIsCurrentPasswordValid(false);
-                        setShowNewPasswordFields(false);
-                      }}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                      required
-                      disabled={isVerifying}
-                    />
 
-                    <button 
-                      type="button"
-                      onClick={verifyCurrentPassword}
-                      disabled={!currentPassword || isVerifying || isCurrentPasswordValid}
-                      className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
-                        ${isCurrentPasswordValid 
-                          ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
-                          : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'}`}
-                    >
-                      {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified' : 'Verify'}
-                    </button>
-                  </div>
-                  {isCurrentPasswordValid && (
-                    <p className="mt-1 text-sm text-green-600">Current password verified</p>
-                  )}
-                </div>
-                {/* Show Password Checkbox */}
-                <div className="flex items-center mt-1">
-                  <input
-                    id="showCurrentPassword"
-                    type="checkbox"
-                    checked={showCurrentPassword}
-                    onChange={() => setShowCurrentPassword((prev) => !prev)}
-                    className="mr-2"
-                  />
-                  <label htmlFor="showCurrentPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+          {activeTab === 'personalSettings' && (
+            <div className="space-y-6">
+              <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200 mb-6 min-h-[calc(100vh-220px)] overflow-y-auto">
+                <div className="flex items-center gap-4 mb-6">
+                  
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
+                    Personal Settings
+                  </h1>
                 </div>
                 
-                {showNewPasswordFields && (
-                  <>
-                    <div>
-                      <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                        New Password
-                      </label>
-                      <input
-                        id="newPassword"
-                        type={showNewPassword ? "text" : "password"}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                        required
-                        minLength={8}
-                      />
+                {user && (
+                  <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+                    <h2 className="text-lg font-semibold text-blue-800 mb-2">Current User</h2>
+                    <p className="text-gray-700">
+                      Logged in as: <span className="font-medium">{user.username}</span>
+                    </p>
+                  </div>
+                )}
+                
+                {/* Password Change Section */}
+                <div className="border border-gray-200 rounded-lg p-5 mb-6">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
+                    <span className="text-orange-600">🔐</span> Change Password
+                  </h2>
+                  
+                  {passwordError && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                      <span className="block sm:inline">{passwordError}</span>
+                    </div>
+                  )}
+                  
+                  {passwordSuccess && (
+                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                      <span className="block sm:inline">{passwordSuccess}</span>
+                    </div>
+                  )}
+                  
+                  <form onSubmit={handlePasswordChange} className="space-y-4">
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                          Current Password
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            id="currentPassword"
+                            type={showCurrentPassword ? "text" : "password"}
+                            value={currentPassword}
+                            onChange={(e) => {
+                              setCurrentPassword(e.target.value);
+                              setIsCurrentPasswordValid(false);
+                              setShowNewPasswordFields(false);
+                            }}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                            required
+                            disabled={isVerifying}
+                          />
+
+                          <button 
+                            type="button"
+                            onClick={verifyCurrentPassword}
+                            disabled={!currentPassword || isVerifying || isCurrentPasswordValid}
+                            className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
+                              ${isCurrentPasswordValid 
+                                ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
+                                : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'}`}
+                          >
+                            {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified' : 'Verify'}
+                          </button>
+                        </div>
+                        {isCurrentPasswordValid && (
+                          <p className="mt-1 text-sm text-green-600">Current password verified</p>
+                        )}
+                      </div>
                       {/* Show Password Checkbox */}
                       <div className="flex items-center mt-1">
                         <input
-                          id="showNewPassword"
+                          id="showCurrentPassword"
                           type="checkbox"
-                          checked={showNewPassword}
-                          onChange={() => setShowNewPassword((prev) => !prev)}
+                          checked={showCurrentPassword}
+                          onChange={() => setShowCurrentPassword((prev) => !prev)}
                           className="mr-2"
                         />
-                        <label htmlFor="showNewPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                        <label htmlFor="showCurrentPassword" className="text-xs text-gray-600 select-none">Show Password</label>
                       </div>
-                      {newPassword && newPassword.length < 8 && (
-                        <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
+                      
+                      {showNewPasswordFields && (
+                        <>
+                          <div>
+                            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                              New Password
+                            </label>
+                            <input
+                              id="newPassword"
+                              type={showNewPassword ? "text" : "password"}
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                              required
+                              minLength={8}
+                            />
+                            {/* Show Password Checkbox */}
+                            <div className="flex items-center mt-1">
+                              <input
+                                id="showNewPassword"
+                                type="checkbox"
+                                checked={showNewPassword}
+                                onChange={() => setShowNewPassword((prev) => !prev)}
+                                className="mr-2"
+                              />
+                              <label htmlFor="showNewPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                            </div>
+                            {newPassword && newPassword.length < 8 && (
+                              <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                              Confirm New Password
+                            </label>
+                            <input
+                              id="confirmPassword"
+                              type={showConfirmPassword ? "text" : "password"}
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                              required
+                            />
+                            {/* Show Password Checkbox */}
+                            <div className="flex items-center mt-1">
+                              <input
+                                id="showConfirmPassword"
+                                type="checkbox"
+                                checked={showConfirmPassword}
+                                onChange={() => setShowConfirmPassword((prev) => !prev)}
+                                className="mr-2"
+                              />
+                              <label htmlFor="showConfirmPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                            </div>
+                            {confirmPassword && newPassword !== confirmPassword && (
+                              <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                     
                     <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                        Confirm New Password
-                      </label>
-                      <input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                        required
-                      />
-                      {/* Show Password Checkbox */}
-                      <div className="flex items-center mt-1">
-                        <input
-                          id="showConfirmPassword"
-                          type="checkbox"
-                          checked={showConfirmPassword}
-                          onChange={() => setShowConfirmPassword((prev) => !prev)}
-                          className="mr-2"
-                        />
-                        <label htmlFor="showConfirmPassword" className="text-xs text-gray-600 select-none">Show Password</label>
-                      </div>
-                      {confirmPassword && newPassword !== confirmPassword && (
-                        <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
-                      )}
+                      <button
+                        type="submit"
+                        disabled={!isFormValid()}
+                        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
+                          ${isFormValid() 
+                            ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
+                            : 'bg-gray-400 cursor-not-allowed'} 
+                          focus:outline-none focus:ring-2 focus:ring-offset-2`}
+                      >
+                        Update Password
+                      </button>
                     </div>
-                  </>
+                  </form>
+                </div>
+                
+                {user?.role === 'admin' && ( // Only show this section if the logged-in user is an admin
+                  <div className="border border-gray-200 rounded-lg p-5 mb-6">
+                    <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
+                      <span className="text-purple-600">🔑</span> Change Secret Access Code
+                    </h2>
+
+                    {secretCodeError && (
+                      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                        <span className="block sm:inline">{secretCodeError}</span>
+                      </div>
+                    )}
+
+                    {secretCodeSuccess && (
+                      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                        <span className="block sm:inline">{secretCodeSuccess}</span>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleChangeSecretCode} className="space-y-4">
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="currentSecretCode" className="block text-sm font-medium text-gray-700 mb-1">
+                            Current Secret Access Code
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              id="currentSecretCode"
+                              type={showCurrentSecretCode ? "text" : "password"}
+                              value={currentSecretCode}
+                              onChange={(e) => {
+                                setCurrentSecretCode(e.target.value);
+                                setIsCurrentSecretCodeValid(false);
+                                setShowNewSecretCodeFields(false);
+                              }}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              required
+                              disabled={isSecretCodeChanging}
+                            />
+                            <button 
+                              type="button"
+                              onClick={verifyCurrentSecretCode}
+                              disabled={!currentSecretCode || isSecretCodeChanging || isCurrentSecretCodeValid}
+                              className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
+                                ${isCurrentSecretCodeValid 
+                                  ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
+                                  : 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'}`}
+                            >
+                              {isSecretCodeChanging ? 'Verifying...' : isCurrentSecretCodeValid ? 'Verified' : 'Verify'}
+                            </button>
+                          </div>
+                          {isCurrentSecretCodeValid && (
+                            <p className="mt-1 text-sm text-green-600">Current secret code verified</p>
+                          )}
+                        </div>
+                        <div className="flex items-center mt-1">
+                          <input
+                            id="showCurrentSecretCode"
+                            type="checkbox"
+                            checked={showCurrentSecretCode}
+                            onChange={() => setShowCurrentSecretCode((prev) => !prev)}
+                            className="mr-2"
+                          />
+                          <label htmlFor="showCurrentSecretCode" className="text-xs text-gray-600 select-none">Show Secret Code</label>
+                        </div>
+
+                        {showNewSecretCodeFields && (
+                          <>
+                            <div>
+                              <label htmlFor="newSecretCode" className="block text-sm font-medium text-gray-700 mb-1">
+                                New Secret Access Code
+                              </label>
+                              <input
+                                id="newSecretCode"
+                                type={showNewSecretCode ? "text" : "password"}
+                                value={newSecretCode}
+                                onChange={(e) => setNewSecretCode(e.target.value)}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                                required
+                                minLength={8}
+                              />
+                              <div className="flex items-center mt-1">
+                                <input
+                                  id="showNewSecretCode"
+                                  type="checkbox"
+                                  checked={showNewSecretCode}
+                                  onChange={() => setShowNewSecretCode((prev) => !prev)}
+                                  className="mr-2"
+                                />
+                                <label htmlFor="showNewSecretCode" className="text-xs text-gray-600 select-none">Show Secret Code</label>
+                              </div>
+                              {newSecretCode && newSecretCode.length < 8 && (
+                                <p className="mt-1 text-sm text-red-600">Secret code must be at least 8 characters</p>
+                              )}
+                            </div>
+
+                            <div>
+                              <label htmlFor="confirmNewSecretCode" className="block text-sm font-medium text-gray-700 mb-1">
+                                Confirm New Secret Access Code
+                              </label>
+                              <input
+                                id="confirmNewSecretCode"
+                                type={showConfirmNewSecretCode ? "text" : "password"}
+                                value={confirmNewSecretCode}
+                                onChange={(e) => setConfirmNewSecretCode(e.target.value)}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                                required
+                              />
+                              <div className="flex items-center mt-1">
+                                <input
+                                  id="showConfirmNewSecretCode"
+                                  type="checkbox"
+                                  checked={showConfirmNewSecretCode}
+                                  onChange={() => setShowConfirmNewSecretCode((prev) => !prev)}
+                                  className="mr-2"
+                                />
+                                <label htmlFor="showConfirmNewSecretCode" className="text-xs text-gray-600 select-none">Show Secret Code</label>
+                              </div>
+                              {confirmNewSecretCode && newSecretCode !== confirmNewSecretCode && (
+                                <p className="mt-1 text-sm text-red-600">Secret codes do not match</p>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div>
+                        <button
+                          type="submit"
+                          disabled={!isSecretCodeFormValid() || isSecretCodeChanging}
+                          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
+                            ${isSecretCodeFormValid() 
+                              ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500' 
+                              : 'bg-gray-400 cursor-not-allowed'} 
+                            focus:outline-none focus:ring-2 focus:ring-offset-2`}
+                        >
+                          {isSecretCodeChanging ? 'Updating...' : 'Update Secret Code'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 )}
+                
+                {/* Account Actions */}
+                <div className="border border-gray-200 rounded-lg p-5">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
+                    <span className="text-red-600">⚠️</span> Account Actions
+                  </h2>
+                  
+                  <div className="space-y-4">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Logout
+                    </button>
+                  </div>
+                </div>
               </div>
-              
-              <div>
-                <button
-                  type="submit"
-                  disabled={!isFormValid()}
-                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
-                    ${isFormValid() 
-                      ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
-                      : 'bg-gray-400 cursor-not-allowed'} 
-                    focus:outline-none focus:ring-2 focus:ring-offset-2`}
-                >
-                  Update Password
-                </button>
-              </div>
-            </form>
-          </div>
-          
-          {/* Account Actions */}
-          <div className="border border-gray-200 rounded-lg p-5">
-            <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-              <span className="text-red-600">⚠️</span> Account Actions
-            </h2>
-            
-            <div className="space-y-4">
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Logout
-              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
-              )}
-            </div>
-          </div>
-          {/* Version Information Section (moved to bottom) */}
-          <div className="bg-white p-2 sm:p-4 rounded-xl shadow-md mb-4 border border-gray-200 overflow-x-auto w-fit mx-auto">
-            <div className="flex items-center justify-center gap-2 text-[0.625rem] text-gray-600 whitespace-nowrap sm:text-sm">
-            <span className="font-medium">Version: {versionInfo.version}</span>
-              <span>|</span>
-            <span className="font-medium">Build: {new Date(versionInfo.buildDate).toLocaleString()}</span>
-              <span>|</span>
-              <span className={`px-1 py-0.5 rounded text-xs font-medium ${
-              versionInfo.environment === 'production' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {versionInfo.environment}
-            </span>
-          </div>
+      {/* Version Information Section (moved to bottom) */}
+      <div className="bg-white p-2 sm:p-4 rounded-xl shadow-md mb-4 border border-gray-200 overflow-x-auto w-fit mx-auto">
+        <div className="flex items-center justify-center gap-2 text-[0.625rem] text-gray-600 whitespace-nowrap sm:text-sm">
+          <span className="font-medium">Version: {versionInfo.version}</span>
+          <span>|</span>
+          <span className="font-medium">Build: {new Date(versionInfo.buildDate).toLocaleString()}</span>
+          <span>|</span>
+          <span className={`px-1 py-0.5 rounded text-xs font-medium ${
+            versionInfo.environment === 'production' 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-yellow-100 text-yellow-800'
+          }`}>
+            {versionInfo.environment}
+          </span>
         </div>
-        </>
-      )}
+      </div>
       
       {/* Confirmation Dialogs */}
       <ConfirmationDialog
@@ -1072,6 +1392,19 @@ const Settings = () => {
         type="danger"
         isLoading={false}
       />
+
+      {/* Secret Code Verification Dialog */}
+      {showSecretCodeDialog && (
+        <PasswordVerificationDialog
+          isOpen={showSecretCodeDialog}
+          onClose={handleSecretCodeDialogClose}
+          onSuccess={handleSecretCodeSuccess}
+          verificationType="secretCode"
+          usedWhere="Settings Admin Control Access"
+          currentUserId={user?._id}
+        />
+      )}
+
     </div>
   );
 };
