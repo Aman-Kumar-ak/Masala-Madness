@@ -7,6 +7,7 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [username, setUsername] = useState(''); // For personal password verification
+  const [showPassword, setShowPassword] = useState(false); // New state for password visibility
   const navigate = useNavigate();
   
   // Get the username from sessionStorage when component mounts or isOpen changes
@@ -170,22 +171,22 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
   // Prevent dialog from rendering if not open
   if (!isOpen) return null;
   
-  const dialogTitle = verificationType === "secretCode" ? "Admin Secret Access Required" : "Admin Verification Required";
+  const dialogTitle = verificationType === "secretCode" ? "Admin Controls Locked" : "Admin Verification Required";
   const dialogMessage = verificationType === "secretCode" 
-    ? "Please enter the secret access code to proceed." 
+    ? "A secret access code is required to manage devices and user roles."
     : "Please enter your admin password to access this section.";
   const passwordLabel = verificationType === "secretCode" ? "Secret Access Code" : "Admin Password";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-orange-100 to-orange-200 opacity-90 pointer-events-auto" onClick={handleOverlayClick}></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-orange-100 to-orange-200 opacity-90"></div>
       
       {/* Dialog */}
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 z-10 overflow-hidden border border-orange-200">
-        <div className="bg-gradient-to-r from-red-500 to-orange-500 px-6 py-4">
-          <h2 className="text-2xl font-bold text-white flex items-center justify-center">
-            <span className="mr-3 text-3xl">🔐</span>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 z-10 overflow-hidden border border-orange-200 pointer-events-auto">
+        <div className="bg-gradient-to-r from-red-500 to-orange-500 px-6 py-4 flex flex-col items-center justify-center">
+          <img src="/images/login.png" alt="Lock Icon" className="w-16 h-16 mb-2" />
+          <h2 className="text-2xl font-bold text-white text-center">
             {dialogTitle}
           </h2>
         </div>
@@ -205,21 +206,34 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
             <label htmlFor="password" className="block text-sm font-semibold text-gray-800 mb-2">
               {passwordLabel}
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base"
-              placeholder={verificationType === "secretCode" ? "Enter secret code" : "Enter your password"}
-              autoComplete={verificationType === "secretCode" ? "off" : "current-password"}
-              autoFocus
-              disabled={isVerifying}
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base pr-10"
+                placeholder={verificationType === "secretCode" ? "Enter secret access code" : "Enter your password"}
+                autoComplete={verificationType === "secretCode" ? "off" : "current-password"}
+                autoFocus
+                disabled={isVerifying}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showPassword ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showPassword ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showPassword ? 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z' : 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z'} />
+                </svg>
+              </button>
+            </div>
           </div>
           
           <div className="text-sm text-gray-500 text-center">
-            <p>Your verification will be valid for 10 minutes</p>
+            <p>Once verified, you'll have access for 15 minutes without re-entering the code.</p>
           </div>
           
           <div className="flex justify-end space-x-3 pt-4">
@@ -233,7 +247,7 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg hover:from-red-700 hover:to-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors duration-200"
+              className="px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors duration-200 flex items-center justify-center space-x-2"
               disabled={isVerifying}
             >
               {isVerifying ? (
@@ -245,7 +259,13 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
                   Verifying...
                 </div>
               ) : (
-                'Verify'
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 11V9a3 3 0 00-3-3V4a1 1 0 011-1h6a1 1 0 011 1v2a3 3 0 00-3 3v2z" />
+                  </svg>
+                  <span className="whitespace-nowrap">Unlock Admin</span>
+                </>
               )}
             </button>
           </div>

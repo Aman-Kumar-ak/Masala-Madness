@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import BackButton from '../../components/BackButton';
@@ -6,6 +6,23 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
 import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
+
+const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
+  return (
+    <label className={`relative inline-flex items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}> 
+      <input
+        type="checkbox"
+        value=""
+        className="sr-only peer"
+        checked={isActive}
+        onChange={onToggle}
+        disabled={disabled}
+      />
+      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+      <span className="ml-3 text-sm font-medium text-gray-900 dark:text-gray-900 mt-0.5">{label}</span>
+    </label>
+  );
+};
 
 const Settings = () => {
   useKeyboardScrollAdjustment();
@@ -33,11 +50,6 @@ const Settings = () => {
   const [isCurrentPasswordValid, setIsCurrentPasswordValid] = useState(false);
   const [showNewPasswordFields, setShowNewPasswordFields] = useState(false);
   
-  // Add state for password visibility
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
   // State for secret code management (for QR and Admin Control)
   const [isSecretCodeAuthenticated, setIsSecretCodeAuthenticated] = useState(false);
   const [secretCodeTimeLeft, setSecretCodeTimeLeft] = useState(null);
@@ -50,6 +62,16 @@ const Settings = () => {
   const [showNewSecretCodeFields, setShowNewSecretCodeFields] = useState(false);
   const [isCurrentSecretCodeValid, setIsCurrentSecretCodeValid] = useState(false);
 
+  // Add state for password visibility
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPasswords, setShowNewPasswords] = useState(false); // Unified state for new/confirm password visibility
+  const [showAddUserPassword, setShowAddUserPassword] = useState(false); // State for Add User form password visibility
+  const [showEditUserPassword, setShowEditUserPassword] = useState(false); // State for Edit User form password visibility
+  const [confirmEditPassword, setConfirmEditPassword] = useState(''); // State for confirm password in Edit User form
+  const [confirmAddUserPassword, setConfirmAddUserPassword] = useState(''); // State for confirm password in Add User form
+  const [showConfirmEditUserPassword, setShowConfirmEditUserPassword] = useState(false); // New state for confirm password visibility in Edit User form
+  const [showConfirmAddUserPassword, setShowConfirmAddUserPassword] = useState(false); // New state for confirm password visibility in Add User form
+  
   // Add state for secret code password visibility
   const [showCurrentSecretCode, setShowCurrentSecretCode] = useState(false);
   const [showNewSecretCode, setShowNewSecretCode] = useState(false);
@@ -74,6 +96,11 @@ const Settings = () => {
   const [revokeSuccess, setRevokeSuccess] = useState('');
   const [revokeError, setRevokeError] = useState('');
   
+  // Add state for all devices and loading
+  const [allDevices, setAllDevices] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [deviceError, setDeviceError] = useState('');
+  
   // Add state for user management
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -86,17 +113,69 @@ const Settings = () => {
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [editUserLoading, setEditUserLoading] = useState(false);
   
-  // Add state for all devices
-  const [allDevices, setAllDevices] = useState([]);
-  const [loadingDevices, setLoadingDevices] = useState(false);
-  const [deviceError, setDeviceError] = useState('');
+  // State to manage expanded user cards
+  const [expandedUsers, setExpandedUsers] = useState(new Set());
+
+  // State to determine if it's a desktop view
+  const [isDesktopView, setIsDesktopView] = useState(false);
+
+  // Function to toggle expanded state of a user card
+  const toggleExpandUser = (userId) => {
+    setExpandedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  // Effect to detect desktop view based on screen width
+  useEffect(() => {
+    const handleResize = () => {
+      // Tailwind's 'md' breakpoint is typically 768px
+      setIsDesktopView(window.innerWidth >= 768);
+    };
+
+    // Set initial value
+    handleResize();
+
+    // Add event listener for window resize
+    window.addEventListener('resize', handleResize);
+
+    // Clean up event listener
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
   
   // Add state for delete confirmation
   const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   
+  // State for user toggle confirmation
+  const [showToggleUserConfirm, setShowToggleUserConfirm] = useState(false);
+  const [userToToggle, setUserToToggle] = useState(null);
+  const [isTogglingUser, setIsTogglingUser] = useState(false);
+  
   // New state for localized loading in Admin Control section
   const [isAdminControlLoading, setIsAdminControlLoading] = useState(false);
+  
+  // Effect to disable body scroll when any dialog is open
+  useEffect(() => {
+    const isAnyDialogShowing = showLogoutConfirm || showDeleteAccountConfirm || showRevokeConfirm || showToggleUserConfirm || showDeleteUserConfirm || showAddUserModal || showEditUserModal;
+    if (isAnyDialogShowing) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'; // Ensure cleanup on unmount
+    };
+  }, [showLogoutConfirm, showDeleteAccountConfirm, showRevokeConfirm, showToggleUserConfirm, showDeleteUserConfirm, showAddUserModal, showEditUserModal]);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -438,6 +517,7 @@ const Settings = () => {
       showSuccess('User added successfully!');
       setShowAddUserModal(false);
       setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
+      setConfirmAddUserPassword(''); // Clear confirm password after successful add
       await fetchUsers();
       window.location.reload(); // Force reload to ensure new user can log in
     } catch (err) {
@@ -450,15 +530,35 @@ const Settings = () => {
   // Edit user handler
   const handleEditUser = async (e) => {
     e.preventDefault();
-    setEditUserLoading(true);
     setUserError('');
+
+    // Client-side validation for password fields
+    if (editUserForm.password) { // Only validate if password is being changed
+      if (editUserForm.password.length < 8) {
+        setUserError('New password must be at least 8 characters long.');
+        return;
+      }
+      if (editUserForm.password !== confirmEditPassword) {
+        setUserError('New passwords do not match.');
+        return;
+      }
+    }
+
+    setEditUserLoading(true);
     try {
       const updateData = { ...editUserForm };
       if (!updateData.password) delete updateData.password; // Don't send empty password
+      // If password is provided, but no confirm password, it's an error on client side, should not happen with required field
+      if (updateData.password && updateData.password !== confirmEditPassword) {
+        setUserError('Passwords do not match. Please re-enter.');
+        setEditUserLoading(false);
+        return;
+      }
       await api.put(`/auth/users/${selectedUser._id}`, updateData);
       showSuccess('User updated successfully!');
       setShowEditUserModal(false);
       setSelectedUser(null);
+      setConfirmEditPassword(''); // Clear confirm password after successful edit
       await fetchUsers();
     } catch (err) {
       setUserError(err.message || 'Failed to update user.');
@@ -469,13 +569,40 @@ const Settings = () => {
 
   // Enable/disable user
   const handleToggleActive = async (userObj) => {
+    if (userObj.isActive) { // If user is active, confirm before disabling
+      setUserToToggle(userObj);
+      setShowToggleUserConfirm(true);
+    } else {
+      // If user is already disabled, enable directly
+      try {
+        await api.put(`/auth/users/${userObj._id}`, { isActive: !userObj.isActive });
+        showSuccess(`User ${userObj.isActive ? 'disabled' : 'enabled'} successfully!`);
+        await fetchUsers();
+      } catch (err) {
+        showError('Failed to update user status.');
+      }
+    }
+  };
+
+  const confirmToggleUser = async () => {
+    if (!userToToggle) return;
+    setIsTogglingUser(true); // Set loading to true
     try {
-      await api.put(`/auth/users/${userObj._id}`, { isActive: !userObj.isActive });
-      showSuccess(`User ${userObj.isActive ? 'disabled' : 'enabled'} successfully!`);
+      await api.put(`/auth/users/${userToToggle._id}`, { isActive: !userToToggle.isActive });
+      showSuccess(`User ${userToToggle.isActive ? 'disabled' : 'enabled'} successfully!`);
       await fetchUsers();
     } catch (err) {
       showError('Failed to update user status.');
+    } finally {
+      setIsTogglingUser(false); // Set loading to false
+      setShowToggleUserConfirm(false);
+      setUserToToggle(null);
     }
+  };
+
+  const cancelToggleUser = () => {
+    setShowToggleUserConfirm(false);
+    setUserToToggle(null);
   };
 
   // Open edit modal
@@ -488,6 +615,7 @@ const Settings = () => {
       role: userObj.role,
       isActive: userObj.isActive
     });
+    setConfirmEditPassword(''); // Reset confirm password
     setShowEditUserModal(true);
   };
 
@@ -530,10 +658,10 @@ const Settings = () => {
   // Handle successful secret code verification for Admin Control access
   const handleSecretCodeSuccess = async () => {
     setIsSecretCodeAuthenticated(true);
-    // Set a timestamp for 10 minutes from now
-    const expiryTime = new Date().getTime() + (10 * 60 * 1000); // 10 minutes
+    // Set a timestamp for 15 minutes from now
+    const expiryTime = new Date().getTime() + (15 * 60 * 1000); // 15 minutes
     localStorage.setItem('qr_verification_expiry', expiryTime.toString());
-    showSuccess('Secret access granted for 10 minutes.');
+    showSuccess('Secret access granted for 15 minutes.');
     
     // Start loading admin data specific to this section
     setIsAdminControlLoading(true);
@@ -626,7 +754,7 @@ const Settings = () => {
   // New function for Admin Control specific secret code verification
   const handleAdminControlSecretCodeVerification = async () => {
     if (!currentSecretCode.trim()) {
-      setSecretCodeError('Please enter your secret access code to unlock Admin Controls.');
+      setSecretCodeError('Enter your secret access code.');
       return;
     }
 
@@ -839,7 +967,7 @@ const Settings = () => {
                           type={showCurrentSecretCode ? 'text' : 'password'}
                           id="secretCodeAdminUnlock"
                           className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-2 pr-10"
-                          placeholder="Enter secret access code to unlock"
+                          placeholder="Enter secret access"
                           value={currentSecretCode}
                           onChange={(e) => setCurrentSecretCode(e.target.value)}
                           required
@@ -873,112 +1001,110 @@ const Settings = () => {
               ) : (
                 <div className="w-full">
                   {/* Actual Admin Controls content */}
-                  <h2 className="text-xl font-bold text-gray-800 mb-6">Device and Roles Management</h2>
+                  <h2 className="text-xl font-bold text-gray-800 mb-6">User and Device Management</h2>
                   {secretCodeTimeLeft && (
                     <div className="text-center mb-4 p-2 bg-blue-50 rounded-lg text-sm text-blue-800 border border-blue-200">
                       Secret access session expires in: <span className="font-semibold">{secretCodeTimeLeft}</span>
                     </div>
                   )}
 
-                  {/* Devices Section */}
-                  <div className="bg-white rounded-lg p-6 shadow mb-6 border border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Devices</h3>
-                    {loadingDevices ? (
-                      <div className="flex items-center justify-center h-64">
-                        <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-500 mr-4"></div>
-                        <p className="text-gray-700 text-xl font-medium">Loading devices...</p>
-                      </div>
-                    ) : (
-                      <>
-                  {/* Device Management Card - Show unique users only */}
-                        <div className="bg-blue-50 shadow-md rounded-xl p-4 sm:p-6 border border-blue-200 mb-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
-                        <i className="fas fa-tablet-alt"></i>
-                      </span>
-                      <h2 className="text-2xl font-bold text-blue-700">User Devices & Status</h2>
-                    </div>
-                    {/* Unique Users Table */}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm border rounded-xl">
-                        <thead>
-                          <tr className="bg-blue-50">
-                            <th className="px-2 py-2 border"></th>
-                            <th className="px-4 py-2 border">User Name</th>
-                            <th className="px-4 py-2 border">Mobile Number</th>
-                            <th className="px-4 py-2 border">Role</th>
-                            <th className="px-4 py-2 border">Status</th>
-                            <th className="px-4 py-2 border">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users && users.length > 0 ? users.map(u => (
-                            <tr key={u._id} className="border-b hover:bg-blue-50 transition">
-                              <td className="px-2 py-2 border text-center">
-                                <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                              </td>
-                              <td className="px-4 py-2 border">{u.name}</td>
-                              <td className="px-4 py-2 border">{u.mobileNumber}</td>
-                              <td className="px-4 py-2 border capitalize">{u.role}</td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    className="focus:outline-none"
-                                    onClick={() => handleToggleActive(u)}
-                                    aria-label={u.isActive ? 'Disable account' : 'Enable account'}
-                                    type="button"
-                                  >
-                                    <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
-                                      style={{ position: 'relative' }}>
-                                      <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
-                                    </span>
-                                  </button>
-                                  <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
-                                </div>
-                              </td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="inline-flex items-center gap-1">
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
-                                    onClick={() => openEditUserModal(u)}
-                                    title="Edit User"
-                                    aria-label="Edit User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
-                                    Edit
-                                  </button>
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
-                                    onClick={() => handleDeleteUser(u)}
-                                    title="Delete User"
-                                    aria-label="Delete User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )) : (
-                            <tr><td colSpan={6} className="text-center text-gray-400 py-6">No users found.</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <hr className="my-8 border-t-2 border-gray-200" />
-
-                  {/* User Management Card */}
-                  <div className="bg-emerald-50 shadow-md rounded-xl p-4 sm:p-6 border border-emerald-200">
+                  {/* User Management Section */}
+                  <div className="bg-emerald-50 shadow-md rounded-xl p-4 sm:p-6 border border-emerald-200 mb-6">
                     <div className="flex items-center gap-3 mb-6">
                       <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
                         <i className="fas fa-users-cog"></i>
                       </span>
                       <h2 className="text-2xl font-bold text-emerald-700">User Management</h2>
                     </div>
+                    {/* User List/Cards */}
+                    {loadingUsers ? (
+                      <div className="flex items-center justify-center h-48">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-emerald-500 mr-4"></div>
+                        <p className="text-gray-700 font-medium">Loading users...</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {users && users.length > 0 ? users.map(u => {
+                          const isExpanded = expandedUsers.has(u._id);
+                          // Determine if details should be displayed (always on desktop, or if expanded on mobile)
+                          const shouldDisplayDetails = isDesktopView || isExpanded;
+
+                          return (
+                            <div
+                              key={u._id}
+                              className={`bg-white border border-gray-200 rounded-lg shadow-sm p-4 relative transition-all duration-200 ${!isDesktopView ? 'cursor-pointer hover:border-blue-300 hover:shadow-lg hover:scale-[1.01]' : ''}`}
+                              onClick={isDesktopView ? null : () => toggleExpandUser(u._id)}
+                            >
+                              <div className="absolute top-3 right-3 flex items-center gap-2">
+                                {/* Active/Disabled Status Indicator */}
+                                <div className={`w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`} title={u.isActive ? 'Active' : 'Disabled'}></div>
+                                {/* Conditionally render arrow icon only on non-desktop views */}
+                                {!isDesktopView && (
+                                  <span className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-0' : 'rotate-180'}`}>
+                                    <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"></path>
+                                    </svg>
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-start mb-2">
+                                <p className="text-2xl font-extrabold text-gray-900">{u.name}</p>
+                                
+                              </div>
+                              <p className="text-base text-gray-600 font-medium capitalize">Role: {u.role}</p>
+
+                              <div
+                                className={`overflow-hidden transition-all duration-300 ease-in-out ${shouldDisplayDetails ? 'opacity-100' : 'opacity-0'}`}
+                                style={{ maxHeight: shouldDisplayDetails ? '500px' : '0' }}
+                              >
+                                <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Mobile:</span> {u.mobileNumber}</p>
+                                <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Last Login:</span> {u.lastLogin ? new Date(u.lastLogin).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'}</p>
+                                <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Created:</span> {new Date(u.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
+                                <div className="mt-4 flex flex-row justify-start items-center gap-2">
+                                  <button
+                                    className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-200 shadow-sm"
+                                    onClick={(e) => { e.stopPropagation(); openEditUserModal(u); }}
+                                    title="Edit User"
+                                    aria-label="Edit User"
+                                  >
+                                    <svg className="h-4 w-4 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
+                                  </button>
+                                  <button
+                                    className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors duration-200 shadow-sm"
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteUser(u); }}
+                                    title="Delete User"
+                                    aria-label="Delete User"
+                                  >
+                                    <svg className="h-4 w-4 text-red-400 group-hover:text-red-700 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
+                                  <div className="w-auto">
+                                    <ToggleSwitch
+                                      isActive={u.isActive}
+                                      onToggle={(e) => { e.stopPropagation(); handleToggleActive(u); }}
+                                      label={u.isActive ? "Active" : "Disabled"}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }) : (
+                          <p className="text-center text-gray-400 py-6 col-span-full">No users found.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Add User Section */}
+                  <div className="bg-blue-50 shadow-md rounded-xl p-4 sm:p-6 border border-blue-200 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
+                        <i className="fas fa-user-plus"></i>
+                      </span>
+                      <h2 className="text-2xl font-bold text-blue-700">Add New User</h2>
+                    </div>
                     {/* Add User Form */}
-                          <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                       <div>
                         <label className="block text-sm font-medium mb-1">Name</label>
                         <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
@@ -989,7 +1115,53 @@ const Settings = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Password</label>
-                        <input type="password" className="w-full border rounded px-3 py-2" required value={addUserForm.password} onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))} />
+                        <div className="relative">
+                          <input
+                            type={showAddUserPassword ? "text" : "password"}
+                            className="w-full border rounded px-3 py-2 pr-10"
+                            required
+                            value={addUserForm.password}
+                            onChange={e => setAddUserForm(f => ({ ...f, password: e.target.value }))}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAddUserPassword(!showAddUserPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700 focus:outline-none"
+                          >
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAddUserPassword ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAddUserPassword ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Confirm Password</label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmAddUserPassword ? "text" : "password"}
+                            className="w-full border rounded px-3 py-2 pr-10"
+                            required
+                            value={confirmAddUserPassword}
+                            onChange={e => setConfirmAddUserPassword(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmAddUserPassword(!showConfirmAddUserPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700 focus:outline-none"
+                          >
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showConfirmAddUserPassword ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showConfirmAddUserPassword ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                            </svg>
+                          </button>
+                        </div>
+                        {addUserForm.password && addUserForm.password.length > 0 && confirmAddUserPassword.length > 0 && addUserForm.password !== confirmAddUserPassword && (
+                          <p className="text-red-500 text-sm mt-1">Passwords do not match.</p>
+                        )}
+                        {addUserForm.password && addUserForm.password.length < 8 && (
+                          <p className="text-red-500 text-sm mt-1">Password must be at least 8 characters.</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Role</label>
@@ -999,291 +1171,163 @@ const Settings = () => {
                         </select>
                       </div>
                       <div className="md:col-span-4 flex justify-end mt-2">
-                        <button type="submit" className="px-6 py-2 rounded bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
+                        <button type="submit" className="px-6 py-2 rounded bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
                       </div>
                     </form>
-                    {/* User Table */}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm border rounded-xl">
-                        <thead>
-                          <tr className="bg-emerald-50">
-                            <th className="px-2 py-2 border"></th>
-                            <th className="px-4 py-2 border">Name</th>
-                            <th className="px-4 py-2 border">Mobile Number</th>
-                            <th className="px-4 py-2 border">Role</th>
-                            <th className="px-4 py-2 border">Active</th>
-                            <th className="px-4 py-2 border">Last Login</th>
-                            <th className="px-4 py-2 border">Created</th>
-                            <th className="px-4 py-2 border">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users && users.length > 0 ? users.map(u => (
-                            <tr key={u._id} className="border-b hover:bg-emerald-50 transition">
-                              <td className="px-2 py-2 border text-center">
-                                <span className={`inline-block w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                              </td>
-                              <td className="px-4 py-2 border">{u.name}</td>
-                              <td className="px-4 py-2 border">{u.mobileNumber}</td>
-                              <td className="px-4 py-2 border capitalize">{u.role}</td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    className="focus:outline-none"
-                                    onClick={() => handleToggleActive(u)}
-                                    aria-label={u.isActive ? 'Disable account' : 'Enable account'}
-                                    type="button"
-                                  >
-                                    <span className={`inline-block w-14 h-8 rounded-full border-2 transition-colors duration-200 ${u.isActive ? 'bg-green-400 border-green-500' : 'bg-gray-200 border-gray-300'}`}
-                                      style={{ position: 'relative' }}>
-                                      <span className={`absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200 ${u.isActive ? 'translate-x-6' : ''}`}></span>
-                                    </span>
-                                  </button>
-                                  <span className={`text-xs font-semibold ${u.isActive ? 'text-green-600' : 'text-red-600'}`}>{u.isActive ? 'Active' : 'Disabled'}</span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-2 border">{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '-'}</td>
-                              <td className="px-4 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
-                              <td className="px-2 py-1 border text-center">
-                                <div className="inline-flex items-center gap-1">
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-blue-200 text-blue-700 bg-white rounded-lg shadow-sm hover:border-blue-400 hover:text-blue-900 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs font-semibold group"
-                                    onClick={() => openEditUserModal(u)}
-                                    title="Edit User"
-                                    aria-label="Edit User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" /></svg>
-                                    Edit
-                                  </button>
-                                  <button
-                                    className="flex items-center gap-1 px-2 py-1 border border-red-200 text-red-600 bg-white rounded-lg shadow-sm hover:bg-red-50 hover:text-red-800 hover:border-red-400 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-200 text-xs font-semibold group"
-                                    onClick={() => handleDeleteUser(u)}
-                                    title="Delete User"
-                                    aria-label="Delete User"
-                                  >
-                                    <svg className="w-3.5 h-3.5 text-red-400 group-hover:text-red-700 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )) : (
-                            <tr><td colSpan={8} className="text-center text-gray-400 py-6">No users found.</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Edit User Modal (reuse ConfirmationDialog) */}
-                  <ConfirmationDialog
-                    isOpen={showEditUserModal}
-                    onClose={() => setShowEditUserModal(false)}
-                    title="Edit User"
-                    confirmText={null}
-                    cancelText={null}
-                    customContent={(
-                      <form onSubmit={handleEditUser} className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Name</label>
-                          <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Mobile Number</label>
-                          <input type="text" className="w-full border rounded px-3 py-2" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Password (leave blank to keep unchanged)</label>
-                          <input type="password" className="w-full border rounded px-3 py-2" value={editUserForm.password} onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Role</label>
-                          <select className="w-full border rounded px-3 py-2" value={editUserForm.role} onChange={e => setEditUserForm(f => ({ ...f, role: e.target.value }))}>
-                            <option value="admin">Admin</option>
-                            <option value="worker">Worker</option>
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
-                          <label htmlFor="isActive" className="text-sm">Active</label>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
-                          <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
-                        </div>
-                      </form>
-                    )}
-              />
-                      </>
-                    )}
                   </div>
                 </div>
               )}
-            </div>
-              )}
-
-              {activeTab === 'personalSettings' && (
-                <div className="space-y-6">
-                  <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200 mb-6 min-h-[calc(100vh-220px)] overflow-y-auto">
-                    <div className="flex items-center gap-4 mb-6">
-                      
-                      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
-                        Personal Settings
-                      </h1>
-          </div>
-          
-          {user && (
-            <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-              <h2 className="text-lg font-semibold text-blue-800 mb-2">Current User</h2>
-              <p className="text-gray-700">
-                Logged in as: <span className="font-medium">{user.username}</span>
-              </p>
             </div>
           )}
-          
-          {/* Password Change Section */}
-          <div className="border border-gray-200 rounded-lg p-5 mb-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
-              <span className="text-orange-600">🔐</span> Change Password
-            </h2>
-            
-            {passwordError && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <span className="block sm:inline">{passwordError}</span>
-              </div>
-            )}
-            
-            {passwordSuccess && (
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <span className="block sm:inline">{passwordSuccess}</span>
-              </div>
-            )}
-            
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                    Current Password
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="currentPassword"
-                      type={showCurrentPassword ? "text" : "password"}
-                      value={currentPassword}
-                      onChange={(e) => {
-                        setCurrentPassword(e.target.value);
-                        setIsCurrentPasswordValid(false);
-                        setShowNewPasswordFields(false);
-                      }}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                      required
-                      disabled={isVerifying}
-                    />
 
-                    <button 
-                      type="button"
-                      onClick={verifyCurrentPassword}
-                      disabled={!currentPassword || isVerifying || isCurrentPasswordValid}
-                      className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
-                        ${isCurrentPasswordValid 
-                          ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
-                          : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'}`}
-                    >
-                      {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified' : 'Verify'}
-                    </button>
-                  </div>
-                  {isCurrentPasswordValid && (
-                    <p className="mt-1 text-sm text-green-600">Current password verified</p>
-                  )}
-                </div>
-                {/* Show Password Checkbox */}
-                <div className="flex items-center mt-1">
-                  <input
-                    id="showCurrentPassword"
-                    type="checkbox"
-                    checked={showCurrentPassword}
-                    onChange={() => setShowCurrentPassword((prev) => !prev)}
-                    className="mr-2"
-                  />
-                  <label htmlFor="showCurrentPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+          {activeTab === 'personalSettings' && (
+            <div className="space-y-6">
+              <div className="bg-white shadow-md rounded-lg p-6 border border-orange-200 mb-6 min-h-[calc(100vh-220px)] overflow-y-auto">
+                <div className="flex items-center gap-4 mb-6">
+                  
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
+                    Personal Settings
+                  </h1>
                 </div>
                 
-                {showNewPasswordFields && (
-                  <>
-                    <div>
-                      <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                        New Password
-                      </label>
-                      <input
-                        id="newPassword"
-                        type={showNewPassword ? "text" : "password"}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                        required
-                        minLength={8}
-                      />
-                      {/* Show Password Checkbox */}
+                {user && (
+                  <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+                    <h2 className="text-lg font-semibold text-blue-800 mb-2">Current User</h2>
+                    <p className="text-gray-700">
+                      Logged in as: <span className="font-medium">{user.username}</span>
+                    </p>
+                  </div>
+                )}
+                
+                {/* Password Change Section */}
+                <div className="border border-gray-200 rounded-lg p-5 mb-6">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
+                    <span className="text-orange-600">🔐</span> Change Password
+                  </h2>
+                  
+                  {passwordError && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                      <span className="block sm:inline">{passwordError}</span>
+                    </div>
+                  )}
+                  
+                  {passwordSuccess && (
+                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                      <span className="block sm:inline">{passwordSuccess}</span>
+                    </div>
+                  )}
+                  
+                  <form onSubmit={handlePasswordChange} className="space-y-4">
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                          Current Password
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            id="currentPassword"
+                            type={showCurrentPassword ? "text" : "password"}
+                            value={currentPassword}
+                            onChange={(e) => {
+                              setCurrentPassword(e.target.value);
+                              setIsCurrentPasswordValid(false);
+                              setShowNewPasswordFields(false);
+                            }}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                            required
+                            disabled={isVerifying}
+                          />
+
+                          <button 
+                            type="button"
+                            onClick={verifyCurrentPassword}
+                            disabled={!currentPassword || isVerifying || isCurrentPasswordValid}
+                            className={`px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 
+                              ${isCurrentPasswordValid 
+                                ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' 
+                                : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'}`}
+                          >
+                            {isVerifying ? 'Verifying...' : isCurrentPasswordValid ? 'Verified' : 'Verify'}
+                          </button>
+                        </div>
+                        {isCurrentPasswordValid && (
+                          <p className="mt-1 text-sm text-green-600">Current password verified</p>
+                        )}
+                      </div>
+                      {/* Show Current Password Checkbox */}
                       <div className="flex items-center mt-1">
                         <input
-                          id="showNewPassword"
+                          id="showCurrentPassword" // Renamed id for clarity
                           type="checkbox"
-                          checked={showNewPassword}
-                          onChange={() => setShowNewPassword((prev) => !prev)}
+                          checked={showCurrentPassword}
+                          onChange={() => setShowCurrentPassword((prev) => !prev)}
                           className="mr-2"
                         />
-                        <label htmlFor="showNewPassword" className="text-xs text-gray-600 select-none">Show Password</label>
+                        <label htmlFor="showCurrentPassword" className="text-xs text-gray-600 select-none">Show Current Password</label>
                       </div>
-                      {newPassword && newPassword.length < 8 && (
-                        <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
+                      
+                      {showNewPasswordFields && (
+                        <>
+                          <div>
+                            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                              New Password
+                            </label>
+                            <input
+                              id="newPassword"
+                              type={showNewPasswords ? "text" : "password"} // Use unified state
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                              required
+                              minLength={8}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                              Confirm New Password
+                            </label>
+                            <input
+                              id="confirmPassword"
+                              type={showNewPasswords ? "text" : "password"} // Use unified state
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                              required
+                            />
+                            {confirmPassword && newPassword !== confirmPassword && (
+                              <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
+                            )}
+                          </div>
+                          {/* Unified Show New/Confirm Passwords Checkbox */}
+                          <div className="flex items-center mt-1">
+                            <input
+                              id="showNewPasswords" // New ID for unified control
+                              type="checkbox"
+                              checked={showNewPasswords}
+                              onChange={() => setShowNewPasswords((prev) => !prev)}
+                              className="mr-2"
+                            />
+                            <label htmlFor="showNewPasswords" className="text-xs text-gray-600 select-none">Show New Passwords</label>
+                          </div>
+                        </>
                       )}
                     </div>
                     
                     <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                        Confirm New Password
-                      </label>
-                      <input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                        required
-                      />
-                      {/* Show Password Checkbox */}
-                      <div className="flex items-center mt-1">
-                        <input
-                          id="showConfirmPassword"
-                          type="checkbox"
-                          checked={showConfirmPassword}
-                          onChange={() => setShowConfirmPassword((prev) => !prev)}
-                          className="mr-2"
-                        />
-                        <label htmlFor="showConfirmPassword" className="text-xs text-gray-600 select-none">Show Password</label>
-                      </div>
-                      {confirmPassword && newPassword !== confirmPassword && (
-                        <p className="mt-1 text-sm text-red-600">Passwords do not match</p>
-                      )}
+                      <button
+                        type="submit"
+                        disabled={!isFormValid()}
+                        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
+                          ${isFormValid() 
+                            ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
+                            : 'bg-gray-400 cursor-not-allowed'} 
+                          focus:outline-none focus:ring-2 focus:ring-offset-2`}
+                      >
+                        Update Password
+                      </button>
                     </div>
-                  </>
-                )}
-              </div>
-              
-              <div>
-                <button
-                  type="submit"
-                  disabled={!isFormValid()}
-                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
-                    ${isFormValid() 
-                      ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
-                      : 'bg-gray-400 cursor-not-allowed'} 
-                    focus:outline-none focus:ring-2 focus:ring-offset-2`}
-                >
-                  Update Password
-                </button>
-              </div>
-            </form>
+                  </form>
           </div>
           
                 {/* Change Secret Access Code Section */}
@@ -1400,7 +1444,7 @@ const Settings = () => {
                   )}
                 </div>
 
-                {/* Logout and Delete Account Section */}
+                {/* Logout Section */}
                 <div className="bg-red-50 rounded-lg p-6 shadow mb-6 border border-red-200 mt-6">
                   <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
                     <span className="text-red-600">⚠️</span> Account Actions
@@ -1498,6 +1542,109 @@ const Settings = () => {
         cancelText="Cancel"
         type="danger"
         isLoading={false}
+      />
+      
+      {/* Edit User Modal (reuse ConfirmationDialog) */}
+      <ConfirmationDialog
+        isOpen={showEditUserModal}
+        onClose={() => setShowEditUserModal(false)}
+        title="Edit User"
+        confirmText={null}
+        cancelText={null}
+        type="success" // Add type prop to change color to green
+        customContent={useMemo(() => (
+          <form onSubmit={handleEditUser} className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
+            <div>
+              <label className="block text-sm font-medium mb-1">Name</label>
+              <input type="text" className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Mobile Number</label>
+              <input type="text" className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Enter New Password</label>
+              <div className="relative">
+                <input
+                  type={showEditUserPassword ? "text" : "password"}
+                  className="w-full border rounded px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={editUserForm.password}
+                  onChange={e => setEditUserForm(f => ({ ...f, password: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditUserPassword(!showEditUserPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showEditUserPassword ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showEditUserPassword ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                  </svg>
+                </button>
+              </div>
+              {editUserForm.password && editUserForm.password.length < 8 && (
+                <p className="text-red-500 text-sm mt-1">Password must be at least 8 characters.</p>
+              )}
+            </div>
+            {editUserForm.password && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Confirm New Password</label>
+                <div className="relative">
+                  <input
+                    type={showConfirmEditUserPassword ? "text" : "password"}
+                    className="w-full border rounded px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={confirmEditPassword}
+                    onChange={e => setConfirmEditPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmEditUserPassword(!showConfirmEditUserPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showConfirmEditUserPassword ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-2.076m5.262-2.324A9.97 9.97 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 2.076m-5.262 2.324L12 12m0 0l-3.875 3.875M3 3l18 18' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'} />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showConfirmEditUserPassword ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z' : 'M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z'} />
+                    </svg>
+                  </button>
+                </div>
+                {editUserForm.password !== confirmEditPassword && (
+                  <p className="text-red-500 text-sm mt-1">New passwords do not match.</p>
+                )}
+              </div>
+            )}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-1">Role</label>
+              <select className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={editUserForm.role} onChange={e => setEditUserForm(f => ({ ...f, role: e.target.value }))}>
+                <option value="admin">Admin</option>
+                <option value="worker">Worker</option>
+              </select>
+            </div>
+            <div className="md:col-span-2 flex items-center gap-2">
+              <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
+              <label htmlFor="isActive" className="text-sm">Active</label>
+            </div>
+            <div className="md:col-span-2 flex justify-end gap-2 mt-4">
+              <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
+              <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </form>
+        ), [editUserForm, confirmEditPassword, showEditUserPassword, editUserLoading, handleEditUser, setShowEditUserModal])}
+      />
+
+      {/* Toggle User Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showToggleUserConfirm}
+        onClose={cancelToggleUser}
+        onConfirm={confirmToggleUser}
+        title={userToToggle?.isActive ? "Disable User" : "Enable User"}
+        message={userToToggle?.isActive 
+          ? `Are you sure you want to disable user '${userToToggle?.name}'? This will prevent them from logging in.`
+          : `Are you sure you want to enable user '${userToToggle?.name}'?`}
+        confirmText={isTogglingUser ? (userToToggle?.isActive ? "Disabling..." : "Enabling...") : (userToToggle?.isActive ? "Yes, Disable" : "Yes, Enable")}
+        cancelText="Cancel"
+        type={userToToggle?.isActive ? "danger" : "info"}
+        isLoading={isTogglingUser}
       />
 
     </div>

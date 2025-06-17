@@ -232,7 +232,7 @@ export const AuthProvider = ({ children }) => {
   
   // Login function
   const login = async (username, password, rememberDevice = true, deviceToken = null) => {
-    console.log('Attempting login...');
+    // console.log('Attempting login...');
     try {
       const body = { username, password, rememberDevice };
       if (deviceToken) body.deviceToken = deviceToken;
@@ -243,50 +243,40 @@ export const AuthProvider = ({ children }) => {
         },
         body: JSON.stringify(body)
       });
-      console.log('Login response status:', response.status);
+      // console.log('Login response status:', response.status);
       const responseText = await response.text();
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (e) {
-        console.error('Failed to parse response as JSON');
-        return { 
-          success: false, 
-          message: 'Invalid response from server. Please try again.' 
-        };
+        // console.error('Failed to parse login response as JSON:', responseText, e);
+        throw new Error('Server response was not valid JSON.');
       }
+
       if (response.ok) {
-        console.log('Login successful');
+        // console.log('Login success - User data:', data.user);
+        setUser(data.user);
+        setIsAuthenticated(true);
+        updateLastActivityTime();
         sessionStorage.setItem('token', data.token);
         sessionStorage.setItem('user', JSON.stringify(data.user));
-        console.log('Login success - User data:', data.user);
-        if (rememberDevice) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-        } else {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+        sessionStorage.setItem('jwtVerified', 'true');
+
+        if (rememberDevice && data.deviceToken) {
+          localStorage.setItem('deviceToken', data.deviceToken);
         }
-        updateLastActivityTime();
-        setIsAuthenticated(true);
-        setUser(data.user);
-        return {
-          success: true,
-          deviceToken: data.deviceToken,
-          user: data.user
-        };
+        return { success: true, user: data.user, deviceToken: data.deviceToken };
       } else {
-        return { 
-          success: false, 
-          message: data.message || 'Login failed. Please check your credentials.' 
-        };
+        // console.error('Login failed - Response data:', data);
+        const errorMessage = data.message || 'Login failed due to unknown error.';
+        throw new Error(errorMessage);
       }
-    } catch (err) {
-      console.error('Login error:', err);
-      return { 
-        success: false, 
-        message: 'An unexpected error occurred. Please try again.'
-      };
+    } catch (error) {
+      // console.error('Login error:', error);
+      return { success: false, message: error.message || 'An unexpected error occurred during login.' };
+    } finally {
+      // Clear auth operation in progress
+      clearAuthOperationInProgress();
     }
   };
   

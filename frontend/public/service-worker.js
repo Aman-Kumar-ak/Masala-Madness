@@ -20,29 +20,20 @@ const PRECACHE_URLS = {
     '/version.json'
   ],
   IMAGES: {
-    LOGO: '/images/logo/logo.png',
+    LOGO: '', // Removing direct precache of logo.png here, will be cached on demand or by main.jsx
     ICONS: [
-      '/images/icons/icon-192X192.png',
-      '/images/icons/icon-512X512.png'
+      '/images/icons/icon-192X192.svg',
+      '/images/icons/icon-512X512.svg'
     ],
-    FALLBACKS: [
-      '/images/fallbacks/image-placeholder.svg',
-      '/images/fallbacks/logo-placeholder.svg',
-      '/images/fallbacks/calendar-placeholder.svg',
-      '/images/fallbacks/login-placeholder.svg',
-      '/images/fallbacks/qr-placeholder.svg',
-      '/images/fallbacks/order-placeholder.svg',
-      '/images/fallbacks/receipt-placeholder.svg',
-      '/images/fallbacks/admin-placeholder.svg',
-      '/images/fallbacks/icon-placeholder-192X192.svg'
-    ]
+    FALLBACKS: [] // Removing aggressive precaching of all fallbacks
   }
 };
 
 // Flatten precache URLs for easier use
 const FLAT_PRECACHE_URLS = [
   ...PRECACHE_URLS.ESSENTIAL,
-  PRECACHE_URLS.IMAGES.LOGO,
+  // Only add LOGO if it's not empty
+  ...(PRECACHE_URLS.IMAGES.LOGO ? [PRECACHE_URLS.IMAGES.LOGO] : []),
   ...PRECACHE_URLS.IMAGES.ICONS,
   ...PRECACHE_URLS.IMAGES.FALLBACKS
 ];
@@ -53,7 +44,7 @@ const cacheOperations = {
     try {
       return await caches.open(cacheName);
     } catch (error) {
-      console.error(`Failed to open cache ${cacheName}:`, error);
+      // console.error(`Failed to open cache ${cacheName}:`, error);
       return null;
     }
   },
@@ -64,7 +55,7 @@ const cacheOperations = {
         await cache.put(request, response.clone());
       }
     } catch (error) {
-      console.error('Failed to add to cache:', error);
+      // console.error('Failed to add to cache:', error);
     }
   },
 
@@ -73,7 +64,7 @@ const cacheOperations = {
       const cache = await caches.open(CACHE_NAMES.STATIC);
       return await cache.match(request);
     } catch (error) {
-      console.error('Failed to get from cache:', error);
+      // console.error('Failed to get from cache:', error);
       return null;
     }
   }
@@ -102,7 +93,7 @@ self.addEventListener('activate', (event) => {
         cacheNames
           .filter(name => !name.includes(`-${DEPLOYMENT_ID}`))
           .map(name => {
-            console.log(`Deleting old cache: ${name}`);
+            // console.log(`Deleting old cache: ${name}`);
             return caches.delete(name);
           })
       );
@@ -137,7 +128,7 @@ self.addEventListener('activate', (event) => {
           });
         });
       } catch (error) {
-        console.error('Error fetching version info:', error);
+        // console.error('Error fetching version info:', error);
       }
     })()
   );
@@ -231,7 +222,7 @@ async function handleDefaultRequest(request) {
     }
     return response;
   }).catch(error => {
-    console.error('Network request failed:', error);
+    // console.error('Network request failed:', error);
     // If we have a cached response, we'll use that instead
     if (cachedResponse) return cachedResponse;
     throw error;
@@ -248,7 +239,7 @@ async function updateCacheInBackground(request) {
     const url = new URL(request.url);
     url.searchParams.set('_cache', Date.now());
     
-    console.log('Attempting to update cache for URL:', url.toString());
+    // console.log('Attempting to update cache for URL:', url.toString());
     
     const response = await fetch(url.toString());
     if (response.ok) {
@@ -256,11 +247,11 @@ async function updateCacheInBackground(request) {
       if (cache) {
         // Store with the original request (without cache-busting)
         await cacheOperations.addToCache(cache, request, response);
-        console.log(`Updated cache for: ${request.url}`);
+        // console.log(`Updated cache for: ${request.url}`);
       }
     }
   } catch (error) {
-    console.error('Background cache update failed:', error);
+    // console.error('Background cache update failed:', error);
   }
 }
 

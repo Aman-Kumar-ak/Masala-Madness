@@ -3,6 +3,7 @@
  */
 
 // Common images that appear across the app
+// NOTE: This list is now deprecated. Use preloadImages with specific URLs per page.
 const COMMON_IMAGES = [
   '/images/m_logo.svg',  // Use SVG version
   '/images/login.png',
@@ -18,25 +19,12 @@ const COMMON_IMAGES = [
 const imageCache = new Map();
 
 /**
- * Preload common images to improve perceived performance
+ * Preload a list of image URLs to improve perceived performance.
+ * Only use for images critical for the initial render of a specific page.
+ * @param {string[]} urlsToPreload - An array of image URLs to preload.
  */
-export const preloadCommonImages = async () => {
-  // Existing preloaded images (if any)
-  const commonImages = [
-    '/images/m_logo.svg',  // Use SVG version
-    '/images/login.png',
-    '/images/receipt.png',
-    '/images/order.png',
-    '/images/calendar.png',
-    '/images/qr-code.png',
-    '/images/admin.png',
-    // Add PWA icons (using SVG version)
-    '/images/icons/icon-192X192.svg',
-    '/images/icons/icon-512X512.svg'
-  ];
-
-  // First check if each image is already in cache
-  for (const src of commonImages) {
+export const preloadImages = async (urlsToPreload) => {
+  for (const src of urlsToPreload) {
     try {
       // Check if image is already in cache
       const isCached = await checkImageInCache(src);
@@ -44,7 +32,7 @@ export const preloadCommonImages = async () => {
       if (isCached) {
         // Image already in cache, no need to download again
         imageCache.set(src, true);
-        console.log(`Image already cached: ${src}`);
+        // console.log(`Image already cached: ${src}`);
         continue;
       }
       
@@ -53,10 +41,10 @@ export const preloadCommonImages = async () => {
       img.src = src;
       img.onload = () => {
         imageCache.set(src, true);
-        console.log(`Preloaded: ${src}`);
+        // console.log(`Preloaded: ${src}`);
       };
       img.onerror = () => {
-        console.error(`Failed to preload: ${src}`);
+        // console.error(`Failed to preload: ${src}`);
       };
       
       // Force image to be loaded with high priority
@@ -83,7 +71,7 @@ export const preloadCommonImages = async () => {
         }
       }, 3000);
     } catch (error) {
-      console.error(`Error preloading image ${src}:`, error);
+      // console.error(`Error preloading image ${src}:`, error);
     }
   }
 };
@@ -110,7 +98,7 @@ const checkImageInCache = async (url) => {
         }
       }
     } catch (error) {
-      console.warn(`Cache check failed for ${url}:`, error);
+      // console.warn(`Cache check failed for ${url}:`, error);
     }
   }
   
@@ -171,7 +159,7 @@ export const addImageToCache = async (url) => {
     imageCache.set(url, true);
     return true;
   } catch (error) {
-    console.error('Failed to cache image:', error);
+    // console.error('Failed to cache image:', error);
     return false;
   }
 };
@@ -180,8 +168,8 @@ export const addImageToCache = async (url) => {
  * Initialize image optimizations
  */
 export const initImageOptimizations = () => {
-  // Preload common images
-  preloadCommonImages();
+  // Preload common images (now handled by specific pages)
+  // preloadCommonImages(); // Deprecated call
 };
 
 /**
@@ -199,46 +187,30 @@ export const initializeFastImageLoading = () => {
     // Could implement a JS-based lazy loading solution here
   }
   
-  // Preload PWA icons for offline use
-  preloadPwaIcons();
+  // Preload PWA icons for offline use (consider moving to App.jsx or main.jsx based on usage)
+  // preloadPwaIcons(); // Deprecated call, moved to main.jsx for universal icons
 };
 
 // Preload all PWA icons for better offline experience
 export const preloadPwaIcons = async () => {
   const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
+  const urlsToPreload = [];
   
   for (const size of iconSizes) {
     // Use SVG icons instead of PNG files (much smaller)
     const iconUrl = `/images/icons/icon-${size}X${size}.svg`;
-    
-    try {
-      // Check if icon is already in cache
-      const isCached = await checkImageInCache(iconUrl);
-      
-      if (isCached) {
-        // Icon already in cache, no need to download again
-        imageCache.set(iconUrl, true);
-        console.log(`Icon already cached: ${iconUrl}`);
-        continue;
-      }
-      
-      // If not in cache, load it
-      const img = new Image();
-      img.src = iconUrl;
-      img.onload = () => {
-        imageCache.set(iconUrl, true);
-        console.log(`Preloaded icon: ${iconUrl}`);
-      };
-    } catch (error) {
-      console.error(`Error preloading icon ${iconUrl}:`, error);
-    }
+    urlsToPreload.push(iconUrl);
   }
+  
+  // Use the generic preloadImages function for PWA icons
+  await preloadImages(urlsToPreload);
 };
 
 export default {
-  preloadCommonImages,
+  preloadImages, // Renamed and modified
   isImageCached,
   addImageToCache,
   initImageOptimizations,
-  initializeFastImageLoading
+  initializeFastImageLoading,
+  preloadPwaIcons
 }; 

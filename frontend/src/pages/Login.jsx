@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNotification } from '../components/NotificationContext';
 import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
 import ConfirmationDialog from "../components/ConfirmationDialog";
+import { preloadImages } from '../utils/imageOptimizations';
 
 const Login = () => {
   useKeyboardScrollAdjustment();
@@ -31,42 +32,36 @@ const Login = () => {
   // Initial check for tokens to prevent login page flash
   useEffect(() => {
     const checkForExistingTokens = async () => {
-      // Only run this check once
       if (initialCheckRef.current) return;
       initialCheckRef.current = true;
       
-      console.log('Login page: Checking for existing tokens...');
       const jwtToken = sessionStorage.getItem('token');
       const deviceToken = localStorage.getItem('deviceToken');
       
-      // If we have either token, don't show the login page at all
       if (jwtToken || deviceToken) {
-        console.log('Login page: Token found, keeping loading state active');
-        // Keep loading state, AuthContext will handle the redirect
         return;
       }
       
-      console.log('Login page: No tokens found, showing login form');
-      // No tokens found, show the login form
       setIsLoading(false);
       setInitialCheckComplete(true);
     };
     
     checkForExistingTokens();
+    
+    // Preload specific images for the login page
+    preloadImages(['/images/m_logo.png', '/images/login.png']);
+
   }, []);
   
   // If already authenticated after initial check, redirect to home page
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('Login page: User is authenticated, redirecting to home');
-      // Check user role and navigate accordingly
       if (user?.role === 'worker') {
         navigate('/worker-home');
       } else {
-      navigate('/home');
+        navigate('/home');
       }
     } else if (initialCheckComplete) {
-      console.log('Login page: Initial check complete, user not authenticated');
       setIsLoading(false);
     }
   }, [isAuthenticated, navigate, initialCheckComplete, user]);
@@ -107,7 +102,7 @@ const Login = () => {
           if (result.user && result.user.role === 'worker') {
             navigate('/worker-home');
           } else {
-          navigate('/home');
+            navigate('/home');
           }
         }, 800);
       } else {
@@ -116,8 +111,8 @@ const Login = () => {
           setShowDisabledAccountDialog(true);
         } else if (result.message.toLowerCase().includes('invalid') || result.message.toLowerCase().includes('credentials')) {
           setError('Invalid credentials. Please try again.');
-      } else {
-        setError(result.message);
+        } else {
+          setError(result.message);
         }
         // Show recovery instructions if we get an indication that admin user doesn't exist
         if (result.message.includes('credentials') || result.message.includes('not found')) {

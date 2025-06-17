@@ -6,21 +6,22 @@ import './style.css';
 
 import { CartProvider } from './components/CartContext'; // ✅ Import the CartProvider
 import { RefreshProvider } from './contexts/RefreshContext'; // ✅ Import the RefreshProvider
-import { initializeFastImageLoading, preloadCommonImages, preloadPwaIcons } from './utils/imageOptimizations'; // Import image optimization
+import { initializeFastImageLoading, preloadImages, preloadPwaIcons } from './utils/imageOptimizations'; // Import image optimization
 
 // Initialize image loading with async functions
 (async () => {
   try {
-    // Start preloading images immediately before any React rendering
-    await preloadCommonImages();
+    // Start preloading universal images immediately before any React rendering
+    // (e.g., logo that appears on all pages)
+    await preloadImages(['/images/m_logo.svg', '/images/logo/logo.png']);
     
-    // Preload PWA icons for better offline experience
+    // Preload PWA icons for better offline experience, as they are universal
     await preloadPwaIcons();
     
     // Then initialize the rest of the image optimization
     initializeFastImageLoading();
   } catch (error) {
-    console.error('Error during image preloading:', error);
+    // console.error('Error during image preloading:', error);
   }
 })();
 
@@ -42,7 +43,7 @@ if ('serviceWorker' in navigator) {
       caches.keys().then(cacheNames => {
         cacheNames.forEach(cacheName => {
           if (cacheName.includes('dynamic-cache')) {
-            console.log('Clearing dynamic cache:', cacheName);
+            // console.log('Clearing dynamic cache:', cacheName);
             caches.delete(cacheName);
           }
         });
@@ -55,7 +56,7 @@ if ('serviceWorker' in navigator) {
       scope: '/'
     })
       .then(registration => {
-        console.log('Service Worker registered with scope:', registration.scope);
+        // console.log('Service Worker registered with scope:', registration.scope);
         
         // Remove interval checking - only check for updates when page loads/refreshes
         
@@ -76,10 +77,10 @@ if ('serviceWorker' in navigator) {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache, must-revalidate' }
               });
-              console.log('Fresh version check completed');
+              // console.log('Fresh version check completed');
             }
           } catch (error) {
-            console.error('Error checking for updates:', error);
+            // console.error('Error checking for updates:', error);
           }
         };
         
@@ -93,7 +94,7 @@ if ('serviceWorker' in navigator) {
           newWorker.addEventListener('statechange', () => {
             // When the service worker is installed
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('New content is available; automatically updating...');
+              // console.log('New content is available; automatically updating...');
               // Skip waiting to apply updates immediately
               if (registration.waiting) {
                 registration.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -105,7 +106,7 @@ if ('serviceWorker' in navigator) {
         });
       })
       .catch(error => {
-        console.error('Service Worker registration failed:', error);
+        // console.error('Service Worker registration failed:', error);
       });
     
     // Listen for messages from the service worker
@@ -113,14 +114,14 @@ if ('serviceWorker' in navigator) {
       if (event.data) {
         // Handle UPDATE_AVAILABLE message (for backward compatibility)
         if (event.data.type === 'UPDATE_AVAILABLE') {
-          console.log('Update available and applied automatically:', event.data.message || '');
+          // console.log('Update available and applied automatically:', event.data.message || '');
           
           // Clear application cache before reload
           if ('caches' in window) {
             caches.keys().then(cacheNames => {
               return Promise.all(
                 cacheNames.filter(name => name.includes('dynamic')).map(name => {
-                  console.log('Clearing cache before reload:', name);
+                  // console.log('Clearing cache before reload:', name);
                   return caches.delete(name);
                 })
               );
@@ -136,7 +137,7 @@ if ('serviceWorker' in navigator) {
         
         // Handle new CACHE_UPDATED message
         if (event.data.type === 'CACHE_UPDATED') {
-          console.log('Cache updated:', event.data.message);
+          // console.log('Cache updated:', event.data.message);
           
           // Clear browser cache for main resources
           if ('caches' in window) {

@@ -98,14 +98,16 @@ async function handleResponse(response, suppressAuthRedirect = false) {
 
   // If response is not ok, handle error
   if (!response.ok) {
-    // If unauthorized AND not suppressing redirect, redirect to login
+    // If unauthorized AND not suppressing redirect, clear session and redirect to login
     if (response.status === 401 && !suppressAuthRedirect) {
       sessionStorage.removeItem('token'); // Clear invalid token
       sessionStorage.removeItem('user'); // Clear user data
       window.location.href = '/login'; // Redirect to login
+      // Prevent further processing if redirect is happening
+      throw new Error('Unauthorized - Redirecting to login');
     }
 
-    // If not JSON, provide a clearer error
+    // If 401 and suppressing redirect, or other error status, just throw the error without redirecting
     if (!isJson) {
       const error = new Error(`API error: Received non-JSON response (status ${response.status}). Possible 404 or server error.`);
       error.status = response.status;
