@@ -530,10 +530,10 @@ const Settings = () => {
   // Handle successful secret code verification for Admin Control access
   const handleSecretCodeSuccess = async () => {
     setIsSecretCodeAuthenticated(true);
-    // Set a timestamp for 15 minutes from now
-    const expiryTime = new Date().getTime() + (15 * 60 * 1000); // 15 minutes
+    // Set a timestamp for 10 minutes from now
+    const expiryTime = new Date().getTime() + (10 * 60 * 1000); // 10 minutes
     localStorage.setItem('qr_verification_expiry', expiryTime.toString());
-    showSuccess('Secret access granted for 15 minutes.');
+    showSuccess('Secret access granted for 10 minutes.');
     
     // Start loading admin data specific to this section
     setIsAdminControlLoading(true);
@@ -552,7 +552,7 @@ const Settings = () => {
     }
   };
 
-  // Handle secret code verification
+  // Handle secret code verification (for change secret code form)
   const verifyCurrentSecretCode = async () => {
     if (!currentSecretCode.trim()) {
       setSecretCodeError('Please enter your current secret access code.');
@@ -623,12 +623,125 @@ const Settings = () => {
     }
   };
 
+  // New function for Admin Control specific secret code verification
+  const handleAdminControlSecretCodeVerification = async () => {
+    if (!currentSecretCode.trim()) {
+      setSecretCodeError('Please enter your secret access code to unlock Admin Controls.');
+      return;
+    }
+
+    if (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) {
+      setSecretCodeError(`Too many failed attempts. Please try again after ${lockoutRemainingTime}.`);
+      return;
+    }
+
+    setIsSecretCodeChanging(true);
+    setSecretCodeError('');
+    setAuthOperationInProgress();
+
+    try {
+      const response = await api.post('/auth/secret-code/verify', {
+        secretCode: currentSecretCode,
+      }, true);
+
+      if (response.status === 'success') {
+        setSecretCodeError('');
+        handleSecretCodeSuccess(); // This unlocks the admin features and sets the timer
+        setSecretCodeAttempts(0); // Reset attempts on success
+        localStorage.removeItem('secretCodeAttempts');
+        localStorage.removeItem('secretCodeLockoutTime');
+        setSecretCodeLockoutTime(null);
+        setLockoutRemainingTime(null);
+        setCurrentSecretCode(''); // Clear the input after successful unlock
+      } else {
+        const newAttempts = secretCodeAttempts + 1;
+        setSecretCodeAttempts(newAttempts);
+        localStorage.setItem('secretCodeAttempts', newAttempts.toString());
+
+        if (newAttempts >= 3) {
+          const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000); 
+          setSecretCodeLockoutTime(lockoutEnd);
+          localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
+          setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
+          showError('Too many failed secret code attempts. Access disabled for 24 hours.');
+        } else {
+          setSecretCodeError(response.message || 'Incorrect secret code.');
+          showError(`Incorrect secret code. ${3 - newAttempts} attempts remaining.`);
+        }
+      }
+    } catch (error) {
+      console.error('Error verifying secret code for Admin Control:', error);
+      const newAttempts = secretCodeAttempts + 1;
+      setSecretCodeAttempts(newAttempts);
+      localStorage.setItem('secretCodeAttempts', newAttempts.toString());
+
+      if (newAttempts >= 3) {
+        const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000);
+        setSecretCodeLockoutTime(lockoutEnd);
+        localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
+        setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
+        showError('Too many failed secret code attempts. Access disabled for 24 hours.');
+      } else {
+        setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
+        showError(`Failed to verify secret code. ${3 - newAttempts} attempts remaining.`);
+      }
+    } finally {
+      setIsSecretCodeChanging(false);
+      clearAuthOperationInProgress();
+    }
+  };
+
   const isSecretCodeFormValid = () => {
     return (
       isCurrentSecretCodeValid &&
       newSecretCode.length >= 8 &&
       newSecretCode === confirmNewSecretCode
     );
+  };
+  
+  // Handle secret code change
+  const handleChangeSecretCode = async (e) => {
+    e.preventDefault();
+
+    setSecretCodeError('');
+    setSecretCodeSuccess('');
+
+    if (newSecretCode !== confirmNewSecretCode) {
+      setSecretCodeError('New secret codes do not match.');
+      return;
+    }
+
+    if (newSecretCode.length < 8) {
+      setSecretCodeError('Secret code must be at least 8 characters long.');
+      return;
+    }
+
+    setIsSecretCodeChanging(true);
+    setAuthOperationInProgress();
+
+    try {
+      const response = await api.post('/auth/secret-code/change', {
+        newSecretCode: newSecretCode,
+      }, true);
+
+      if (response.status === 'success') {
+        setSecretCodeSuccess('Secret access code changed successfully!');
+        setCurrentSecretCode('');
+        setNewSecretCode('');
+        setConfirmNewSecretCode('');
+        setIsCurrentSecretCodeValid(false); // Reset verification status
+        showSuccess('Secret access code changed successfully!');
+      } else {
+        setSecretCodeError(response.message || 'Failed to change secret code.');
+        showError('Failed to change secret code.');
+      }
+    } catch (error) {
+      setSecretCodeError(error.response?.data?.message || 'Error changing secret code. Please try again.');
+      showError('Error changing secret code.');
+    } finally {
+      setIsSecretCodeChanging(false);
+      clearAuthOperationInProgress();
+    }
   };
 
   // Use effect to load secret code attempts and lockout from localStorage on mount
@@ -716,9 +829,9 @@ const Settings = () => {
                     A secret access code is required to manage devices and user roles.
                   </p>
                   <p className="text-gray-500 mb-4 text-sm">
-                    Once verified, you'll have access for 10 minutes without re-entering the code.
+                    Once verified, you'll have access for 15 minutes without re-entering the code.
                   </p>
-                  <form onSubmit={(e) => { e.preventDefault(); verifyCurrentSecretCode(); }} className="space-y-4">
+                  <form onSubmit={(e) => { e.preventDefault(); handleAdminControlSecretCodeVerification(); }} className="space-y-4">
                     <div>
                       <label htmlFor="secretCodeAdminUnlock" className="sr-only">Secret Access Code</label>
                       <div className="mt-1 relative rounded-md shadow-sm">
@@ -778,7 +891,7 @@ const Settings = () => {
                     ) : (
                       <>
                   {/* Device Management Card - Show unique users only */}
-                        <div className="bg-white shadow-lg rounded-xl p-6 border border-blue-200 mb-6">
+                        <div className="bg-blue-50 shadow-md rounded-xl p-4 sm:p-6 border border-blue-200 mb-6">
                     <div className="flex items-center gap-3 mb-6">
                       <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
                         <i className="fas fa-tablet-alt"></i>
@@ -854,8 +967,10 @@ const Settings = () => {
                     </div>
                   </div>
 
+                  <hr className="my-8 border-t-2 border-gray-200" />
+
                   {/* User Management Card */}
-                  <div className="bg-white shadow-lg rounded-xl p-6 border border-emerald-200">
+                  <div className="bg-emerald-50 shadow-md rounded-xl p-4 sm:p-6 border border-emerald-200">
                     <div className="flex items-center gap-3 mb-6">
                       <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
                         <i className="fas fa-users-cog"></i>
@@ -1286,7 +1401,7 @@ const Settings = () => {
                 </div>
 
                 {/* Logout and Delete Account Section */}
-                <div className="bg-red-50 rounded-lg p-6 shadow mb-6 border border-red-200">
+                <div className="bg-red-50 rounded-lg p-6 shadow mb-6 border border-red-200 mt-6">
                   <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">
                     <span className="text-red-600">⚠️</span> Account Actions
                   </h2>
@@ -1302,16 +1417,6 @@ const Settings = () => {
                       Logout
                     </button>
 
-                    {/* Delete Account Button */}
-                    <button
-                      onClick={handleDeleteAccount}
-                      className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-red-400 rounded-md shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Delete My Account
-                    </button>
                   </div>
                 </div>
               </div>
