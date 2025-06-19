@@ -49,6 +49,8 @@ const Settings = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCurrentPasswordValid, setIsCurrentPasswordValid] = useState(false);
   const [showNewPasswordFields, setShowNewPasswordFields] = useState(false);
+  const [adminSecretCodeAttempts, setAdminSecretCodeAttempts] = useState(0);
+  const [adminSecretCodeLockout, setAdminSecretCodeLockout] = useState(null);
   
   // State for secret code management (for QR and Admin Control)
   const [isSecretCodeAuthenticated, setIsSecretCodeAuthenticated] = useState(false);
@@ -194,8 +196,6 @@ const Settings = () => {
         setIsSecretCodeAuthenticated(true);
         return;
       }
-      // Otherwise, redirect to login
-      navigate('/login');
     }
   }, [loading, isAuthenticated, navigate]);
   
@@ -734,10 +734,6 @@ const Settings = () => {
         setSecretCodeError(error.data?.message || 'Too many failed attempts. Locked out.');
         return;
       }
-      if (error.status === 401 || error.status === 403) {
-        navigate('/login');
-        return;
-      }
       setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
     } finally {
       setIsSecretCodeChanging(false);
@@ -751,8 +747,12 @@ const Settings = () => {
       setSecretCodeError('Enter your secret access code.');
       return;
     }
-    if (lockoutMs && lockoutMs > 0) {
-      setSecretCodeError(lockoutMessage || `Too many failed attempts. Please try again after ${lockoutTimer}.`);
+    if (adminSecretCodeLockout && Date.now() < adminSecretCodeLockout) {
+      const ms = adminSecretCodeLockout - Date.now();
+      const hours = Math.floor(ms / (1000 * 60 * 60));
+      const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+      setSecretCodeError(`Locked out. Try again after ${hours > 0 ? `${hours}h ` : ''}${minutes}m ${seconds}s.`);
       return;
     }
     setIsSecretCodeChanging(true);
@@ -781,22 +781,40 @@ const Settings = () => {
         setLockoutMessage('');
         setLockoutTimer('');
         setCurrentSecretCode('');
+        setAdminSecretCodeAttempts(0); // reset attempts on success
+        setAdminSecretCodeLockout(null);
       } else {
-        setSecretCodeError(response.message || 'Incorrect secret code.');
+        // Wrong code: increment attempts
+        const newAttempts = adminSecretCodeAttempts + 1;
+        setAdminSecretCodeAttempts(newAttempts);
+        if (newAttempts >= 3) {
+          // Lockout for 24 hours
+          const lockoutUntil = Date.now() + 24 * 60 * 60 * 1000;
+          setAdminSecretCodeLockout(lockoutUntil);
+          setSecretCodeError('Too many failed attempts. Locked out for 24 hours.');
+        } else {
+          setSecretCodeError(`Incorrect secret code. ${3 - newAttempts} attempt${3 - newAttempts === 1 ? '' : 's'} left.`);
+        }
       }
     } catch (error) {
+      // Do NOT log out or redirect on 401/403 for this case
       if (error.status === 423) {
-        setLockoutMs(error.data?.lockoutMs || 1800000);
+        setLockoutMs(error.data?.lockoutMs || 24 * 60 * 60 * 1000);
         lockoutStartRef.current = Date.now();
         setLockoutMessage(error.data?.message || 'Too many failed attempts. Locked out.');
         setSecretCodeError(error.data?.message || 'Too many failed attempts. Locked out.');
         return;
       }
-      if (error.status === 401 || error.status === 403) {
-        navigate('/login');
-        return;
+      // Instead, treat as a failed attempt
+      const newAttempts = adminSecretCodeAttempts + 1;
+      setAdminSecretCodeAttempts(newAttempts);
+      if (newAttempts >= 3) {
+        const lockoutUntil = Date.now() + 24 * 60 * 60 * 1000;
+        setAdminSecretCodeLockout(lockoutUntil);
+        setSecretCodeError('Too many failed attempts. Locked out for 24 hours.');
+      } else {
+        setSecretCodeError(`Incorrect secret code. ${3 - newAttempts} attempt${3 - newAttempts === 1 ? '' : 's'} left.`);
       }
-      setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
     } finally {
       setIsSecretCodeChanging(false);
       clearAuthOperationInProgress();
@@ -914,6 +932,20 @@ const Settings = () => {
     return () => clearInterval(timer);
   }, [lockoutMs]);
 
+  // Add useEffect to clear attempts/lockout after lockout expires
+  useEffect(() => {
+    if (adminSecretCodeLockout) {
+      const timer = setInterval(() => {
+        if (Date.now() >= adminSecretCodeLockout) {
+          setAdminSecretCodeAttempts(0);
+          setAdminSecretCodeLockout(null);
+          setSecretCodeError('');
+        }
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [adminSecretCodeLockout]);
+
   // At the top of the return statement, show a spinner if loading
   if (loading) {
     return (
@@ -988,8 +1020,11 @@ const Settings = () => {
                       </div>
                     </div>
                     {secretCodeError && <p className="text-red-500 text-sm mt-1 text-center">{secretCodeError}</p>}
-                    {lockoutMs && lockoutMs > 0 && (
-                      <p className="text-red-500 text-sm mt-2 text-center">Too many failed attempts. Try again after {lockoutTimer}.</p>
+                    {adminSecretCodeLockout && Date.now() < adminSecretCodeLockout && (
+                      <p className="text-red-500 text-sm mt-2 text-center">Locked out. Try again after {(() => { const ms = adminSecretCodeLockout - Date.now(); const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); const s = Math.floor((ms % 60000) / 1000); return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`; })()}</p>
+                    )}
+                    {!adminSecretCodeLockout && adminSecretCodeAttempts > 0 && adminSecretCodeAttempts < 3 && (
+                      <p className="text-orange-500 text-sm mt-2 text-center">{3 - adminSecretCodeAttempts} attempt{3 - adminSecretCodeAttempts === 1 ? '' : 's'} left</p>
                     )}
                     <button
                       type="submit"
