@@ -6,6 +6,7 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
 import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
+import Modal from '../../components/Modal'; // You may need to create a simple Modal component if not present
 
 const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
   return (
@@ -26,7 +27,7 @@ const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
 
 const Settings = () => {
   useKeyboardScrollAdjustment();
-  const { user, isAuthenticated, logout, getUserDevices, revokeDevice, setAuthOperationInProgress, clearAuthOperationInProgress } = useAuth();
+  const { user, isAuthenticated, logout, getUserDevices, revokeDevice, setAuthOperationInProgress, clearAuthOperationInProgress, loading } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
   
@@ -177,29 +178,28 @@ const Settings = () => {
     };
   }, [showLogoutConfirm, showDeleteAccountConfirm, showRevokeConfirm, showToggleUserConfirm, showDeleteUserConfirm, showAddUserModal, showEditUserModal]);
   
-  // Redirect if not authenticated
+  // Redirect if not authenticated, but only after loading is false
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!loading && !isAuthenticated) {
       navigate('/login');
     }
-  }, [isAuthenticated, navigate]);
+  }, [loading, isAuthenticated, navigate]);
   
   // Unified useEffect for initial data fetching and secret code authentication check
   useEffect(() => {
+    if (loading || !isAuthenticated || !user) return; // Wait for auth to be ready
     const loadAllInitialData = async () => {
       const initialPromises = [];
-
       // Fetch version information
       initialPromises.push(
         fetch('/version.json')
           .then(response => response.json())
           .then(data => setVersionInfo({ ...data, environment: process.env.NODE_ENV || 'development' }))
           .catch(error => {
-        console.error('Error fetching version info:', error);
+            console.error('Error fetching version info:', error);
             setVersionInfo({ version: 'Unknown', buildDate: 'Unknown', environment: process.env.NODE_ENV || 'development' });
           })
       );
-
       // Check secret code authentication status if admin - but don't block page load
       if (user?.role === 'admin') {
         const verificationExpiry = localStorage.getItem('qr_verification_expiry');
@@ -212,7 +212,6 @@ const Settings = () => {
             const remainingMinutes = Math.floor(remainingMs / 60000);
             const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
             setSecretCodeTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
-            // Admin data will be fetched when the section is unlocked, not on initial load
           } else {
             localStorage.removeItem('qr_verification_expiry');
             setSecretCodeTimeLeft(null);
@@ -222,15 +221,10 @@ const Settings = () => {
           setIsSecretCodeAuthenticated(false);
         }
       }
-
       await Promise.allSettled(initialPromises);
     };
-
-    // Only attempt to load if authentication status is known and user data is available
-    if (isAuthenticated !== undefined && user !== undefined) {
-      loadAllInitialData();
-    }
-  }, [isAuthenticated, user]); // Removed getUserDevices as a dependency since its call is moved
+    loadAllInitialData();
+  }, [loading, isAuthenticated, user]);
 
   // Periodically check secret code verification expiry
   useEffect(() => {
@@ -947,6 +941,18 @@ const Settings = () => {
 
     return () => clearInterval(timer);
   }, [secretCodeLockoutTime, showSuccess]);
+
+  // At the top of the return statement, show a spinner if loading
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-orange-50 to-orange-100">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+          <p className="text-lg font-medium text-gray-700">Loading Masala Madness...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-900">

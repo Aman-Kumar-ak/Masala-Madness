@@ -64,11 +64,19 @@ const authenticateToken = async (req, res, next) => {
       const userWithDevice = await User.findOne({ 'devices.deviceId': token });
       if (userWithDevice) {
         const device = userWithDevice.devices.find(d => d.deviceId === token);
-        if (device && (device.isActive || device.expiresAt > new Date())) {
+        if (device) {
+          let reason = 'invalid';
+          if (device.isActive || device.expiresAt > new Date()) {
+            reason = device.expiresAt <= new Date() ? 'expired' : 'logged out';
+          } else if (device.expiresAt <= new Date()) {
+            reason = 'expired';
+          } else if (!device.isActive) {
+            reason = 'inactive';
+          }
           device.isActive = false;
           device.statusHistory.push({
             status: 'inactive',
-            reason: device.expiresAt <= new Date() ? 'expired' : 'logged out',
+            reason,
             timestamp: getISTDate()
           });
           await userWithDevice.save();

@@ -413,6 +413,7 @@ router.put('/devices/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'Device not found' });
     }
     user.devices[deviceIndex].isActive = isActive;
+    user.devices[deviceIndex].statusHistory.push({ status: isActive ? 'active' : 'inactive', reason: isActive ? 'admin enabled' : 'admin disabled', timestamp: getISTDate() });
     await user.save();
     res.json({ message: 'Device updated', device: user.devices[deviceIndex] });
   } catch (error) {
