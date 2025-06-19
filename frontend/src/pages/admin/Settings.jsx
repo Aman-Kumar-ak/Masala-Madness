@@ -6,7 +6,6 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
 import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
-import Modal from '../../components/Modal'; // You may need to create a simple Modal component if not present
 
 const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
   return (
@@ -79,9 +78,12 @@ const Settings = () => {
   const [showConfirmNewSecretCode, setShowConfirmNewSecretCode] = useState(false);
   
   // Add state for secret code attempt tracking
-  const [secretCodeAttempts, setSecretCodeAttempts] = useState(0);
-  const [secretCodeLockoutTime, setSecretCodeLockoutTime] = useState(null);
-  const [lockoutRemainingTime, setLockoutRemainingTime] = useState(null);
+  // const [secretCodeAttempts, setSecretCodeAttempts] = useState(0);
+  // const [secretCodeLockoutTime, setSecretCodeLockoutTime] = useState(null);
+  // const [lockoutRemainingTime, setLockoutRemainingTime] = useState(null);
+  const [lockoutMs, setLockoutMs] = useState(null); // Backend lockout duration in ms
+  const [lockoutMessage, setLockoutMessage] = useState('');
+  const [lockoutTimer, setLockoutTimer] = useState('');
   
   // State for confirmation dialogs
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -180,7 +182,19 @@ const Settings = () => {
   
   // Redirect if not authenticated, but only after loading is false
   useEffect(() => {
+    // Check for valid device token and secret code session
+    const deviceToken = localStorage.getItem('deviceToken');
+    const qrExpiry = localStorage.getItem('admin_unlock_expiry');
+    const now = new Date().getTime();
+    const isSecretCodeSessionValid = qrExpiry && now < parseInt(qrExpiry, 10);
+
     if (!loading && !isAuthenticated) {
+      if (deviceToken && isSecretCodeSessionValid) {
+        // Allow access if device token and secret code session are valid
+        setIsSecretCodeAuthenticated(true);
+        return;
+      }
+      // Otherwise, redirect to login
       navigate('/login');
     }
   }, [loading, isAuthenticated, navigate]);
@@ -202,7 +216,7 @@ const Settings = () => {
       );
       // Check secret code authentication status if admin - but don't block page load
       if (user?.role === 'admin') {
-        const verificationExpiry = localStorage.getItem('qr_verification_expiry');
+        const verificationExpiry = localStorage.getItem('admin_unlock_expiry');
         if (verificationExpiry) {
           const expiryTime = parseInt(verificationExpiry);
           const currentTime = new Date().getTime();
@@ -213,7 +227,7 @@ const Settings = () => {
             const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
             setSecretCodeTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
           } else {
-            localStorage.removeItem('qr_verification_expiry');
+            localStorage.removeItem('admin_unlock_expiry');
             setSecretCodeTimeLeft(null);
             setIsSecretCodeAuthenticated(false);
           }
@@ -230,7 +244,7 @@ const Settings = () => {
   useEffect(() => {
     if (isSecretCodeAuthenticated) {
       const timer = setInterval(() => {
-        const verificationExpiry = localStorage.getItem('qr_verification_expiry');
+        const verificationExpiry = localStorage.getItem('admin_unlock_expiry');
         if (verificationExpiry) {
           const expiryTime = parseInt(verificationExpiry);
           const currentTime = new Date().getTime();
@@ -240,7 +254,7 @@ const Settings = () => {
             const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
             setSecretCodeTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
           } else {
-            localStorage.removeItem('qr_verification_expiry');
+            localStorage.removeItem('admin_unlock_expiry');
             setSecretCodeTimeLeft(null);
             setIsSecretCodeAuthenticated(false);
             showError('Secret code verification expired. Please re-verify.');
@@ -654,7 +668,7 @@ const Settings = () => {
     setIsSecretCodeAuthenticated(true);
     // Set a timestamp for 15 minutes from now
     const expiryTime = new Date().getTime() + (15 * 60 * 1000); // 15 minutes
-    localStorage.setItem('qr_verification_expiry', expiryTime.toString());
+    localStorage.setItem('admin_unlock_expiry', expiryTime.toString());
     showSuccess('Secret access granted for 15 minutes.');
     
     // Start loading admin data specific to this section
@@ -680,79 +694,54 @@ const Settings = () => {
       setSecretCodeError('Please enter your current secret access code.');
       return;
     }
-  
-    // Check if locked out
-    if (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) {
-      setSecretCodeError(`Too many failed attempts. Please try again after ${lockoutRemainingTime}.`);
+    if (lockoutMs && lockoutMs > 0) {
+      setSecretCodeError(lockoutMessage || `Too many failed attempts. Please try again after ${lockoutTimer}.`);
       return;
     }
-
-    setIsSecretCodeChanging(true); // Reusing this for verification loading state
+    setIsSecretCodeChanging(true);
     setSecretCodeError('');
-    setAuthOperationInProgress(); // Indicate that an auth operation is in progress
-  
+    setAuthOperationInProgress();
     try {
-      // Use session token if available, otherwise use device token
       let token = sessionStorage.getItem('token');
       if (!token) {
         token = localStorage.getItem('deviceToken');
       }
       const response = await api.post('/auth/secret-code/verify', {
         secretCode: currentSecretCode,
-        deviceToken: localStorage.getItem('deviceToken'), // Include device token in request
+        deviceToken: localStorage.getItem('deviceToken'),
         usedWhere: 'Settings'
-      }, true, false, token); // Pass token as 5th argument
-
+      }, true, false, token);
       if (response.status === 'success') {
-        // Store new session token if present
         if (response.token) {
           sessionStorage.setItem('token', response.token);
         }
         setIsCurrentSecretCodeValid(true);
         setSecretCodeError('');
         showSuccess('Secret code verified. You can now change it.');
-        setSecretCodeAttempts(0); // Reset attempts on success
-        localStorage.removeItem('secretCodeAttempts');
-        localStorage.removeItem('secretCodeLockoutTime');
-        setSecretCodeLockoutTime(null);
-        setLockoutRemainingTime(null);
+        setLockoutMs(null);
+        setLockoutMessage('');
+        setLockoutTimer('');
       } else {
-        const newAttempts = secretCodeAttempts + 1;
-        setSecretCodeAttempts(newAttempts);
-        localStorage.setItem('secretCodeAttempts', newAttempts.toString());
-
-        if (newAttempts >= 3) {
-          const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours from now
-          setSecretCodeLockoutTime(lockoutEnd);
-          localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
-          setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
-          showError('Too many failed secret code attempts. Access disabled for 24 hours.');
-        } else {
-          setSecretCodeError(response.message || 'Incorrect secret code.');
-          showError(`Incorrect secret code. ${3 - newAttempts} attempts remaining.`);
-        }
+        setSecretCodeError(response.message || 'Incorrect secret code.');
         setIsCurrentSecretCodeValid(false);
       }
     } catch (error) {
-      console.error('Error verifying secret code:', error);
-      const newAttempts = secretCodeAttempts + 1;
-      setSecretCodeAttempts(newAttempts);
-      localStorage.setItem('secretCodeAttempts', newAttempts.toString());
-
-      if (newAttempts >= 3) {
-        const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours from now
-        setSecretCodeLockoutTime(lockoutEnd);
-        localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
-        setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
-        showError('Too many failed secret code attempts. Access disabled for 24 hours.');
-      } else {
-        setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
-        showError(`Failed to verify secret code. ${3 - newAttempts} attempts remaining.`);
+      if (error.status === 423) {
+        // Backend lockout
+        setLockoutMs(error.data?.lockoutMs || 24 * 60 * 60 * 1000);
+        lockoutStartRef.current = Date.now();
+        setLockoutMessage(error.data?.message || 'Too many failed attempts. Locked out.');
+        setSecretCodeError(error.data?.message || 'Too many failed attempts. Locked out.');
+        return;
       }
-      setIsCurrentSecretCodeValid(false);
+      if (error.status === 401 || error.status === 403) {
+        navigate('/login');
+        return;
+      }
+      setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
     } finally {
       setIsSecretCodeChanging(false);
-      clearAuthOperationInProgress(); // Clear auth operation in progress
+      clearAuthOperationInProgress();
     }
   };
 
@@ -762,78 +751,52 @@ const Settings = () => {
       setSecretCodeError('Enter your secret access code.');
       return;
     }
-
-    if (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) {
-      setSecretCodeError(`Too many failed attempts. Please try again after ${lockoutRemainingTime}.`);
+    if (lockoutMs && lockoutMs > 0) {
+      setSecretCodeError(lockoutMessage || `Too many failed attempts. Please try again after ${lockoutTimer}.`);
       return;
     }
-
     setIsSecretCodeChanging(true);
     setSecretCodeError('');
     setAuthOperationInProgress();
-
     try {
-      // Use session token if available, otherwise use device token
       let token = sessionStorage.getItem('token');
       if (!token) {
         token = localStorage.getItem('deviceToken');
       }
-      
       const response = await api.post('/auth/secret-code/verify', {
         secretCode: currentSecretCode,
-        deviceToken: localStorage.getItem('deviceToken'), // Include device token in request
+        deviceToken: localStorage.getItem('deviceToken'),
         usedWhere: 'Settings'
       }, true, false, token);
-
       if (response.status === 'success') {
-        // Store new session token if present
         if (response.token) {
           sessionStorage.setItem('token', response.token);
         }
-        // If device token is present in response, update it
         if (response.deviceToken) {
           localStorage.setItem('deviceToken', response.deviceToken);
         }
         setSecretCodeError('');
-        handleSecretCodeSuccess(); // This unlocks the admin features and sets the timer
-        setSecretCodeAttempts(0); // Reset attempts on success
-        localStorage.removeItem('secretCodeAttempts');
-        localStorage.removeItem('secretCodeLockoutTime');
-        setSecretCodeLockoutTime(null);
-        setLockoutRemainingTime(null);
-        setCurrentSecretCode(''); // Clear the input after successful unlock
+        handleSecretCodeSuccess();
+        setLockoutMs(null);
+        setLockoutMessage('');
+        setLockoutTimer('');
+        setCurrentSecretCode('');
       } else {
-        const newAttempts = secretCodeAttempts + 1;
-        setSecretCodeAttempts(newAttempts);
-        localStorage.setItem('secretCodeAttempts', newAttempts.toString());
-
-        if (newAttempts >= 3) {
-          const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000); 
-          setSecretCodeLockoutTime(lockoutEnd);
-          localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
-          setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
-          showError('Too many failed secret code attempts. Access disabled for 24 hours.');
-        } else {
-          setSecretCodeError(response.message || 'Incorrect secret code.');
-          showError(`Incorrect secret code. ${3 - newAttempts} attempts remaining.`);
-        }
+        setSecretCodeError(response.message || 'Incorrect secret code.');
       }
     } catch (error) {
-      console.error('Error verifying secret code for Admin Control:', error);
-      const newAttempts = secretCodeAttempts + 1;
-      setSecretCodeAttempts(newAttempts);
-      localStorage.setItem('secretCodeAttempts', newAttempts.toString());
-
-      if (newAttempts >= 3) {
-        const lockoutEnd = new Date().getTime() + (24 * 60 * 60 * 1000);
-        setSecretCodeLockoutTime(lockoutEnd);
-        localStorage.setItem('secretCodeLockoutTime', lockoutEnd.toString());
-        setSecretCodeError(`Too many failed attempts. Secret code access disabled for 24 hours.`);
-        showError('Too many failed secret code attempts. Access disabled for 24 hours.');
-      } else {
-        setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
-        showError(`Failed to verify secret code. ${3 - newAttempts} attempts remaining.`);
+      if (error.status === 423) {
+        setLockoutMs(error.data?.lockoutMs || 1800000);
+        lockoutStartRef.current = Date.now();
+        setLockoutMessage(error.data?.message || 'Too many failed attempts. Locked out.');
+        setSecretCodeError(error.data?.message || 'Too many failed attempts. Locked out.');
+        return;
       }
+      if (error.status === 401 || error.status === 403) {
+        navigate('/login');
+        return;
+      }
+      setSecretCodeError(error.response?.data?.message || 'Failed to verify secret code. Network error.');
     } finally {
       setIsSecretCodeChanging(false);
       clearAuthOperationInProgress();
@@ -894,53 +857,62 @@ const Settings = () => {
   };
 
   // Use effect to load secret code attempts and lockout from localStorage on mount
-  useEffect(() => {
-    const storedAttempts = parseInt(localStorage.getItem('secretCodeAttempts') || '0', 10);
-    const storedLockoutTime = localStorage.getItem('secretCodeLockoutTime');
-
-    setSecretCodeAttempts(storedAttempts);
-    if (storedLockoutTime) {
-      const lockoutMs = parseInt(storedLockoutTime, 10);
-      const currentTime = new Date().getTime();
-      if (currentTime < lockoutMs) {
-        setSecretCodeLockoutTime(lockoutMs);
-      } else {
-        // Lockout time has passed, clear stored values
-        localStorage.removeItem('secretCodeLockoutTime');
-        localStorage.removeItem('secretCodeAttempts');
-        setSecretCodeAttempts(0);
-        setSecretCodeLockoutTime(null);
-      }
-    }
-  }, []);
-
-  // Effect to handle lockout timer countdown
+  // Remove useEffect to load secret code attempts and lockout from localStorage
+  // Remove useEffect to handle lockout timer countdown from localStorage
+  // Add useEffect to handle backend lockout timer
   useEffect(() => {
     let timer;
-    if (secretCodeLockoutTime) {
+    if (lockoutMs && lockoutMs > 0) {
       timer = setInterval(() => {
-        const currentTime = new Date().getTime();
-        const remainingMs = secretCodeLockoutTime - currentTime;
-
+        const remainingMs = lockoutMs - (Date.now() - lockoutStartRef.current);
         if (remainingMs > 0) {
-          const minutes = Math.floor(remainingMs / (1000 * 60));
+          const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+          const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
           const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
-          setLockoutRemainingTime(`${minutes}m ${seconds}s`);
+          if (hours > 0) {
+            setLockoutTimer(`${hours}h ${minutes}m`);
+          } else {
+            setLockoutTimer(`${minutes}m ${seconds}s`);
+          }
         } else {
-          // Lockout expired
           clearInterval(timer);
-          setSecretCodeLockoutTime(null);
-          setSecretCodeAttempts(0);
-          setLockoutRemainingTime(null);
-          localStorage.removeItem('secretCodeLockoutTime');
-          localStorage.removeItem('secretCodeAttempts');
-          showSuccess('Secret code access re-enabled. You can try again now.');
+          setLockoutMs(null);
+          setLockoutMessage('');
+          setLockoutTimer('');
         }
       }, 1000);
     }
-
     return () => clearInterval(timer);
-  }, [secretCodeLockoutTime, showSuccess]);
+  }, [lockoutMs]);
+  const lockoutStartRef = useRef(Date.now());
+
+  // Effect to handle lockout timer countdown
+  // Remove useEffect to handle lockout timer countdown from localStorage
+  // Add useEffect to handle backend lockout timer
+  useEffect(() => {
+    let timer;
+    if (lockoutMs && lockoutMs > 0) {
+      timer = setInterval(() => {
+        const remainingMs = lockoutMs - (Date.now() - lockoutStartRef.current);
+        if (remainingMs > 0) {
+          const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+          const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+          if (hours > 0) {
+            setLockoutTimer(`${hours}h ${minutes}m`);
+          } else {
+            setLockoutTimer(`${minutes}m ${seconds}s`);
+          }
+        } else {
+          clearInterval(timer);
+          setLockoutMs(null);
+          setLockoutMessage('');
+          setLockoutTimer('');
+        }
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [lockoutMs]);
 
   // At the top of the return statement, show a spinner if loading
   if (loading) {
@@ -990,7 +962,7 @@ const Settings = () => {
                     A secret access code is required to manage devices and user roles.
                   </p>
                   <p className="text-gray-500 mb-4 text-sm">
-                    Once verified, you'll have access for 15 minutes without re-entering the code.
+                    Once verified, you'll have access for 15 minutes without re-entering the code. 3 failed attempts will lock you out for 30 minutes.
                   </p>
                   <form onSubmit={(e) => { e.preventDefault(); handleAdminControlSecretCodeVerification(); }} className="space-y-4">
                     <div>
@@ -1016,18 +988,18 @@ const Settings = () => {
                       </div>
                     </div>
                     {secretCodeError && <p className="text-red-500 text-sm mt-1 text-center">{secretCodeError}</p>}
-                    {secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime && (
-                      <p className="text-red-500 text-sm mt-2 text-center">Too many failed attempts. Try again after {lockoutRemainingTime}.</p>
+                    {lockoutMs && lockoutMs > 0 && (
+                      <p className="text-red-500 text-sm mt-2 text-center">Too many failed attempts. Try again after {lockoutTimer}.</p>
                     )}
                     <button
                       type="submit"
                       className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 text-lg"
-                      disabled={isSecretCodeChanging || (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime)}
+                      disabled={isSecretCodeChanging || (lockoutMs && lockoutMs > 0)}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
-                      {isSecretCodeChanging ? 'Unlocking...' : (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) ? `Locked` : 'Unlock Admin'}
+                      {isSecretCodeChanging ? 'Unlocking...' : (lockoutMs && lockoutMs > 0) ? `Locked for ${lockoutTimer}` : 'Unlock Admin'}
                     </button>
                   </form>
                 </div>
@@ -1366,7 +1338,7 @@ const Settings = () => {
                 {/* Change Secret Access Code Section */}
                 <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
                   <h3 className="text-xl font-bold text-gray-800 mb-4">Change Secret Access Code</h3>
-                  <p className="text-gray-600 mb-6">Update the master secret code for admin access to QR and Devices & Roles sections. This requires verifying your current secret code first.</p>
+                  <p className="text-xs text-gray-500 mt-1 mb-2">3 failed attempts will lock you out for 24 hours.</p>
 
                   {!isCurrentSecretCodeValid ? (
                     <form onSubmit={(e) => { e.preventDefault(); verifyCurrentSecretCode(); }} className="space-y-4">
@@ -1396,12 +1368,12 @@ const Settings = () => {
                       <button
                         type="submit"
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-200"
-                        disabled={isSecretCodeChanging || (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime)}
+                        disabled={isSecretCodeChanging || (lockoutMs && lockoutMs > 0)}
                       >
-                        {isSecretCodeChanging ? 'Verifying...' : (secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime) ? `Locked for ${lockoutRemainingTime}` : 'Verify Current Secret Code'}
+                        {isSecretCodeChanging ? 'Verifying...' : (lockoutMs && lockoutMs > 0) ? `Locked for ${lockoutTimer}` : 'Verify Current Secret Code'}
                       </button>
-                      {secretCodeLockoutTime && new Date().getTime() < secretCodeLockoutTime && (
-                        <p className="text-red-500 text-sm mt-2 text-center">Too many failed attempts. Try again after {lockoutRemainingTime}.</p>
+                      {lockoutMs && lockoutMs > 0 && (
+                        <p className="text-red-500 text-sm mt-2 text-center">Too many failed attempts. Try again after {lockoutTimer}.</p>
                       )}
                     </form>
                   ) : (

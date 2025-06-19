@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api';
 
-const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationType = "personalPassword", usedWhere = "Unknown", currentUserId }) => {
+const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationType = "personalPassword", usedWhere = "Unknown", currentUserId, infoText }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -129,6 +129,11 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
         if (verificationType === "secretCode") {
           const expiryTime = new Date().getTime() + (10 * 60 * 1000); // Current time + 10 minutes
           localStorage.setItem('qr_verification_expiry', expiryTime.toString());
+          if (usedWhere === 'QR Access') {
+            localStorage.setItem('qr_unlock_expiry', expiryTime.toString());
+          } else if (usedWhere === 'Settings' || usedWhere === 'Devices') {
+            localStorage.setItem('admin_unlock_expiry', expiryTime.toString());
+          }
         }
         
         setPassword('');
@@ -240,7 +245,7 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
           </div>
           
           <div className="text-sm text-gray-500 text-center">
-            <p>Once verified, you'll have access for 15 minutes without re-entering the code.</p>
+            <p>{infoText ? infoText : "Once verified, you'll have access for 15 minutes without re-entering the code."}</p>
           </div>
           
           <div className="flex justify-end space-x-3 pt-4">

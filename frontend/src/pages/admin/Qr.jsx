@@ -51,9 +51,15 @@ export default function Qr() {
   const { showSuccess, showError, showInfo } = useNotification();
   const navigate = useNavigate();
 
+  // Add state for lockoutMs, lockoutMessage, and lockoutTimer for QR secret code verification.
+  // On too many failed attempts, set lockoutMs to 30 minutes (1800000 ms), set lockoutMessage, and start a timer to update lockoutTimer in 'Xm Ys' format.
+  const [lockoutMs, setLockoutMs] = useState(null);
+  const [lockoutMessage, setLockoutMessage] = useState("");
+  const [lockoutTimer, setLockoutTimer] = useState("");
+
   // Check authentication status on component mount and when isLoggedIn changes
   useEffect(() => {
-    const verificationExpiry = localStorage.getItem('qr_verification_expiry');
+    const verificationExpiry = localStorage.getItem('qr_unlock_expiry');
     const currentTime = new Date().getTime();
     let accessCurrentlyGranted = false;
 
@@ -64,7 +70,7 @@ export default function Qr() {
       const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
       setSessionTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
     } else {
-      localStorage.removeItem('qr_verification_expiry'); // Clean up expired/non-existent
+      localStorage.removeItem('qr_unlock_expiry'); // Clean up expired/non-existent
       setSessionTimeLeft(null);
     }
     
@@ -79,7 +85,7 @@ export default function Qr() {
     // Only run this timer if secret code access has been granted for this session
     if (isSecretCodeAccessGranted) {
       const timer = setInterval(() => {
-        const verificationExpiry = localStorage.getItem('qr_verification_expiry');
+        const verificationExpiry = localStorage.getItem('qr_unlock_expiry');
         const currentTime = new Date().getTime();
 
         if (verificationExpiry && currentTime < parseInt(verificationExpiry)) {
@@ -89,7 +95,7 @@ export default function Qr() {
           setSessionTimeLeft(`${remainingMinutes}m ${remainingSeconds}s`);
         } else {
           // If expired or not present, revoke access and clear timer
-          localStorage.removeItem('qr_verification_expiry');
+          localStorage.removeItem('qr_unlock_expiry');
           setSessionTimeLeft(null);
           setIsSecretCodeAccessGranted(false); // Revoke access
           showError('QR access expired. Please re-verify.');
@@ -147,7 +153,7 @@ export default function Qr() {
     setIsSecretCodeAccessGranted(true); // Grant access only on successful verification
     setShowPasswordDialog(false);
     const expiryTime = new Date().getTime() + (15 * 60 * 1000); // 15 minutes validity
-    localStorage.setItem('qr_verification_expiry', expiryTime.toString());
+    localStorage.setItem('qr_unlock_expiry', expiryTime.toString());
     fetchUpiAddresses(); // Fetch UPI addresses now that access is granted
     showSuccess('Access granted. QR settings unlocked.');
   };
@@ -431,6 +437,10 @@ export default function Qr() {
           verificationType="secretCode"
           usedWhere="QR Access"
           currentUserId={user ? user._id : null} // Pass the current user ID for audit
+          lockoutMs={lockoutMs}
+          lockoutMessage={lockoutMessage}
+          lockoutTimer={lockoutTimer}
+          infoText="Once verified, you'll have access for 15 minutes. 3 failed attempts will lock you out for 30 minutes."
         />
       )}
 

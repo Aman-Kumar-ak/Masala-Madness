@@ -54,8 +54,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('qr_verification_expiry'); // Invalidate QR/Settings secret code access on logout
-      localStorage.removeItem('secretCodeAttempts'); // Clear attempts on logout
-      localStorage.removeItem('secretCodeLockoutTime'); // Clear lockout on logout
+      localStorage.removeItem('admin_unlock_expiry');
+      localStorage.removeItem('qr_unlock_expiry');
     } catch (error) {
       console.error('Error in logout process:', error);
     } finally {

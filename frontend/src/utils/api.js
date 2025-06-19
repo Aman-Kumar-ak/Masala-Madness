@@ -1,8 +1,8 @@
 // src/utils/api.js
 const API_BASE_URL = "https://masala-madness-production.up.railway.app/api"; // Backend base URL
 
-// Get auth token from sessionStorage
-const getToken = () => sessionStorage.getItem('token');
+// Get auth token from sessionStorage or fallback to device token from localStorage
+const getToken = () => sessionStorage.getItem('token') || localStorage.getItem('deviceToken');
 
 // Common options for fetch requests
 const getHeaders = (includeAuth = true, tokenOverride = null) => {

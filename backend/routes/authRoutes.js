@@ -515,29 +515,58 @@ router.post('/secret-code/initialize', adminAuth, async (req, res) => {
 router.post('/secret-code/verify', authenticateToken, async (req, res) => {
   try {
     const { secretCode, usedWhere, currentUserId } = req.body;
-
+    // Find device for device-based lockout
+    let device = null;
+    if (req.tokenType === 'device' && req.deviceId) {
+      device = req.user.devices.find(d => d.deviceId === req.deviceId);
+    }
+    // Check lockout
+    if (device && device.secretCodeLockoutUntil && device.secretCodeLockoutUntil > new Date()) {
+      const msLeft = device.secretCodeLockoutUntil - new Date();
+      const minutes = Math.floor(msLeft / 60000);
+      const seconds = Math.floor((msLeft % 60000) / 1000);
+      return res.status(423).json({
+        status: 'locked',
+        message: `Too many failed attempts. Try again after ${minutes}m ${seconds}s.`,
+        lockoutMs: msLeft
+      });
+    }
     if (!secretCode) {
       return res.status(400).json({ message: 'Secret code is required.' });
     }
-
     const secretCodeDoc = await SecretCode.findOne();
-
     if (!secretCodeDoc) {
       return res.status(404).json({ message: 'Secret code not set up. Please initialize it.' });
     }
-
     const isMatch = await secretCodeDoc.compareSecretCode(secretCode);
-
     if (!isMatch) {
+      // Increment failed attempts and set lockout if needed
+      if (device) {
+        device.failedSecretCodeAttempts = (device.failedSecretCodeAttempts || 0) + 1;
+        if (device.failedSecretCodeAttempts >= 3) {
+          device.secretCodeLockoutUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+          await req.user.save();
+          return res.status(423).json({
+            status: 'locked',
+            message: 'Too many failed attempts. Secret code access disabled for 24 hours.',
+            lockoutMs: 24 * 60 * 60 * 1000
+          });
+        }
+        await req.user.save();
+      }
       return res.status(401).json({ message: 'Incorrect secret code. Please try again.' });
     }
-
+    // On success, reset failed attempts and lockout
+    if (device) {
+      device.failedSecretCodeAttempts = 0;
+      device.secretCodeLockoutUntil = null;
+      await req.user.save();
+    }
     // Update lastUsedAt, lastUsedBy, and lastUsedWhere
     secretCodeDoc.lastUsedAt = getISTDate();
     secretCodeDoc.lastUsedBy = currentUserId; // Store the user who used it
     secretCodeDoc.lastUsedWhere = usedWhere; // Store where it was used (e.g., QR, Settings)
     await secretCodeDoc.save();
-
     return res.status(200).json({
       status: 'success',
       message: 'Secret code verified successfully.',

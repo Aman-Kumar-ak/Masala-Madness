@@ -81,7 +81,9 @@ const userSchema = new mongoose.Schema({
           timestamp: { type: Date, default: Date.now },
           reason: { type: String }
         }
-      ]
+      ],
+      failedSecretCodeAttempts: { type: Number, default: 0 },
+      secretCodeLockoutUntil: { type: Date, default: null }
     }
   ]
 });
