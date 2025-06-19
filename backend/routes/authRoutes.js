@@ -389,10 +389,19 @@ router.get('/profile', auth, async (req, res) => {
 // Get all devices with user info (admin only)
 router.get('/devices/all', adminAuth, async (req, res) => {
   try {
-    const devices = await User.find({})
-      .populate('devices.userId', 'name role')
-      .sort({ 'devices.lastLogin': -1 });
-    res.json(devices);
+    const users = await User.find({}).select('name role devices');
+    const allDevices = [];
+    users.forEach(user => {
+      user.devices.forEach(device => {
+        allDevices.push({
+          ...device.toObject(),
+          userName: user.name,
+          userRole: user.role,
+          userId: user._id
+        });
+      });
+    });
+    res.json(allDevices);
   } catch (error) {
     console.error('Get all devices error:', error);
     res.status(500).json({ message: 'Server error' });
