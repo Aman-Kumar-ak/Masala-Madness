@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const Device = require('../models/Device');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
@@ -62,25 +61,28 @@ router.post('/login', async (req, res) => {
     let newDeviceToken = null;
     if (rememberDevice) {
       if (deviceToken) {
-        // Update existing device token
-        const device = await Device.findOne({ deviceId: deviceToken });
-        if (device) {
-          device.lastLogin = getISTDate();
-          device.isActive = true;
-          await device.save();
+        // Update existing device token in user's devices array
+        const deviceIndex = user.devices.findIndex(d => d.deviceId === deviceToken);
+        if (deviceIndex !== -1) {
+          user.devices[deviceIndex].lastLogin = getISTDate();
+          user.devices[deviceIndex].isActive = true;
           newDeviceToken = deviceToken;
         }
       } else {
-        // Create new device token
-        const device = new Device({
+        // Create new device token in user's devices array
+        const newDevice = {
           deviceId: require('crypto').randomBytes(32).toString('hex'),
-          userId: user._id,
+          lastLogin: getISTDate(),
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-          userAgent: req.headers['user-agent']
-        });
-        await device.save();
-        newDeviceToken = device.deviceId;
+          isActive: true,
+          userAgent: req.headers['user-agent'],
+          createdAt: getISTDate(),
+          statusHistory: [{ status: 'active', timestamp: getISTDate(), reason: 'login' }]
+        };
+        user.devices.push(newDevice);
+        newDeviceToken = newDevice.deviceId;
       }
+      await user.save();
     }
 
     res.json({
@@ -116,59 +118,33 @@ router.post('/logout', authenticateToken, async (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    const tokenType = req.tokenType; // From our enhanced middleware
-    
-    // Handle logout based on token type
+    const tokenType = req.tokenType;
     if (tokenType === 'device') {
-      // If it's a device token, deactivate it
-      const device = await Device.findOneAndUpdate(
-        { deviceId: token },
-        { 
-          isActive: false, 
-          $push: { 
-            statusHistory: { 
-              status: 'inactive', 
-              reason: 'explicit logout', 
-              timestamp: getISTDate() 
-            } 
-          } 
-        },
-        { new: true } // Return the updated document
-      );
-      
-      if (device) {
+      // Deactivate device in user's devices array
+      const user = await User.findById(req.user._id || req.user.id);
+      const deviceIndex = user.devices.findIndex(d => d.deviceId === token);
+      if (deviceIndex !== -1) {
+        user.devices[deviceIndex].isActive = false;
+        user.devices[deviceIndex].statusHistory.push({ status: 'inactive', reason: 'explicit logout', timestamp: getISTDate() });
+        await user.save();
         console.log(`[Device Auth] Device deactivated (logout): deviceId=${token.substring(0, 8)}...`);
       }
     } else {
-      // For JWT tokens, we don't need to do anything server-side
-      // The client will remove the token from storage
       console.log(`[Auth] JWT token logout`);
     }
-    
-    return res.status(200).json({ 
-      status: 'success', 
-      message: 'Logged out successfully' 
-    });
+    return res.status(200).json({ status: 'success', message: 'Logged out successfully' });
   } catch (error) {
     console.error('Logout error:', error);
-    return res.status(500).json({ 
-      status: 'error', 
-      message: 'Internal server error' 
-    });
+    return res.status(500).json({ status: 'error', message: 'Internal server error' });
   }
 });
 
-// Add a new route to get all devices for the current user
+// Get all devices for the current user
 router.get('/devices', authenticateToken, async (req, res) => {
   try {
-    // Find all devices for the current user
-    const devices = await Device.find({ 
-      userId: req.user.id 
-    }).sort({ lastLogin: -1 }); // Sort by most recently used
-    
-    // Format the response to include only necessary information
+    const user = await User.findById(req.user._id || req.user.id);
+    const devices = user.devices.sort((a, b) => b.lastLogin - a.lastLogin);
     const formattedDevices = devices.map(device => ({
-      id: device._id,
       deviceId: device.deviceId,
       lastLogin: device.lastLogin,
       isActive: device.isActive,
@@ -177,72 +153,33 @@ router.get('/devices', authenticateToken, async (req, res) => {
       createdAt: device.createdAt,
       isCurrent: req.tokenType === 'device' && req.deviceId === device.deviceId
     }));
-    
-    return res.status(200).json({
-      status: 'success',
-      devices: formattedDevices
-    });
+    return res.status(200).json({ status: 'success', devices: formattedDevices });
   } catch (error) {
     console.error('Error fetching devices:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Failed to fetch devices'
-    });
+    return res.status(500).json({ status: 'error', message: 'Failed to fetch devices' });
   }
 });
 
-// Add a route to revoke a specific device
+// Revoke a specific device
 router.post('/revoke-device', authenticateToken, async (req, res) => {
   try {
     const { deviceId } = req.body;
-    
     if (!deviceId) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Device ID is required'
-      });
+      return res.status(400).json({ status: 'error', message: 'Device ID is required' });
     }
-    
-    // Find and update the device
-    const device = await Device.findOneAndUpdate(
-      { 
-        deviceId,
-        userId: req.user.id // Ensure the device belongs to the current user
-      },
-      { 
-        isActive: false,
-        $push: { 
-          statusHistory: { 
-            status: 'inactive', 
-            reason: 'manually revoked', 
-            timestamp: getISTDate() 
-          } 
-        }
-      },
-      { new: true }
-    );
-    
-    if (!device) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Device not found or already revoked'
-      });
+    const user = await User.findById(req.user._id || req.user.id);
+    const deviceIndex = user.devices.findIndex(d => d.deviceId === deviceId);
+    if (deviceIndex === -1) {
+      return res.status(404).json({ status: 'error', message: 'Device not found or already revoked' });
     }
-    
-    // If the user is revoking their current device, we should indicate this
+    user.devices[deviceIndex].isActive = false;
+    user.devices[deviceIndex].statusHistory.push({ status: 'inactive', reason: 'manually revoked', timestamp: getISTDate() });
+    await user.save();
     const isCurrentDevice = req.tokenType === 'device' && req.deviceId === deviceId;
-    
-    return res.status(200).json({
-      status: 'success',
-      message: 'Device revoked successfully',
-      isCurrentDevice
-    });
+    return res.status(200).json({ status: 'success', message: 'Device revoked successfully', isCurrentDevice });
   } catch (error) {
     console.error('Error revoking device:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Failed to revoke device'
-    });
+    return res.status(500).json({ status: 'error', message: 'Failed to revoke device' });
   }
 });
 
@@ -452,9 +389,9 @@ router.get('/profile', auth, async (req, res) => {
 // Get all devices with user info (admin only)
 router.get('/devices/all', adminAuth, async (req, res) => {
   try {
-    const devices = await Device.find({})
-      .populate('userId', 'name role')
-      .sort({ createdAt: -1 });
+    const devices = await User.find({})
+      .populate('devices.userId', 'name role')
+      .sort({ 'devices.lastLogin': -1 });
     res.json(devices);
   } catch (error) {
     console.error('Get all devices error:', error);
@@ -466,15 +403,18 @@ router.get('/devices/all', adminAuth, async (req, res) => {
 router.put('/devices/:id', adminAuth, async (req, res) => {
   try {
     const { isActive } = req.body;
-    const device = await Device.findByIdAndUpdate(
-      req.params.id,
-      { $set: { isActive } },
-      { new: true }
-    );
-    if (!device) {
+    // Find the user who owns this device
+    const user = await User.findOne({ 'devices.deviceId': req.params.id });
+    if (!user) {
+      return res.status(404).json({ message: 'User with this device not found' });
+    }
+    const deviceIndex = user.devices.findIndex(d => d.deviceId === req.params.id);
+    if (deviceIndex === -1) {
       return res.status(404).json({ message: 'Device not found' });
     }
-    res.json({ message: 'Device updated', device });
+    user.devices[deviceIndex].isActive = isActive;
+    await user.save();
+    res.json({ message: 'Device updated', device: user.devices[deviceIndex] });
   } catch (error) {
     console.error('Update device error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -485,20 +425,15 @@ router.put('/devices/:id', adminAuth, async (req, res) => {
 router.delete('/users/:id', auth, adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-
     // Prevent an admin from deleting their own account
     if (req.user.userId === id) {
       return res.status(403).json({ message: 'You cannot delete your own account.' });
     }
-
     const user = await User.findByIdAndDelete(id);
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
     }
-
-    // Also delete any associated device tokens for the deleted user
-    await Device.deleteMany({ userId: id });
-
+    // No need to delete devices separately, as they're embedded
     res.status(200).json({ message: 'User and associated devices deleted successfully.' });
   } catch (error) {
     console.error('Delete user error:', error);

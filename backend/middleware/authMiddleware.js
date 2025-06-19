@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
 // const Admin = require('../models/Admin'); // Remove old Admin model
-const Device = require('../models/Device');
 const User = require('../models/User');
 
 // Helper to get current IST date (reused from authRoutes.js)
@@ -54,75 +53,66 @@ const authenticateToken = async (req, res, next) => {
 
     // Try as device token
     const userAgent = req.headers['user-agent'] || 'unknown';
-    const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    
-    // Find active device token
-    let device = await Device.findOne({ 
-      deviceId: token,
-      isActive: true,
-      expiresAt: { $gt: new Date() }
+    // Find user with an active device token
+    const user = await User.findOne({
+      'devices.deviceId': token,
+      'devices.isActive': true,
+      'devices.expiresAt': { $gt: new Date() }
     });
-
-    if (!device) {
-      // If device token exists but is expired or not active, update its status
-      device = await Device.findOne({ deviceId: token });
-      if (device) {
-        // Only update if status needs to change
-        if (device.isActive || device.expiresAt > new Date()) {
+    if (!user) {
+      // Try to find user with this device token (even if inactive/expired)
+      const userWithDevice = await User.findOne({ 'devices.deviceId': token });
+      if (userWithDevice) {
+        const device = userWithDevice.devices.find(d => d.deviceId === token);
+        if (device && (device.isActive || device.expiresAt > new Date())) {
           device.isActive = false;
-          device.statusHistory.push({ 
-            status: 'inactive', 
-            reason: device.expiresAt <= new Date() ? 'expired' : 'logged out', 
-            timestamp: getISTDate() 
+          device.statusHistory.push({
+            status: 'inactive',
+            reason: device.expiresAt <= new Date() ? 'expired' : 'logged out',
+            timestamp: getISTDate()
           });
-          await device.save();
+          await userWithDevice.save();
         }
       }
-      return res.status(401).json({ 
-        status: 'error', 
-        message: 'Invalid or expired device token.' 
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid or expired device token.'
       });
     }
-
+    // Find the device in user's devices array
+    const device = user.devices.find(d => d.deviceId === token);
+    if (!device) {
+      return res.status(401).json({ status: 'error', message: 'Device not found.' });
+    }
     // Update last login time and record user agent if changed
     const currentDate = getISTDate();
     device.lastLogin = currentDate;
-    
-    // Record any changes in user agent (could indicate device sharing or token theft)
     if (device.userAgent !== userAgent) {
-      device.statusHistory.push({ 
-        status: 'active', 
-        reason: 'user agent changed', 
-        timestamp: currentDate 
+      device.statusHistory.push({
+        status: 'active',
+        reason: 'user agent changed',
+        timestamp: currentDate
       });
       device.userAgent = userAgent;
     }
-    
     // Extend expiry date on active use - rolling window approach
     const newExpiryDate = new Date();
     newExpiryDate.setDate(newExpiryDate.getDate() + 30); // 30 days from now
     device.expiresAt = newExpiryDate;
-    
-    await device.save();
-
-    // Get user info (use User model)
-    const user = await User.findById(device.userId);
-    if (!user || !user.isActive) {
-      // Deactivate device if user account is disabled
+    await user.save();
+    if (!user.isActive) {
       device.isActive = false;
-      device.statusHistory.push({ 
-        status: 'inactive', 
-        reason: 'user account disabled', 
-        timestamp: currentDate 
+      device.statusHistory.push({
+        status: 'inactive',
+        reason: 'user account disabled',
+        timestamp: currentDate
       });
-      await device.save();
-      
-      return res.status(403).json({ 
-        status: 'error', 
-        message: 'User account is disabled.' 
+      await user.save();
+      return res.status(403).json({
+        status: 'error',
+        message: 'User account is disabled.'
       });
     }
-
     req.user = user;
     req.tokenType = 'device';
     req.deviceId = device.deviceId;

@@ -50,10 +50,9 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
       let token = sessionStorage.getItem('token');
       
       if (!token) {
-        // Fallback: If no session token, attempt mini-login to get one
-        // This part is primarily for personal password verification where a user might have a stale session.
-        // For secret code, the user is already logged in, so a token should exist.
-        if (verificationType === "personalPassword") {
+        // Try device token if session token is not available
+        token = localStorage.getItem('deviceToken');
+        if (!token && verificationType === "personalPassword") {
           console.log('No session token found, attempting mini-login for verification...');
           if (!username) {
             setError('User data missing. Cannot proceed with verification.');
@@ -82,10 +81,6 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
           }
           token = loginData.token;
           console.log('Mini-login successful, proceeding with verification using new token.');
-        } else {
-          setError('Authentication token missing. Please log in.');
-          setIsVerifying(false);
-          return;
         }
       }
       
@@ -94,11 +89,15 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
 
       if (verificationType === "secretCode") {
         apiUrl = `${API_BASE_URL}/auth/secret-code/verify`;
-        bodyData = { secretCode: password, usedWhere: usedWhere };
-        if (currentUserId) { // Add currentUserId to body for backend audit trail
+        bodyData = { 
+          secretCode: password, 
+          usedWhere: usedWhere,
+          deviceToken: localStorage.getItem('deviceToken') // Include device token in request
+        };
+        if (currentUserId) {
           bodyData.currentUserId = currentUserId;
         }
-      } else { // Default to personalPassword
+      } else {
         apiUrl = `${API_BASE_URL}/auth/verify-password`;
         bodyData = { password: password };
       }
@@ -116,12 +115,20 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
       const data = await response.json();
       
       if (response.ok && data.message.includes('successfully')) {
+        // Store new session token if present
+        if (data.token) {
+          sessionStorage.setItem('token', data.token);
+        }
+        // If device token is present in response, update it
+        if (data.deviceToken) {
+          localStorage.setItem('deviceToken', data.deviceToken);
+        }
         console.log(`${verificationType} successfully verified.`);
         
         // Set the verification timestamp in localStorage with 10-minute expiry for QR/Settings access
         if (verificationType === "secretCode") {
           const expiryTime = new Date().getTime() + (10 * 60 * 1000); // Current time + 10 minutes
-          localStorage.setItem('qr_verification_expiry', expiryTime.toString()); // Reusing the same key for both QR and Settings secret access
+          localStorage.setItem('qr_verification_expiry', expiryTime.toString());
         }
         
         setPassword('');

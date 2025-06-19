@@ -5,13 +5,13 @@ const API_BASE_URL = "https://masala-madness-production.up.railway.app/api"; // 
 const getToken = () => sessionStorage.getItem('token');
 
 // Common options for fetch requests
-const getHeaders = (includeAuth = true) => {
+const getHeaders = (includeAuth = true, tokenOverride = null) => {
   const headers = {
     'Content-Type': 'application/json'
   };
   
   if (includeAuth) {
-    const token = getToken();
+    const token = tokenOverride || getToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -23,11 +23,11 @@ const getHeaders = (includeAuth = true) => {
 // API methods
 const api = {
   // GET request
-  async get(endpoint, authenticated = true, suppressAuthRedirect = false) {
+  async get(endpoint, authenticated = true, suppressAuthRedirect = false, token = null) {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'GET',
-        headers: getHeaders(authenticated)
+        headers: getHeaders(authenticated, token)
       });
       
       return await handleResponse(response, suppressAuthRedirect);
@@ -38,11 +38,11 @@ const api = {
   },
   
   // POST request
-  async post(endpoint, data, authenticated = true, suppressAuthRedirect = false) {
+  async post(endpoint, data, authenticated = true, suppressAuthRedirect = false, token = null) {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
-        headers: getHeaders(authenticated),
+        headers: getHeaders(authenticated, token),
         body: JSON.stringify(data)
       });
       
@@ -58,8 +58,7 @@ const api = {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'PUT',
-        headers: getHeaders(authenticated),
-        body: JSON.stringify(data)
+        headers: getHeaders(authenticated)
       });
       
       return await handleResponse(response, suppressAuthRedirect);

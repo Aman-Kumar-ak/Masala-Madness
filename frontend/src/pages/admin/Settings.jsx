@@ -698,11 +698,22 @@ const Settings = () => {
     setAuthOperationInProgress(); // Indicate that an auth operation is in progress
   
     try {
+      // Use session token if available, otherwise use device token
+      let token = sessionStorage.getItem('token');
+      if (!token) {
+        token = localStorage.getItem('deviceToken');
+      }
       const response = await api.post('/auth/secret-code/verify', {
         secretCode: currentSecretCode,
-      }, true); // Pass true for suppressAuthRedirect
+        deviceToken: localStorage.getItem('deviceToken'), // Include device token in request
+        usedWhere: 'Settings'
+      }, true, false, token); // Pass token as 5th argument
 
       if (response.status === 'success') {
+        // Store new session token if present
+        if (response.token) {
+          sessionStorage.setItem('token', response.token);
+        }
         setIsCurrentSecretCodeValid(true);
         setSecretCodeError('');
         showSuccess('Secret code verified. You can now change it.');
@@ -768,11 +779,27 @@ const Settings = () => {
     setAuthOperationInProgress();
 
     try {
+      // Use session token if available, otherwise use device token
+      let token = sessionStorage.getItem('token');
+      if (!token) {
+        token = localStorage.getItem('deviceToken');
+      }
+      
       const response = await api.post('/auth/secret-code/verify', {
         secretCode: currentSecretCode,
-      }, true);
+        deviceToken: localStorage.getItem('deviceToken'), // Include device token in request
+        usedWhere: 'Settings'
+      }, true, false, token);
 
       if (response.status === 'success') {
+        // Store new session token if present
+        if (response.token) {
+          sessionStorage.setItem('token', response.token);
+        }
+        // If device token is present in response, update it
+        if (response.deviceToken) {
+          localStorage.setItem('deviceToken', response.deviceToken);
+        }
         setSecretCodeError('');
         handleSecretCodeSuccess(); // This unlocks the admin features and sets the timer
         setSecretCodeAttempts(0); // Reset attempts on success

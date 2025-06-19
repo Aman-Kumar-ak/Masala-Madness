@@ -1,3 +1,5 @@
+// This script is deprecated. Device data is now stored in the users collection as an embedded array.
+
 const mongoose = require('mongoose');
 const Device = require('../models/Device');
 require('dotenv').config();
