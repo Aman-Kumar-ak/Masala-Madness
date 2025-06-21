@@ -33,14 +33,22 @@ const io = new Server(server, {
 // Make io available in routes
 app.set('io', io);
 
+const allowedOrigins = [
+  'https://masala-madness-production.up.railway.app',
+  'https://masala-madness-main-production.up.railway.app',
+  process.env.FRONTEND_URL,
+  'http://localhost:5173'
+];
+
 // Middleware
 app.use(cors({
-  origin: [
-    'https://masala-madness-production.up.railway.app',
-    'https://masala-madness-main-production.up.railway.app',
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:5173'
-  ],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
