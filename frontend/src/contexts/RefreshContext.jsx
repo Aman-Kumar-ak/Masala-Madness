@@ -3,6 +3,7 @@ import io from 'socket.io-client';
 import { API_URL } from "../utils/config";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const SOCKET_URL = 'https://masala-madness-production.up.railway.app'; // Backend WebSocket endpoint
 
 const RefreshContext = createContext();
 
@@ -16,7 +17,7 @@ export const RefreshProvider = ({ children }) => {
   // Initialize Socket.IO connection
   useEffect(() => {
     // Configure socket with reconnection settings
-    const newSocket = io(API_URL, {
+    const newSocket = io(SOCKET_URL, {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
