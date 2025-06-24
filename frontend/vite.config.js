@@ -14,7 +14,7 @@ export default defineConfig({
     port: 4173,        // <-- important!
     host: true,        // <-- important!
     allowedHosts: [
-      'https://masala-madness.vercel.app/login'
+      'masala-madness.vercel.app'
     ],
   },
   base: './',
