@@ -1,6 +1,6 @@
 {
   "name": "masala-madness-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Backend for Masala Madness Restaurant Management System",
   "main": "server.js",
   "scripts": {
