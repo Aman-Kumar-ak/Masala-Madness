@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Notification from './Notification';
-import { API_URL } from "../utils/config";
+import { api } from '../utils/api';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -15,11 +15,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     async function fetchData() {
       try {
         setLoading(true);
-        const res = await fetch(`${API_URL}/api/dishes`);
-        if (!res.ok) {
-          throw new Error('Failed to fetch categories');
-        }
-        const categoriesData = await res.json();
+        const categoriesData = await api.get('/dishes');
         // Sort categories alphabetically by categoryName
         const sortedCategories = categoriesData.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
         
@@ -89,14 +85,11 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     let totalAmount = subtotal;
     
     try {
-      const discountResponse = await fetch(`${API_URL}/api/discounts/active`);
-      if (discountResponse.ok) {
-        const activeDiscount = await discountResponse.json();
-        if (activeDiscount && subtotal >= activeDiscount.minOrderAmount) {
-          discountPercentage = activeDiscount.percentage;
-          discountAmount = Math.round((subtotal * discountPercentage) / 100);
-          totalAmount = subtotal - discountAmount;
-        }
+      const discountResponse = await api.get('/discounts/active');
+      if (discountResponse && subtotal >= discountResponse.minOrderAmount) {
+        discountPercentage = discountResponse.percentage;
+        discountAmount = Math.round((subtotal * discountPercentage) / 100);
+        totalAmount = subtotal - discountAmount;
       }
     } catch (error) {
       console.error('Error fetching discount:', error);
@@ -119,13 +112,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     };
 
     try {
-      const response = await fetch(`${API_URL}/api/pending-orders/${orderId}`, {
-        method: 'PUT', // Use PUT to update the existing order
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const response = await api.put(`/pending-orders/${orderId}`, requestBody);
 
       if (!response.ok) throw new Error('Failed to update order');
 

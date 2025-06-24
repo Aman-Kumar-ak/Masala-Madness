@@ -1,21 +1,12 @@
 // src/utils/fetchCategories.js
-import { API_BASE_URL } from "./api";
+import { api } from './api';
 
 export const fetchCategories = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/dishes`);
-    
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || `Server error: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    
+    const data = await api.get('/dishes');
     if (!Array.isArray(data)) {
       throw new Error('Invalid data format received from server');
     }
-    
     return data;
   } catch (error) {
     console.error("Error fetching categories:", error);

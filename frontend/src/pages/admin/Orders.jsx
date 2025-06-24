@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import BackButton from "../../components/BackButton";
 import { useRefresh } from "../../contexts/RefreshContext";
 import { useNavigate } from "react-router-dom";
-import { API_URL } from "../../utils/config";
+import { api } from '../../utils/api';
 import DeleteOrderConfirmation from "../../components/DeleteOrderConfirmation";
 import Notification from "../../components/Notification";
 
@@ -46,26 +46,11 @@ const Orders = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // Ensure we have a valid date to query
       const dateToQuery = selectedDate || getCurrentDate();
-      
-      const [ordersResponse, pendingOrdersResponse] = await Promise.all([
-        fetch(`${API_URL}/api/orders/date/${dateToQuery}`),
-        fetch(`${API_URL}/api/pending-orders`),
+      const [ordersData, pendingOrdersData] = await Promise.all([
+        api.get(`/orders/date/${dateToQuery}`),
+        api.get('/pending-orders'),
       ]);
-
-      if (!ordersResponse.ok) {
-        throw new Error(`HTTP error! status: ${ordersResponse.status}`);
-      }
-
-      if (!pendingOrdersResponse.ok) {
-        throw new Error(`HTTP error! status: ${pendingOrdersResponse.status}`);
-      }
-
-      const ordersData = await ordersResponse.json();
-      const pendingOrdersData = await pendingOrdersResponse.json();
-
       setOrders(ordersData.orders || []);
       setStats(ordersData.stats || {
         totalOrders: 0,
@@ -73,7 +58,6 @@ const Orders = () => {
         totalRevenue: 0,
         avgOrderValue: 0
       });
-
       setPendingOrdersCount(pendingOrdersData.length || 0);
     } catch (error) {
       console.error('Error loading orders:', error);

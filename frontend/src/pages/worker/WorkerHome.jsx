@@ -6,6 +6,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
 import { API_URL } from "../../utils/config";
 import OptimizedImage from "../../components/OptimizedImage";
+import { api } from '../../utils/api';
 
 export default function WorkerHome() {
   const { cartItems, clearCart } = useCart();
@@ -45,11 +46,8 @@ export default function WorkerHome() {
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/discounts/active`);
-        if (response.ok) {
-          const data = await response.json();
-          setActiveDiscount(data);
-        }
+        const data = await api.get('/discounts/active');
+        setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
       }
@@ -59,9 +57,7 @@ export default function WorkerHome() {
 
     const fetchPendingOrdersCount = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/pending-orders`);
-        if (!response.ok) throw new Error('Failed to fetch pending orders');
-        const data = await response.json();
+        const data = await api.get('/pending-orders');
         setPendingOrdersCount(data.length || 0);
       } catch (error) {
         console.error('Error fetching pending orders count:', error);

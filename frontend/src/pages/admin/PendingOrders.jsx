@@ -6,7 +6,7 @@ import MenuModal from "../../components/MenuModal";
 import { useRefresh } from "../../contexts/RefreshContext";
 import Notification from '../../components/Notification';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
-import { API_URL } from "../../utils/config";
+import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 
 export default function PendingOrders() {
@@ -116,9 +116,7 @@ export default function PendingOrders() {
 
     const fetchAvailableItems = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/dishes`);
-        if (!response.ok) throw new Error('Failed to fetch items');
-        const data = await response.json();
+        const data = await api.get('/dishes');
         const items = data.flatMap(category => category.dishes);
         setAvailableItems(items);
       } catch (error) {
@@ -128,11 +126,8 @@ export default function PendingOrders() {
 
     const fetchActiveDiscount = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/discounts/active`);
-        if (response.ok) {
-          const data = await response.json();
-          setActiveDiscount(data);
-        }
+        const data = await api.get('/discounts/active');
+        setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
       }
@@ -140,16 +135,12 @@ export default function PendingOrders() {
 
     const fetchDefaultUpiAddress = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/upi`);
-        if (response.ok) {
-          const data = await response.json();
-          const defaultAddress = data.find(addr => addr.isDefault);
-          if (defaultAddress) {
-            setDefaultUpiAddress(defaultAddress);
-          } else if (data.length > 0) {
-            // If no default is set, use the first one
-            setDefaultUpiAddress(data[0]);
-          }
+        const data = await api.get('/upi');
+        const defaultAddress = data.find(addr => addr.isDefault);
+        if (defaultAddress) {
+          setDefaultUpiAddress(defaultAddress);
+        } else if (data.length > 0) {
+          setDefaultUpiAddress(data[0]);
         }
       } catch (error) {
         console.error('Error fetching UPI addresses:', error);

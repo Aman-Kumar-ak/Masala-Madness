@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import { api } from '../utils/api';
 
 const AuthContext = createContext();
 
@@ -102,48 +102,22 @@ export const AuthProvider = ({ children }) => {
         setLoading(true);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-        const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/verify', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${deviceToken}`
-          },
-          signal: controller.signal
-        });
+        // Use api utility for verification
+        const response = await api.get('/auth/verify', true, false, deviceToken);
         clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          console.warn('restoreSession: Device token verification failed (response not ok). Status:', response.status);
+        if (!response) {
+          console.warn('restoreSession: Device token verification failed (response not ok).');
           logoutUser();
-          setLoading(false); // Ensure loading is false before navigating on error
-          navigate('/login'); // Force redirect
+          setLoading(false);
+          navigate('/login');
           return;
         }
-
-        const data = await response.json();
-        if (data.user) {
-          setUser(data.user); // data.user will contain role
-          setIsAuthenticated(true);
-          updateLastActivityTime();
-          sessionStorage.setItem('user', JSON.stringify(data.user));
-          sessionStorage.setItem('jwtVerified', 'true');
-        } else {
-          console.warn('restoreSession: Device token verification successful but no user data. Logging out.');
-          logoutUser();
-          setLoading(false); // Ensure loading is false before navigating on error
-          navigate('/login');
-        }
-      } catch (err) {
-        console.error('restoreSession: Device token verification error:', err);
+      } catch (error) {
         logoutUser();
-        setLoading(false); // Ensure loading is false before navigating on error
-        navigate('/login');
-      } finally {
         setLoading(false);
+        navigate('/login');
+        return;
       }
-    } else {
-      setIsAuthenticated(false);
-      setUser(null);
-      setLoading(false); // Set loading to false if no device token to begin with
     }
   };
   
@@ -232,50 +206,29 @@ export const AuthProvider = ({ children }) => {
   
   // Login function
   const login = async (username, password, rememberDevice = true, deviceToken = null) => {
-    // console.log('Attempting login...');
     try {
       const body = { username, password, rememberDevice };
       if (deviceToken) body.deviceToken = deviceToken;
-      const response = await fetch('https://masala-madness-production.up.railway.app/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-      // console.log('Login response status:', response.status);
-      const responseText = await response.text();
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        // console.error('Failed to parse login response as JSON:', responseText, e);
-        throw new Error('Server response was not valid JSON.');
-      }
-
-      if (response.ok) {
-        // console.log('Login success - User data:', data.user);
+      // Use api utility for login
+      const data = await api.post('/auth/login', body, false);
+      if (data && data.token) {
         setUser(data.user);
         setIsAuthenticated(true);
         updateLastActivityTime();
         sessionStorage.setItem('token', data.token);
         sessionStorage.setItem('user', JSON.stringify(data.user));
         sessionStorage.setItem('jwtVerified', 'true');
-
         if (rememberDevice && data.deviceToken) {
           localStorage.setItem('deviceToken', data.deviceToken);
         }
         return { success: true, user: data.user, deviceToken: data.deviceToken };
       } else {
-        // console.error('Login failed - Response data:', data);
-        const errorMessage = data.message || 'Login failed due to unknown error.';
+        const errorMessage = (data && data.message) || 'Login failed due to unknown error.';
         throw new Error(errorMessage);
       }
     } catch (error) {
-      // console.error('Login error:', error);
       return { success: false, message: error.message || 'An unexpected error occurred during login.' };
     } finally {
-      // Clear auth operation in progress
       clearAuthOperationInProgress();
     }
   };

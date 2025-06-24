@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../utils/api';
+import { api } from '../utils/api';
 
 const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationType = "personalPassword", usedWhere = "Unknown", currentUserId, infoText }) => {
   const [password, setPassword] = useState('');
@@ -59,23 +59,10 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
             setIsVerifying(false);
             return;
           }
-          const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username, password: password, rememberDevice: false })
-          });
-
-          let loginData = {};
-          try {
-            loginData = await loginResponse.json();
-          } catch (jsonErr) {
-            console.error('Mini-login: Failed to parse JSON response', jsonErr);
-            throw new Error('Server error during verification login. Please try again later.');
-          }
-
-          if (!loginResponse.ok || loginData.status !== 'success' || !loginData.token) {
-            console.warn('Mini-login failed during verification', loginData.message);
-            setError(loginData.message || 'Incorrect password. Please try again.');
+          // Use api utility for login
+          const loginData = await api.post('/auth/login', { username, password, rememberDevice: false });
+          if (!loginData || !loginData.token) {
+            setError('Incorrect password. Please try again.');
             setIsVerifying(false);
             return;
           }
@@ -84,37 +71,27 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
         }
       }
       
-      let apiUrl;
-      let bodyData = {};
-
+      let apiUrl, bodyData;
       if (verificationType === "secretCode") {
-        apiUrl = `${API_BASE_URL}/auth/secret-code/verify`;
+        apiUrl = '/auth/secret-code/verify';
         bodyData = { 
           secretCode: password, 
           usedWhere: usedWhere,
-          deviceToken: localStorage.getItem('deviceToken') // Include device token in request
+          deviceToken: localStorage.getItem('deviceToken')
         };
         if (currentUserId) {
           bodyData.currentUserId = currentUserId;
         }
       } else {
-        apiUrl = `${API_BASE_URL}/auth/verify-password`;
+        apiUrl = '/auth/verify-password';
         bodyData = { password: password };
       }
 
       console.log(`Attempting to verify ${verificationType}...`);
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(bodyData)
-      });
+      // Use api utility for verification
+      const data = await api.post(apiUrl, bodyData, true, false, token);
       
-      const data = await response.json();
-      
-      if (response.ok && data.message.includes('successfully')) {
+      if (data.message.includes('successfully')) {
         // Store new session token if present
         if (data.token) {
           sessionStorage.setItem('token', data.token);

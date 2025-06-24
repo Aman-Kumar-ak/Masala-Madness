@@ -4,7 +4,7 @@ import Menu from "../../components/Menu";
 import { useCart } from "../../components/CartContext";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
-import { API_URL } from "../../utils/config";
+import { api } from '../../utils/api';
 import OptimizedImage from "../../components/OptimizedImage";
 
 export default function Home() {
@@ -45,11 +45,8 @@ export default function Home() {
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/discounts/active`);
-        if (response.ok) {
-          const data = await response.json();
-          setActiveDiscount(data);
-        }
+        const data = await api.get('/discounts/active');
+        setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
       }
@@ -59,9 +56,7 @@ export default function Home() {
 
     const fetchPendingOrdersCount = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/pending-orders`);
-        if (!response.ok) throw new Error('Failed to fetch pending orders');
-        const data = await response.json();
+        const data = await api.get('/pending-orders');
         setPendingOrdersCount(data.length || 0);
       } catch (error) {
         console.error('Error fetching pending orders count:', error);
@@ -100,10 +95,7 @@ export default function Home() {
     try {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const response = await fetch(`${API_URL}/api/orders/date/${today}`);
-      if (!response.ok) throw new Error('Failed to fetch stats');
-      
-      const data = await response.json();
+      const data = await api.get(`/orders/date/${today}`);
       setStats({
         totalOrders: data.stats.totalOrders || 0,
         totalPaidOrders: data.stats.totalPaidOrders || 0,
