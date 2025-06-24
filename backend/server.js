@@ -16,16 +16,19 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Setup Socket.IO with CORS
+// Setup Socket.IO with CORS and increased timeouts
 const io = new Server(server, {
   cors: {
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:3000',
-      'http://localhost:5173'
+      'http://localhost:5173',
+      'https://masala-madness.vercel.app'
     ],
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  pingTimeout: 30000, // 30 seconds
+  pingInterval: 10000 // 10 seconds
 });
 
 // Make io available in routes
@@ -59,6 +62,11 @@ app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => {
   res.send('Masala Madness API is running.');
+});
+
+// Wake-up ping endpoint
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ message: 'pong', time: Date.now() });
 });
 
 // Socket.IO events
