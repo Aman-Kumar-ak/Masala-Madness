@@ -5,7 +5,7 @@ import { useNotification } from "../../components/NotificationContext";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import PasswordVerificationDialog from "../../components/PasswordVerificationDialog";
 import { useAuth } from "../../contexts/AuthContext";
-import { API_URL } from "../../utils/config";
+import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 
 
@@ -130,7 +130,7 @@ export default function Qr() {
   // Fetch all UPI addresses from the database
   const fetchUpiAddresses = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/upi`);
+      const response = await api.get('/upi');
       if (!response.ok) throw new Error('Failed to fetch UPI addresses');
       
       const data = await response.json();
@@ -183,13 +183,7 @@ export default function Qr() {
       }
       
       setIsLoading(true);
-      const response = await fetch(`${API_URL}/api/upi`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newUpiAddress)
-      });
+      const response = await api.post('/upi', newUpiAddress);
       
       const data = await response.json();
       
@@ -233,13 +227,7 @@ export default function Qr() {
       }
       
       setIsLoading(true);
-      const response = await fetch(`${API_URL}/api/upi/${currentUpiAddress._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newUpiAddress)
-      });
+      const response = await api.put(`/upi/${currentUpiAddress._id}`, newUpiAddress);
       
       const data = await response.json();
       
@@ -264,9 +252,7 @@ export default function Qr() {
     
     try {
       setIsDeletingUpiAddress(true);
-      const response = await fetch(`${API_URL}/api/upi/${id}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/upi/${id}`);
       
       if (!response.ok) {
         const data = await response.json();
@@ -302,9 +288,7 @@ export default function Qr() {
     
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_URL}/api/upi/${id}/default`, {
-        method: 'PATCH'
-      });
+      const response = await api.patch(`/upi/${id}/default`);
       
       if (!response.ok) {
         const errorData = await response.json();

@@ -84,7 +84,7 @@ export default function WorkerHome() {
     try {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const response = await fetch(`${API_URL}/api/orders/date/${today}`);
+      const response = await api.get(`/orders/date/${today}`);
       if (!response.ok) throw new Error('Failed to fetch stats');
       
       const data = await response.json();

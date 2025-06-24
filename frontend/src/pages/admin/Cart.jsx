@@ -5,7 +5,6 @@ import BackButton from "../../components/BackButton";
 import Notification from "../../components/Notification";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
-import { API_URL } from "../../utils/config";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
 

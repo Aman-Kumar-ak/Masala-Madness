@@ -270,22 +270,7 @@ export default function PendingOrders() {
     
     console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
     try {
-      const response = await fetch(`${API_URL}/api/pending-orders/confirm/${orderId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          paymentMethod: finalPaymentMethod, // Use the constructed finalPaymentMethod
-          isPaid: true,
-          discountAmount: totalDiscount,
-          discountPercentage: percentageDiscount,
-          manualDiscount,
-          totalAmount: discountedTotal,
-          customCashAmount: paymentMethod === "Custom" ? customCashAmount : undefined,
-          customOnlineAmount: paymentMethod === "Custom" ? customOnlineAmount : undefined,
-        }),
-      });
+      const response = await api.post(`/pending-orders/confirm/${orderId}`);
       
       if (!response.ok) throw new Error('Failed to confirm payment');
       
@@ -401,17 +386,13 @@ export default function PendingOrders() {
       onConfirm: async () => {
                                 try {
                                   if (isLastItem) {
-                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
-                                      method: 'DELETE',
-                                    });
+                                    const response = await api.delete(`/pending-orders/${order.orderId}`);
                                     if (!response.ok) throw new Error('Failed to delete order');
                                     setPendingOrders(prevOrders =>
                                       prevOrders.filter(o => o.orderId !== order.orderId)
                                     );
                                   } else {
-                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}/item/${index}`, {
-                                      method: 'DELETE',
-                                    });
+                                    const response = await api.delete(`/pending-orders/${order.orderId}/item/${index}`);
                                     if (!response.ok) throw new Error('Failed to remove item');
                                     const data = await response.json();
                                     setPendingOrders(prevOrders =>
@@ -436,9 +417,7 @@ export default function PendingOrders() {
       message: `Are you sure you want to delete the entire order #${pendingOrders.length - pendingOrders.indexOf(order)}?`,
       onConfirm: async () => {
         try {
-          const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
-            method: 'DELETE',
-          });
+          const response = await api.delete(`/pending-orders/${order.orderId}`);
           if (!response.ok) throw new Error('Failed to delete order');
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)

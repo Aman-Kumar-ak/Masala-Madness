@@ -123,7 +123,7 @@ const Orders = () => {
     if (orders.length === 0) {
       return;
     }
-    const url = `${API_URL}/api/orders/excel/${selectedDate}`;
+    const url = `${api.API_BASE_URL}/orders/excel/${selectedDate}`;
     // Use a method more compatible with WebViews for triggering downloads
     const link = document.createElement('a');
     link.href = url;
@@ -149,9 +149,7 @@ const Orders = () => {
     try {
       setDeleteLoading(true);
       
-      const response = await fetch(`${API_URL}/api/orders/${orderToDelete.orderId}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/orders/${orderToDelete.orderId}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

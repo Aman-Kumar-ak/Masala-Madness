@@ -45,7 +45,7 @@ const allowedOrigins = [
 // Middleware
 app.use(cors({
   origin: true, // Allow all origins for testing
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   credentials: true
 }));
 app.use(express.json());

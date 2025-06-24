@@ -68,7 +68,7 @@ export default function WorkerPendingOrders() {
   const fetchPendingOrders = useCallback(async () => {
       try {
       setLoading(true);
-        const response = await fetch(`${API_URL}/api/pending-orders`);
+        const response = await api.get('/pending-orders');
         if (!response.ok) throw new Error('Failed to fetch pending orders');
         const data = await response.json();
         setPendingOrders(data);

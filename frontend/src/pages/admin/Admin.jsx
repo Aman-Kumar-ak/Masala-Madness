@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useRefresh } from "../../contexts/RefreshContext";
 import { API_URL } from "../../utils/config";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
+import { api } from '../../utils/api';
 
 const Admin = () => {
   useKeyboardScrollAdjustment();
@@ -48,7 +49,7 @@ const Admin = () => {
 
   const loadActiveDiscount = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/discounts/active`);
+      const response = await api.get(`/discounts/active`);
       if (response.ok) {
         const data = await response.json();
         setActiveDiscount(data);
@@ -98,16 +99,10 @@ const Admin = () => {
     e.preventDefault();
     setIsSubmittingDiscount(true);
     try {
-      const response = await fetch(`${API_URL}/api/discounts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await api.post('/discounts', {
           ...newDiscount,
           percentage: Number(newDiscount.percentage),
           minOrderAmount: Number(newDiscount.minOrderAmount)
-        }),
       });
 
       if (response.ok) {
@@ -135,9 +130,7 @@ const Admin = () => {
   const confirmRemoveDiscount = async () => {
     setIsRemovingDiscount(true);
     try {
-      const response = await fetch(`${API_URL}/api/discounts/${activeDiscount._id}`, {
-        method: 'DELETE'
-      });
+      const response = await api.delete(`/discounts/${activeDiscount._id}`);
 
       if (!response.ok) {
         throw new Error('Failed to delete discount');
