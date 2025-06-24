@@ -14,8 +14,7 @@ export default defineConfig({
     port: 4173,        // <-- important!
     host: true,        // <-- important!
     allowedHosts: [
-      'masala-madness-main-production.up.railway.app',
-      '.up.railway.app'
+      'https://masala-madness.vercel.app/login'
     ],
   },
   base: './',

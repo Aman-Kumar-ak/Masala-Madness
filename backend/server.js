@@ -20,8 +20,6 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      'https://masala-madness-production.up.railway.app',
-      'https://masala-madness-main-production.up.railway.app',
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:5173'
     ],
@@ -34,8 +32,6 @@ const io = new Server(server, {
 app.set('io', io);
 
 const allowedOrigins = [
-  'https://masala-madness-production.up.railway.app',
-  'https://masala-madness-main-production.up.railway.app',
   process.env.FRONTEND_URL,
   'http://localhost:5173'
 ];

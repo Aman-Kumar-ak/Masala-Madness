@@ -158,8 +158,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then(res => {
-          // Optionally cache the response
-          caches.open(CACHE_NAMES.DYNAMIC).then(cache => cache.put(request, res.clone()));
+          // Only cache if response is ok and not already used
+          if (res.ok) {
+            const resClone = res.clone();
+            caches.open(CACHE_NAMES.DYNAMIC).then(cache => cache.put(request, resClone));
+          }
           return res;
         })
         .catch(() => {
@@ -182,7 +185,8 @@ self.addEventListener('fetch', (event) => {
         return fetch(request)
           .then(res => {
             if (res.ok) {
-              caches.open(CACHE_NAMES.STATIC).then(cache => cache.put(request, res.clone()));
+              const resClone = res.clone();
+              caches.open(CACHE_NAMES.STATIC).then(cache => cache.put(request, resClone));
             }
             return res;
           })
@@ -205,7 +209,8 @@ self.addEventListener('fetch', (event) => {
         fetch(request)
           .then(res => {
             if (res.ok) {
-              caches.open(CACHE_NAMES.STATIC).then(cache => cache.put(request, res.clone()));
+              const resClone = res.clone();
+              caches.open(CACHE_NAMES.STATIC).then(cache => cache.put(request, resClone));
             }
             return res;
           })
