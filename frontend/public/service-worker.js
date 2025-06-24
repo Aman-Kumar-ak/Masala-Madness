@@ -139,98 +139,81 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Handle different types of requests with optimized strategies
+  // Network-first for API requests
+  if (request.url.includes('/api/')) {
+    event.respondWith(
+      fetch(request)
+        .then(res => res)
+        .catch(() => {
+          return caches.match(request).then(cached =>
+            cached || new Response(null, { status: 503, statusText: 'Offline' })
+          );
+        })
+    );
+    return;
+  }
+
+  // For navigation/documents: try network, fallback to cache, then offline.html
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(
+      fetch(request)
+        .then(res => {
+          // Optionally cache the response
+          caches.open(CACHE_NAMES.DYNAMIC).then(cache => cache.put(request, res.clone()));
+          return res;
+        })
+        .catch(() => {
+          return caches.match(request).then(cached =>
+            cached || caches.match('/offline.html')
+          );
+        })
+    );
+    return;
+  }
+
+  // For images: cache-first, fallback to placeholder
   if (request.destination === 'image' || url.pathname.includes('/images/')) {
-    event.respondWith(handleImageRequest(request));
-  } else if (request.mode === 'navigate' || request.destination === 'document') {
-    event.respondWith(handleNavigationRequest(request));
-  } else {
-    event.respondWith(handleDefaultRequest(request));
+    event.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) {
+          updateCacheInBackground(request);
+          return cached;
+        }
+        return fetch(request)
+          .then(res => {
+            if (res.ok) {
+              caches.open(CACHE_NAMES.STATIC).then(cache => cache.put(request, res.clone()));
+            }
+            return res;
+          })
+          .catch(() => {
+            const fallbackUrl = getFallbackImageUrl(request.url);
+            return caches.match(fallbackUrl).then(fallback =>
+              fallback || new Response('Image not available', { status: 404 })
+            );
+          });
+      })
+    );
+    return;
   }
+
+  // Default: try cache, then network, fallback to 503
+  event.respondWith(
+    caches.match(request).then(cached => {
+      return (
+        cached ||
+        fetch(request)
+          .then(res => {
+            if (res.ok) {
+              caches.open(CACHE_NAMES.STATIC).then(cache => cache.put(request, res.clone()));
+            }
+            return res;
+          })
+          .catch(() => new Response('Offline', { status: 503, statusText: 'Offline' }))
+      );
+    })
+  );
 });
-
-// Optimize image request handling
-async function handleImageRequest(request) {
-  const cachedResponse = await cacheOperations.getFromCache(request);
-  if (cachedResponse) {
-    // Start background update
-    updateCacheInBackground(request);
-    return cachedResponse;
-  }
-
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await cacheOperations.openCache(CACHE_NAMES.STATIC);
-      if (cache) {
-        await cacheOperations.addToCache(cache, request, response);
-      }
-    }
-    return response;
-  } catch (error) {
-    // Return fallback image if available
-    const fallbackUrl = getFallbackImageUrl(request.url);
-    const fallbackResponse = await cacheOperations.getFromCache(new Request(fallbackUrl));
-    return fallbackResponse || new Response('Image not available', { status: 404 });
-  }
-}
-
-// Optimize navigation request handling
-async function handleNavigationRequest(request) {
-  try {
-    const response = await fetch(request);
-    const cache = await cacheOperations.openCache(CACHE_NAMES.DYNAMIC);
-    if (cache) {
-      await cacheOperations.addToCache(cache, request, response);
-    }
-    return response;
-  } catch (error) {
-    const cachedResponse = await cacheOperations.getFromCache(request);
-    return cachedResponse || cacheOperations.getFromCache(new Request('/offline.html'));
-  }
-}
-
-// Optimize default request handling with improved cache validation
-async function handleDefaultRequest(request) {
-  // For API requests or dynamic content, prefer network
-  if (request.url.includes('/api/') || request.headers.get('Accept')?.includes('application/json')) {
-    try {
-      const response = await fetch(request);
-      return response;
-    } catch (error) {
-      // Fall back to cache only if network fails
-      const cachedResponse = await cacheOperations.getFromCache(request);
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return new Response(JSON.stringify({ error: 'Network request failed and no cache available' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-  }
-
-  // For other resources, use stale-while-revalidate strategy
-  const cachedResponse = await cacheOperations.getFromCache(request);
-  const fetchPromise = fetch(request).then(response => {
-    // Update cache in background if response is valid
-    if (response.ok) {
-      const clonedResponse = response.clone();
-      cacheOperations.openCache(CACHE_NAMES.STATIC).then(cache => {
-        if (cache) cacheOperations.addToCache(cache, request, clonedResponse);
-      });
-    }
-    return response;
-  }).catch(error => {
-    // console.error('Network request failed:', error);
-    // If we have a cached response, we'll use that instead
-    if (cachedResponse) return cachedResponse;
-    throw error;
-  });
-
-  // Return cached response immediately if available, otherwise wait for fetch
-  return cachedResponse || fetchPromise;
-}
 
 // Helper function to update cache in background with improved validation
 async function updateCacheInBackground(request) {
