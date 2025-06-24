@@ -7,6 +7,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
 import { API_URL } from "../../utils/config";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
+import { api } from '../../utils/api';
 
 export default function Cart() {
   useKeyboardScrollAdjustment();
@@ -63,11 +64,8 @@ export default function Cart() {
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/discounts/active`);
-        if (response.ok) {
-          const data = await response.json();
-          setActiveDiscount(data);
-        }
+        const data = await api.get('/discounts/active');
+        setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
       }
@@ -75,16 +73,12 @@ export default function Cart() {
 
     const fetchDefaultUpiAddress = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/upi`);
-        if (response.ok) {
-          const data = await response.json();
-          const defaultAddress = data.find(addr => addr.isDefault);
-          if (defaultAddress) {
-            setDefaultUpiAddress(defaultAddress);
-          } else if (data.length > 0) {
-            // If no default is set, use the first one
-            setDefaultUpiAddress(data[0]);
-          }
+        const data = await api.get('/upi');
+        const defaultAddress = data.find(addr => addr.isDefault);
+        if (defaultAddress) {
+          setDefaultUpiAddress(defaultAddress);
+        } else if (data.length > 0) {
+          setDefaultUpiAddress(data[0]);
         }
       } catch (error) {
         console.error('Error fetching UPI addresses:', error);
@@ -229,14 +223,9 @@ export default function Cart() {
         setShowQrCode(false);
         setShowSplashScreen(true);
 
-        const res = await fetch(`${API_URL}/api/orders/confirm`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await res.json();
-        if (res.ok) {
+        const res = await api.post('/orders/confirm', payload);
+        const data = res;
+        if (data && data.message) {
           // Handle successful payment
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
           clearCart();
@@ -244,27 +233,21 @@ export default function Cart() {
             navigate("/");
           }, 1500);
         } else {
-          throw new Error(data.message || "Failed to process order");
+          throw new Error((data && data.message) || "Failed to process order");
         }
       } else {
         // Add to pending logic
-        const res = await fetch(`${API_URL}/api/pending-orders`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await res.json();
-        if (res.ok) {
+        const res = await api.post('/pending-orders', payload);
+        const data = res;
+        if (data && data.message) {
           // Handle adding to pending
           showInfo(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
           clearCart();
-          // The dialog (showPendingConfirm) will be closed by confirmAddToPending after this
           setTimeout(() => {
             navigate("/");
           }, 1500);
         } else {
-          throw new Error(data.message || "Failed to add order to pending");
+          throw new Error((data && data.message) || "Failed to add order to pending");
         }
       }
     } catch (error) {

@@ -112,11 +112,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     };
 
     try {
-      const response = await api.put(`/pending-orders/${orderId}`, requestBody);
-
-      if (!response.ok) throw new Error('Failed to update order');
-
-      const data = await response.json();
+      const data = await api.put(`/pending-orders/${orderId}`, requestBody);
       onSave(data.order);  // Pass updated order object instead of just selectedItems
       setNotification({ message: 'Items added successfully!', type: 'success' });
     } catch (error) {

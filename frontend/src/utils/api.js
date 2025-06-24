@@ -81,6 +81,21 @@ const api = {
       handleError(error);
       throw error;
     }
+  },
+  
+  // PATCH request
+  async patch(endpoint, data, authenticated = true, suppressAuthRedirect = false, token = null) {
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'PATCH',
+        headers: getHeaders(authenticated, token),
+        body: JSON.stringify(data)
+      });
+      return await handleResponse(response, suppressAuthRedirect);
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
   }
 };
 

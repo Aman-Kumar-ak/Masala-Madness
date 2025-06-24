@@ -34,20 +34,18 @@ const io = new Server(server, {
 // Make io available in routes
 app.set('io', io);
 
+// Always allow the Vercel frontend, .env FRONTEND_URL, and localhost for CORS
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  'http://localhost:5173'
+  'https://masala-madness.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
 ];
 
 // Middleware
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Allow all origins for testing
+  methods: ['GET', 'POST'],
   credentials: true
 }));
 app.use(express.json());

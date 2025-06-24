@@ -64,23 +64,21 @@ export default function PendingOrders() {
 
   // Create a memoized fetchPendingOrders function that we can call from multiple places
   const fetchPendingOrders = useCallback(async () => {
-      try {
+    try {
       setLoading(true);
-        const response = await fetch(`${API_URL}/api/pending-orders`);
-        if (!response.ok) throw new Error('Failed to fetch pending orders');
-        const data = await response.json();
-        setPendingOrders(data);
-      } catch (error) {
-        console.error('Error fetching pending orders:', error);
+      const data = await api.get('/pending-orders');
+      setPendingOrders(data);
+    } catch (error) {
+      console.error('Error fetching pending orders:', error);
       setNotification({ 
         message: 'Failed to fetch pending orders. Please try again.', 
         type: 'error' 
       });
-      } finally {
-        setLoading(false);
+    } finally {
+      setLoading(false);
       // Restore scroll position after data loads
       setTimeout(restoreScrollPosition, 0);
-      }
+    }
   }, [restoreScrollPosition]);
 
   // Listen for socket events
@@ -330,15 +328,7 @@ export default function PendingOrders() {
     saveScrollPosition();
     
     try {
-      const response = await fetch(`${API_URL}/api/pending-orders/${orderId}/item-quantity`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ itemIndex, delta })
-      });
-      if (!response.ok) throw new Error("Failed to update quantity");
-      const data = await response.json();
+      const data = await api.patch(`/pending-orders/${orderId}/item-quantity`, { itemIndex, delta });
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
