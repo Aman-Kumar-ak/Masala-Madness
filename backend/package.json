@@ -2,25 +2,20 @@
   "name": "masala-madness-backend",
   "version": "1.0.0",
   "description": "Backend for Masala Madness Restaurant Management System",
-  "engines": {
-    "node": "20.x"
-  },
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "postinstall": "npm install iconv-lite@0.4.24 --force"
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "debug": "^4.4.1",
     "dotenv": "^16.0.3",
-    "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.3",
     "socket.io": "^4.7.5",
+    "exceljs": "^4.4.0",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
@@ -28,5 +23,8 @@
   },
   "overrides": {
     "iconv-lite": "0.4.24"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
