@@ -1,5 +1,5 @@
 // src/utils/api.js
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://masala-madness-production.up.railway.app/api"; // Backend base URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://masala-madness.onrender.com/api"; // Backend base URL
 
 // Get auth token from sessionStorage or fallback to device token from localStorage
 const getToken = () => sessionStorage.getItem('token') || localStorage.getItem('deviceToken');
@@ -146,4 +146,3 @@ function handleError(error) {
 
 export { API_BASE_URL, api };
 export default api;
-    

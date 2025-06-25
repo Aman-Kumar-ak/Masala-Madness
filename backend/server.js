@@ -22,7 +22,8 @@ const io = new Server(server, {
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:5173',
-      'https://masala-madness.vercel.app'
+      'https://masala-madness.vercel.app',
+      'https://masala-madness.onrender.com'
     ],
     methods: ['GET', 'POST'],
     credentials: true
