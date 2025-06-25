@@ -6,7 +6,7 @@ const PendingOrder = require("../models/PendingOrder");
 
 const router = express.Router();
 
-// Cache orders for 30 seconds
+// Cache orders for 30 seconds5
 const ordersCache = new Map();
 const CACHE_DURATION = 30 * 1000; // 30 seconds
 
