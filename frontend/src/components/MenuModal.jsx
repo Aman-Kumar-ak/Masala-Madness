@@ -73,17 +73,26 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
 
   const handleSave = async () => {
     if (selectedItems.length === 0) return;
-    
     setLoading(true);
 
+    // Combine existing items and selected items for the full updated list
+    const allItems = [
+      ...existingItems,
+      ...selectedItems.map(item => ({
+        name: item.name,
+        type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion === 'fixed' ? 'Fixed' : item.portion,
+        price: item.price,
+        quantity: item.quantity || 1,
+        totalPrice: item.price * (item.quantity || 1),
+      }))
+    ];
+
     // Calculate the subtotal
-    const subtotal = selectedItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0);
-    
+    const subtotal = allItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0);
     // Fetch active discount
     let discountAmount = 0;
     let discountPercentage = 0;
     let totalAmount = subtotal;
-    
     try {
       const discountResponse = await api.get('/discounts/active');
       if (discountResponse && subtotal >= discountResponse.minOrderAmount) {
@@ -95,20 +104,14 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
       console.error('Error fetching discount:', error);
     }
 
-    // Prepare the request body
+    // Prepare the request body with all items
     const requestBody = {
-      items: selectedItems.map(item => ({
-        name: item.name,
-        type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion === 'fixed' ? 'Fixed' : item.portion,
-        price: item.price,
-        quantity: item.quantity || 1,
-        totalPrice: item.price * (item.quantity || 1),
-      })),
+      items: allItems,
       subtotal,
       discountAmount,
       discountPercentage,
       totalAmount,
-      isPaid: false, // Assuming the order is not paid yet
+      isPaid: false,
     };
 
     try {

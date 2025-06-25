@@ -347,6 +347,7 @@ export default function PendingOrders() {
       return order;
     }));
     setShowMenu(false);
+    triggerRefresh(); // Ensure pending orders list is refreshed after saving
   };
 
   const handleRemoveManualDiscount = async (orderId) => {
@@ -387,7 +388,8 @@ export default function PendingOrders() {
                                 try {
                                   if (isLastItem) {
                                     const response = await api.delete(`/pending-orders/${order.orderId}`);
-                                    if (!response.ok) throw new Error('Failed to delete order');
+                                    // No response.ok, just check for error in response or rely on try/catch
+                                    if (response.error) throw new Error(response.error);
                                     setPendingOrders(prevOrders =>
                                       prevOrders.filter(o => o.orderId !== order.orderId)
                                     );
@@ -418,7 +420,8 @@ export default function PendingOrders() {
       onConfirm: async () => {
         try {
           const response = await api.delete(`/pending-orders/${order.orderId}`);
-          if (!response.ok) throw new Error('Failed to delete order');
+          // No response.ok, just check for error in response or rely on try/catch
+          if (response.error) throw new Error(response.error);
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)
           );
