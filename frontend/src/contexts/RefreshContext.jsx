@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const SOCKET_URL = 'https://masala-madness-production.up.railway.app'; // Backend WebSocket endpoint
+const SOCKET_URL = 'https://masala-madness.onrender.com'; // Backend WebSocket endpoint
 
 const RefreshContext = createContext();
 
@@ -11,7 +11,7 @@ export const useRefresh = () => useContext(RefreshContext);
 // Helper to wake up backend before connecting socket
 async function wakeUpBackend() {
   try {
-    await fetch('https://masala-madness-production.up.railway.app/api/ping', { cache: 'no-store' });
+    await fetch('https://masala-madness.onrender.com/api/ping', { cache: 'no-store' });
   } catch (err) {
     // Ignore errors, just try to wake up
   }
@@ -91,4 +91,4 @@ export const RefreshProvider = ({ children }) => {
       {children}
     </RefreshContext.Provider>
   );
-}; 
+};
