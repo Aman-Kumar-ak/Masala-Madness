@@ -8,6 +8,7 @@ export const useAuth = () => useContext(AuthContext);
 
 // Sessions will expire after 8 hours of inactivity
 const SESSION_EXPIRY_TIME = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -96,6 +97,26 @@ export const AuthProvider = ({ children }) => {
   
   // Expose a function to restore session from device token
   const restoreSession = async () => {
+    // Try to restore from localStorage if sessionStorage is empty and rememberMeExpiry is valid
+    const expiry = localStorage.getItem('rememberMeExpiry');
+    if (!sessionStorage.getItem('token') && localStorage.getItem('token')) {
+      if (expiry && Date.now() > parseInt(expiry, 10)) {
+        // Expired, clear localStorage and require login
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('jwtVerified');
+        localStorage.removeItem('deviceToken');
+        localStorage.removeItem('rememberMeExpiry');
+        logoutUser();
+        setLoading(false);
+        navigate('/login');
+        return;
+      } else {
+        sessionStorage.setItem('token', localStorage.getItem('token'));
+        sessionStorage.setItem('user', localStorage.getItem('user'));
+        sessionStorage.setItem('jwtVerified', localStorage.getItem('jwtVerified'));
+      }
+    }
     const deviceToken = localStorage.getItem('deviceToken');
     if (deviceToken) {
       try {
@@ -220,6 +241,17 @@ export const AuthProvider = ({ children }) => {
         sessionStorage.setItem('jwtVerified', 'true');
         if (rememberDevice && data.deviceToken) {
           localStorage.setItem('deviceToken', data.deviceToken);
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('jwtVerified', 'true');
+          // Store expiry timestamp (30 days from now)
+          const expiry = Date.now() + THIRTY_DAYS_MS;
+          localStorage.setItem('rememberMeExpiry', expiry.toString());
+        } else {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('jwtVerified');
+          localStorage.removeItem('rememberMeExpiry');
         }
         return { success: true, user: data.user, deviceToken: data.deviceToken };
       } else {
@@ -263,13 +295,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
   
-  // On app load, restore JWT and user from localStorage if not in sessionStorage
+  // On app load, restore JWT and user from localStorage if not in sessionStorage and rememberMeExpiry is valid
   useEffect(() => {
     const token = sessionStorage.getItem('token');
     const userData = sessionStorage.getItem('user');
+    const expiry = localStorage.getItem('rememberMeExpiry');
     if (!token && localStorage.getItem('token')) {
-      sessionStorage.setItem('token', localStorage.getItem('token'));
-      sessionStorage.setItem('user', localStorage.getItem('user'));
+      if (expiry && Date.now() > parseInt(expiry, 10)) {
+        // Expired, clear localStorage and do not restore session
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('jwtVerified');
+        localStorage.removeItem('deviceToken');
+        localStorage.removeItem('rememberMeExpiry');
+      } else {
+        sessionStorage.setItem('token', localStorage.getItem('token'));
+        sessionStorage.setItem('user', localStorage.getItem('user'));
+        sessionStorage.setItem('jwtVerified', localStorage.getItem('jwtVerified'));
+      }
     }
   }, []);
   
