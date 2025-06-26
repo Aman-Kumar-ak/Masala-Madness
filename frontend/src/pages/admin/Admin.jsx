@@ -54,7 +54,6 @@ const Admin = () => {
         setActiveDiscount(data);
       } else {
         setActiveDiscount(null);
-        setNotification({ message: 'No active discount found', type: 'info' });
       }
     } catch (error) {
       console.error('Error loading active discount:', error);

@@ -40,8 +40,11 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   'https://masala-madness.vercel.app',
   'http://localhost:5173',
-  'http://localhost:3000'
-];
+  'http://localhost:3000',
+  'https://masala-madness.onrender.com' // Add production backend for local testing if needed
+].filter(Boolean); // Remove undefined/null
+
+console.log('CORS allowed origins:', allowedOrigins);
 
 // Middleware
 app.use(cors({
