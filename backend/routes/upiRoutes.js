@@ -43,33 +43,29 @@ router.get('/:id', async (req, res) => {
 // Create a new UPI address
 router.post('/', async (req, res) => {
   try {
+    console.log('POST /upi body:', req.body); // Log incoming request
     const { name, upiId, description, isDefault } = req.body;
-    
     if (!name || !upiId) {
       return res.status(400).json({ message: 'Name and UPI ID are required' });
     }
-    
     // Validate UPI ID format (basic validation)
     const upiRegex = /^[\w\.\-]+@[\w\.\-]+$/;
     if (!upiRegex.test(upiId)) {
       return res.status(400).json({ message: 'Invalid UPI ID format. Expected format: username@provider' });
     }
-    
     try {
       const newUpiAddress = new UpiAddress({
         name,
         description: description || '',
         isDefault: isDefault || false,
       });
-      
       // Use the virtual property setter for encryption
       newUpiAddress.upiId = upiId;
-      
       await newUpiAddress.save();
       res.status(201).json(newUpiAddress);
     } catch (error) {
       console.error('Error saving UPI address:', error);
-      return res.status(500).json({ message: 'Failed to save UPI address: ' + error.message });
+      return res.status(500).json({ message: 'Failed to save UPI address: ' + (error.message || error) });
     }
   } catch (error) {
     console.error('Error in POST /api/upi:', error);
@@ -80,24 +76,20 @@ router.post('/', async (req, res) => {
 // Update a UPI address
 router.put('/:id', async (req, res) => {
   try {
+    console.log('PUT /upi/:id body:', req.body); // Log incoming request
     const { name, upiId, description, isDefault } = req.body;
     const updates = {};
-    
     if (name) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (isDefault !== undefined) updates.isDefault = isDefault;
-    
     const upiAddress = await UpiAddress.findById(req.params.id);
-    
     if (!upiAddress) {
       return res.status(404).json({ message: 'UPI address not found' });
     }
-    
     // Update fields
     Object.keys(updates).forEach(key => {
       upiAddress[key] = updates[key];
     });
-    
     // Update UPI ID if provided (this will trigger encryption)
     if (upiId) {
       // Validate UPI ID format
@@ -105,20 +97,19 @@ router.put('/:id', async (req, res) => {
       if (!upiRegex.test(upiId)) {
         return res.status(400).json({ message: 'Invalid UPI ID format. Expected format: username@provider' });
       }
-      
       try {
         upiAddress.upiId = upiId;
       } catch (error) {
-        return res.status(500).json({ message: 'Failed to encrypt UPI ID: ' + error.message });
+        console.error('Failed to encrypt UPI ID:', error);
+        return res.status(500).json({ message: 'Failed to encrypt UPI ID: ' + (error.message || error) });
       }
     }
-    
     try {
       await upiAddress.save();
       res.json(upiAddress);
     } catch (error) {
       console.error('Error saving updated UPI address:', error);
-      return res.status(500).json({ message: 'Failed to save UPI address: ' + error.message });
+      return res.status(500).json({ message: 'Failed to update UPI address: ' + (error.message || error) });
     }
   } catch (error) {
     console.error('Error in PUT /api/upi/:id:', error);
@@ -159,4 +150,4 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;
