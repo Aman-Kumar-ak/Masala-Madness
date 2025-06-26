@@ -273,14 +273,10 @@ export default function PendingOrders() {
     };
     try {
       const response = await api.post(`/pending-orders/confirm/${orderId}`, payload);
-      if (!response || (response.ok === false)) throw new Error('Failed to confirm payment');
-      let data = response;
-      // If response is a fetch Response, parse JSON
-      if (typeof response.json === 'function') {
-        data = await response.json();
-      }
-      setNotification(null);
-      setNotification({ message: data.message || 'Order confirmed', type: 'success' });
+      // Optimistically remove the order immediately
+      setPendingOrders(prev => prev.filter(order => order.orderId !== orderId));
+      setNotification({ message: response.message, type: 'success' });
+      // Trigger refresh to ensure UI is in sync with backend
       triggerRefresh();
       if (newPendingOrders.length === 0) {
         setTimeout(() => navigate('/'), 1500);

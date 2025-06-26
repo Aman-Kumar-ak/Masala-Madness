@@ -229,7 +229,7 @@ export default function WorkerPendingOrders() {
   };
 
   // Update handleConfirmPayment to include manual discount
-  const handleConfirmPayment = async (orderId, paymentMethod, options = {}) => {
+  const handleConfirmPayment = async (orderId, paymentMethod, customAmounts = {}) => {
     if (!paymentMethod) {
       console.error('Payment method is not specified');
       return;
@@ -261,8 +261,8 @@ export default function WorkerPendingOrders() {
     let finalPaymentMethod = paymentMethod; // Declare here
 
     if (paymentMethod === "Custom") {
-      customCashAmount = options.customCashAmount || 0;
-      customOnlineAmount = options.customOnlineAmount || 0;
+      customCashAmount = customAmounts.customCashAmount || 0;
+      customOnlineAmount = customAmounts.customOnlineAmount || 0;
       // Construct the paymentMethod string with amounts, similar to Cart.jsx
       finalPaymentMethod = `Custom (Cash: ₹${customCashAmount.toFixed(2)}, Online: ₹${customOnlineAmount.toFixed(2)})`;
     }
@@ -273,34 +273,20 @@ export default function WorkerPendingOrders() {
     
     console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
     try {
-      const response = await fetch(`${API_URL}/api/pending-orders/confirm/${orderId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          paymentMethod: finalPaymentMethod, // Use the constructed finalPaymentMethod
-          isPaid: true,
-          discountAmount: totalDiscount,
-          discountPercentage: percentageDiscount,
-          manualDiscount,
-          totalAmount: discountedTotal,
-          customCashAmount: paymentMethod === "Custom" ? customCashAmount : undefined,
-          customOnlineAmount: paymentMethod === "Custom" ? customOnlineAmount : undefined,
-        }),
+      const data = await api.post(`/pending-orders/confirm/${orderId}`, {
+        paymentMethod: finalPaymentMethod,
+        isPaid: true,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        manualDiscount,
+        totalAmount: discountedTotal,
+        customCashAmount: paymentMethod === "Custom" ? customCashAmount : undefined,
+        customOnlineAmount: paymentMethod === "Custom" ? customOnlineAmount : undefined,
       });
-      
-      if (!response.ok) throw new Error('Failed to confirm payment');
-      
-      const data = await response.json();
-      // Remove the processing notification before showing success
-      setNotification(null);
-      setNotification({ 
-        message: data.message, 
-        type: 'success' 
-      });
-      
-      // Trigger manual refresh to ensure all components update
+      // Optimistically remove the order immediately
+      setPendingOrders(prev => prev.filter(order => order.orderId !== orderId));
+      setNotification({ message: data.message, type: 'success' });
+      // Trigger refresh to ensure UI is in sync with backend
       triggerRefresh();
       
       // Delay navigation and notification removal to synchronize with splash screen
@@ -330,24 +316,12 @@ export default function WorkerPendingOrders() {
   };
 
   const handleQuantityChange = async (orderId, itemIndex, delta) => {
-    // Save scroll position before update
     saveScrollPosition();
-    
     try {
-      const response = await fetch(`${API_URL}/api/pending-orders/${orderId}/item-quantity`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ itemIndex, delta })
-      });
-      if (!response.ok) throw new Error("Failed to update quantity");
-      const data = await response.json();
+      const data = await api.patch(`/pending-orders/${orderId}/item-quantity`, { itemIndex, delta });
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
-      
-      // Restore scroll position after state update
       setTimeout(restoreScrollPosition, 0);
     } catch (error) {
       console.error("Error updating quantity:", error);
