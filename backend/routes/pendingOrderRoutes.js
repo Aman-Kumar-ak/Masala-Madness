@@ -360,4 +360,63 @@ router.patch("/:orderId/manual-discount", async (req, res) => {
   }
 });
 
+// @route   POST /api/pending-orders/:orderId/append-items
+// Append new items to a pending order, deduplicating by name, type, and price
+router.post("/:orderId/append-items", async (req, res) => {
+  try {
+    const { items: newItems = [] } = req.body;
+    if (!Array.isArray(newItems) || newItems.length === 0) {
+      return res.status(400).json({ message: "No items to append" });
+    }
+
+    const pendingOrder = await PendingOrder.findOne({ orderId: req.params.orderId });
+    if (!pendingOrder) {
+      return res.status(404).json({ message: "Pending order not found" });
+    }
+
+    // Merge items: keep all existing, append only new unique ones (by name, type, price)
+    const existingItems = pendingOrder.items;
+    const mergedItems = [...existingItems];
+    newItems.forEach(newItem => {
+      const exists = existingItems.some(item =>
+        item.name === newItem.name &&
+        item.type === newItem.type &&
+        item.price === newItem.price
+      );
+      if (!exists) {
+        mergedItems.push(newItem);
+      }
+    });
+
+    // Recalculate subtotal
+    const newSubtotal = mergedItems.reduce((total, item) => total + item.totalPrice, 0);
+    // Recalculate discount and total
+    let discountAmount = pendingOrder.discountAmount || 0;
+    let discountPercentage = pendingOrder.discountPercentage || 0;
+    if (discountPercentage > 0) {
+      discountAmount = Math.round((newSubtotal * discountPercentage) / 100);
+    }
+    const totalAmount = newSubtotal - discountAmount;
+
+    pendingOrder.items = mergedItems;
+    pendingOrder.subtotal = newSubtotal;
+    pendingOrder.discountAmount = discountAmount;
+    pendingOrder.totalAmount = totalAmount;
+    pendingOrder.updatedAt = new Date();
+
+    const savedOrder = await pendingOrder.save();
+
+    // Emit event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'pending-order-items-appended', order: savedOrder });
+    }
+
+    res.status(200).json({ message: "Items appended successfully", order: savedOrder });
+  } catch (error) {
+    console.error("Append items error:", error);
+    res.status(500).json({ message: "Failed to append items", error: error.message });
+  }
+});
+
 module.exports = router;

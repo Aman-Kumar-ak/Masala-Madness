@@ -87,10 +87,24 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     if (selectedItems.length === 0) return;
     setLoading(true);
 
-    // Combine and deduplicate items
-    const allItems = deduplicateItems([
-      ...existingItems,
-      ...selectedItems.map(item => ({
+    // Only send new items (not already in existingItems)
+    const newItems = selectedItems.filter(sel => {
+      return !existingItems.some(
+        (ex) =>
+          (ex.id === sel.id || ex._id === sel.id) &&
+          (ex.type === (sel.portion === 'half' ? 'H' : sel.portion === 'full' ? 'F' : sel.portion === 'fixed' ? 'Fixed' : sel.portion))
+      );
+    });
+
+    if (newItems.length === 0) {
+      setNotification({ message: 'No new items to add.', type: 'info' });
+      setLoading(false);
+      return;
+    }
+
+    // Prepare the request body with only new items
+    const requestBody = {
+      items: newItems.map(item => ({
         name: item.name,
         type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion === 'fixed' ? 'Fixed' : item.portion,
         price: item.price,
@@ -98,39 +112,13 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
         totalPrice: item.price * (item.quantity || 1),
         id: item.id || item._id,
         index: item.index
-      }))
-    ]);
-
-    // Calculate the subtotal
-    const subtotal = allItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0);
-    // Fetch active discount
-    let discountAmount = 0;
-    let discountPercentage = 0;
-    let totalAmount = subtotal;
-    try {
-      const discountResponse = await api.get('/discounts/active');
-      if (discountResponse && subtotal >= discountResponse.minOrderAmount) {
-        discountPercentage = discountResponse.percentage;
-        discountAmount = Math.round((subtotal * discountPercentage) / 100);
-        totalAmount = subtotal - discountAmount;
-      }
-    } catch (error) {
-      console.error('Error fetching discount:', error);
-    }
-
-    // Prepare the request body with all items
-    const requestBody = {
-      items: allItems,
-      subtotal,
-      discountAmount,
-      discountPercentage,
-      totalAmount,
-      isPaid: false,
+      })),
+      append: true // let backend know to append, not replace
     };
 
     try {
-      const data = await api.put(`/pending-orders/${orderId}`, requestBody);
-      onSave(data.order);  // Pass updated order object instead of just selectedItems
+      const data = await api.put(`/pending-orders/${orderId}/append-items`, requestBody);
+      onSave(data.order);  // Pass updated order object
       setNotification({ message: 'Items added successfully!', type: 'success' });
     } catch (error) {
       console.error('Error updating order:', error);
