@@ -19,6 +19,7 @@ const Login = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
   const [initialCheckComplete, setInitialCheckComplete] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   const { login, isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
@@ -539,15 +540,36 @@ const Login = () => {
                         <input
                           id="password"
                           name="password"
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           required
-                          className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
+                          className="appearance-none block w-full pl-8 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
                           placeholder="Enter your password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           disabled={isLoading}
                           autoComplete="new-password"
                         />
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          onClick={() => setShowPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-9 h-9 bg-transparent border-none outline-none focus:outline-none"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          style={{ boxShadow: 'none', background: 'none', padding: 0 }}
+                        >
+                          {showPassword ? (
+                            // Hide password (eye with slash)
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18M9.88 9.88A3 3 0 0112 9c1.66 0 3 1.34 3 3 0 .53-.14 1.03-.38 1.46M6.53 6.53A9.97 9.97 0 003 12c0 2.97 4 7 9 7 1.13 0 2.19-.37 3.13-1.03m2.1-2.1A9.97 9.97 0 0021 12c0-2.97-4-7-9-7-1.13 0-2.19.37-3.13 1.03" />
+                            </svg>
+                          ) : (
+                            // Show password (provided SVG)
+                            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v.01M12 12v.01M12 15v.01M21 12c-1.333 4-5.333 7-9 7s-7.667-3-9-7c1.333-4 5.333-7 9-7s7.667 3 9 7z" />
+                            </svg>
+                          )}
+                        </button>
                       </div>
                     </div>
                     <div className="flex items-center justify-center gap-3 px-2 py-2 rounded-lg bg-orange-50 border border-orange-200 w-full">
@@ -638,7 +660,7 @@ const Login = () => {
                     <div className="flex">
                       <div className="flex-shrink-0">
                         <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m-1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="ml-3">
@@ -678,4 +700,4 @@ const Login = () => {
   );
 };
 
-export default Login; 
+export default Login;

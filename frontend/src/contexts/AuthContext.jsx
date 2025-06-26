@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
+import OfflinePage from '../components/OfflinePage';
 
 const AuthContext = createContext();
 
@@ -15,6 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthOperationInProgress, setIsAuthOperationInProgress] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const navigate = useNavigate();
   
   // Functions to manage auth operation in progress state
@@ -142,18 +144,49 @@ export const AuthProvider = ({ children }) => {
     }
   };
   
+  // Listen for online/offline events
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Retry handler for OfflinePage
+  const handleRetry = () => {
+    if (navigator.onLine) {
+      setIsOffline(false);
+      setLoading(true);
+      setAuthOperationInProgress(false); // Triggers auth check
+    }
+  };
+
   // Fast optimistic auth check for instant redirect
   useEffect(() => {
-    // If a token or deviceToken exists, optimistically set as authenticated
+    if (isOffline) return;
     const token = sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('deviceToken');
     if (token) {
       setIsAuthenticated(true);
-      setLoading(false); // Allow fast navigation
+      setLoading(false);
     }
-  }, []);
+  }, [isOffline]);
 
   // Check if user is already logged in (via token in sessionStorage or deviceToken in localStorage)
   useEffect(() => {
+    if (isOffline) {
+      setLoading(false);
+      return;
+    }
+    // If offline, skip backend verification and do not redirect to login
+    if (!navigator.onLine) {
+      setLoading(false);
+      // Optionally, show an offline notification here
+      return;
+    }
     const pageRefreshFlag = sessionStorage.getItem('pageRefreshFlag');
     if (!pageRefreshFlag) {
       sessionStorage.setItem('pageRefreshFlag', 'true');
@@ -241,7 +274,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       clearInterval(sessionCheckInterval);
     };
-  }, [navigate, isAuthenticated, isAuthOperationInProgress]);
+  }, [navigate, isAuthenticated, isAuthOperationInProgress, isOffline]);
   
   // Login function
   const login = async (username, password, rememberDevice = true, deviceToken = null) => {
@@ -350,7 +383,7 @@ export const AuthProvider = ({ children }) => {
   
   return (
     <AuthContext.Provider value={authContextValue}>
-      {children}
+      {isOffline ? <OfflinePage onRetry={handleRetry} /> : children}
     </AuthContext.Provider>
   );
 };

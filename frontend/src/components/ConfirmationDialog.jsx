@@ -170,15 +170,18 @@ const ConfirmationDialog = ({
                   confirmText
                 )}
               </motion.button>
-              <motion.button
-                onClick={handleCancel}
-                className="bg-gray-100 text-gray-700 px-5 py-3 rounded-xl flex-1 font-medium hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 text-base"
-                whileHover={buttonHoverAnimation}
-                whileTap={{ scale: 0.95 }}
-                disabled={isLoading}
-              >
-                {cancelText}
-              </motion.button>
+              {/* Only render cancel button if cancelText is not null */}
+              {cancelText && (
+                <motion.button
+                  onClick={handleCancel}
+                  className="bg-gray-100 text-gray-700 px-5 py-3 rounded-xl flex-1 font-medium hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 text-base"
+                  whileHover={buttonHoverAnimation}
+                  whileTap={{ scale: 0.95 }}
+                  disabled={isLoading}
+                >
+                  {cancelText}
+                </motion.button>
+              )}
             </motion.div>
           )}
         </div>
