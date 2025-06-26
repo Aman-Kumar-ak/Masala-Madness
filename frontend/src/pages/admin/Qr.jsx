@@ -222,14 +222,29 @@ export default function Qr() {
       }
       
       setIsLoading(true);
-      const response = await api.put(`/upi/${currentUpiAddress._id}`, newUpiAddress);
-      
-      const data = await response;
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update UPI address');
+      // Always send all fields to backend
+      const body = {
+        name: newUpiAddress.name,
+        upiId: newUpiAddress.upiId,
+        description: newUpiAddress.description || '',
+        isDefault: !!newUpiAddress.isDefault
+      };
+      let response, data;
+      try {
+        response = await api.put(`/upi/${currentUpiAddress._id}`, body);
+        data = await response;
+      } catch (err) {
+        // If api abstraction throws, show error
+        showError(err.message || 'Failed to update UPI address');
+        setIsLoading(false);
+        return;
       }
-      
+      if (!response.ok) {
+        // Show backend error message if available
+        showError(data && data.message ? data.message : 'Failed to update UPI address');
+        setIsLoading(false);
+        return;
+      }
       await fetchUpiAddresses();
       setIsEditingUpi(false);
       showSuccess('UPI address updated successfully');
