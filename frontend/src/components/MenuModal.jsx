@@ -42,7 +42,19 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
       }
     }
     fetchData();
+    setSelectedItems([]); // Reset selected items every time modal opens
   }, []);
+
+  // Helper to deduplicate items by id, portion, and index
+  function deduplicateItems(items) {
+    const seen = new Set();
+    return items.filter(item => {
+      const key = `${item.id || item._id}-${item.portion || item.type}-${item.index ?? ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
 
   const handleSelectItem = (item, portion, price, index) => {
     const existingIndex = selectedItems.findIndex(
@@ -75,8 +87,8 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     if (selectedItems.length === 0) return;
     setLoading(true);
 
-    // Combine existing items and selected items for the full updated list
-    const allItems = [
+    // Combine and deduplicate items
+    const allItems = deduplicateItems([
       ...existingItems,
       ...selectedItems.map(item => ({
         name: item.name,
@@ -84,8 +96,10 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
         price: item.price,
         quantity: item.quantity || 1,
         totalPrice: item.price * (item.quantity || 1),
+        id: item.id || item._id,
+        index: item.index
       }))
-    ];
+    ]);
 
     // Calculate the subtotal
     const subtotal = allItems.reduce((total, item) => total + item.price * (item.quantity || 1), 0);

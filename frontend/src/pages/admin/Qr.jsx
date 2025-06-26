@@ -169,23 +169,14 @@ export default function Qr() {
         showError('Name and UPI ID are required');
         return;
       }
-      
       // Basic UPI validation on frontend
       const upiRegex = /^[\w\.\-]+@[\w\.\-]+$/;
       if (!upiRegex.test(newUpiAddress.upiId)) {
         showError('Invalid UPI ID format. Expected format: username@provider');
         return;
       }
-      
       setIsLoading(true);
-      const response = await api.post('/upi', newUpiAddress);
-      
-      const data = await response;
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to create UPI address');
-      }
-      
+      await api.post('/upi', newUpiAddress);
       await fetchUpiAddresses();
       setIsAddingUpi(false);
       setNewUpiAddress({
@@ -229,22 +220,7 @@ export default function Qr() {
         description: newUpiAddress.description || '',
         isDefault: !!newUpiAddress.isDefault
       };
-      let response, data;
-      try {
-        response = await api.put(`/upi/${currentUpiAddress._id}`, body);
-        data = await response;
-      } catch (err) {
-        // If api abstraction throws, show error
-        showError(err.message || 'Failed to update UPI address');
-        setIsLoading(false);
-        return;
-      }
-      if (!response.ok) {
-        // Show backend error message if available
-        showError(data && data.message ? data.message : 'Failed to update UPI address');
-        setIsLoading(false);
-        return;
-      }
+      await api.put(`/upi/${currentUpiAddress._id}`, body);
       await fetchUpiAddresses();
       setIsEditingUpi(false);
       showSuccess('UPI address updated successfully');
@@ -262,12 +238,7 @@ export default function Qr() {
     
     try {
       setIsDeletingUpiAddress(true);
-      const response = await api.delete(`/upi/${id}`);
-      
-      if (!response.ok) {
-        throw new Error(response.message || 'Failed to delete UPI address');
-      }
-      
+      await api.delete(`/upi/${id}`);
       await fetchUpiAddresses();
       showSuccess('UPI address deleted successfully');
       setConfirmDialog(prev => ({ ...prev, isOpen: false }));
