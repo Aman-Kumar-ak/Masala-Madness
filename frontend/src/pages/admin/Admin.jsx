@@ -26,7 +26,7 @@ const Admin = () => {
   });
   const [notification, setNotification] = useState(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [isSubmittingDiscount, setIsSubmittingDiscount] = useState(false);
+  const [discountLoading, setDiscountLoading] = useState(false);
   const [isRemovingDiscount, setIsRemovingDiscount] = useState(false);
   const [isDishModalOpen, setIsDishModalOpen] = useState(false);
   
@@ -49,10 +49,12 @@ const Admin = () => {
 
   const loadActiveDiscount = async () => {
     try {
-      const response = await api.get(`/discounts/active`);
-      if (response.ok) {
-        const data = await response.json();
+      const data = await api.get(`/discounts/active`);
+      if (data) {
         setActiveDiscount(data);
+      } else {
+        setActiveDiscount(null);
+        setNotification({ message: 'No active discount found', type: 'info' });
       }
     } catch (error) {
       console.error('Error loading active discount:', error);
@@ -95,57 +97,46 @@ const Admin = () => {
     setShowDiscountForm(false);
   };
 
-  const handleDiscountSubmit = async (e) => {
+  const handleDiscountSave = async (e) => {
     e.preventDefault();
-    setIsSubmittingDiscount(true);
+    setDiscountLoading(true);
+    setNotification(null);
     try {
-      const response = await api.post('/discounts', {
-          ...newDiscount,
-          percentage: Number(newDiscount.percentage),
-          minOrderAmount: Number(newDiscount.minOrderAmount)
+      // Add or update discount
+      const savedDiscount = await api.post('/discounts', {
+        ...newDiscount,
+        percentage: Number(newDiscount.percentage),
+        minOrderAmount: Number(newDiscount.minOrderAmount)
       });
+      setShowDiscountForm(false);
+      setNewDiscount({ percentage: '', minOrderAmount: '', isActive: true });
 
-      if (response.ok) {
-        setShowDiscountForm(false);
-        setNewDiscount({ percentage: '', minOrderAmount: '', isActive: true });
-        await loadActiveDiscount();
-        setNotification({ message: "Discount saved successfully", type: "success" });
+      // If the new discount is active, set it immediately
+      if (savedDiscount && savedDiscount.isActive) {
+        setActiveDiscount(savedDiscount);
       } else {
-        const errorData = await response.json();
-        setNotification({ message: errorData.message || "Failed to save discount", type: "error" });
+        await loadActiveDiscount();
       }
+
+      setNotification({ message: 'Discount saved successfully!', type: 'success' });
     } catch (error) {
-      console.error('Error creating discount:', error);
-      setNotification({ message: "Error creating discount: " + error.message, type: 'error' });
+      setNotification({ message: error.message || 'Failed to save discount.', type: 'error' });
     } finally {
-      setIsSubmittingDiscount(false);
+      setDiscountLoading(false);
     }
   };
 
-  const handleRemoveDiscount = () => {
+  const handleDiscountDelete = async () => {
     if (!activeDiscount?._id) return;
-    setShowDeleteConfirmation(true);
-  };
-
-  const confirmRemoveDiscount = async () => {
     setIsRemovingDiscount(true);
+    setNotification(null);
     try {
-      const response = await api.delete(`/discounts/${activeDiscount._id}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to delete discount');
-      }
-
-      // Clear the active discount from local state
+      await api.delete(`/discounts/${activeDiscount._id}`);
       setActiveDiscount(null);
-      setNotification({ message: "Discount removed successfully", type: "success" });
-
-      // Trigger a refresh of the active discount
-      loadActiveDiscount();
-      
+      setNotification({ message: 'Discount removed successfully!', type: 'success' });
+      await loadActiveDiscount();
     } catch (error) {
-      console.error('Error removing discount:', error);
-      setNotification({ message: "Failed to remove discount. Please try again.", type: "error" });
+      setNotification({ message: error.message || 'Failed to remove discount.', type: 'error' });
     } finally {
       setShowDeleteConfirmation(false);
       setIsRemovingDiscount(false);
@@ -242,7 +233,9 @@ const Admin = () => {
                     </div>
                   </div>
                   <button
-                    onClick={handleRemoveDiscount}
+                    onClick={() => {
+                      setShowDeleteConfirmation(true);
+                    }}
                     className="p-2.5 bg-red-50 rounded-lg transition-colors duration-200 group focus:outline-none focus:ring-2 focus:ring-red-300 border border-red-200"
                     title="Remove Discount"
                   >
@@ -272,7 +265,7 @@ const Admin = () => {
                 className="bg-gradient-to-r from-green-50 to-blue-50 p-5 rounded-lg border border-green-200 shadow-sm"
               >
                 <h3 className="text-lg font-semibold mb-4 text-gray-800">Add New Discount</h3>
-                <form onSubmit={handleDiscountSubmit} className="space-y-4">
+                <form onSubmit={handleDiscountSave} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Discount Percentage
@@ -289,7 +282,7 @@ const Admin = () => {
                       })}
                       className="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-4 bg-white focus:ring-2 focus:ring-green-300 focus:border-green-300 transition-all duration-200"
                       placeholder="Enter percentage (0-100)"
-                      disabled={isSubmittingDiscount}
+                      disabled={discountLoading}
                     />
                   </div>
                   <div>
@@ -307,7 +300,7 @@ const Admin = () => {
                       })}
                       className="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-4 bg-white focus:ring-2 focus:ring-green-300 focus:border-green-300 transition-all duration-200"
                       placeholder="Enter minimum amount"
-                      disabled={isSubmittingDiscount}
+                      disabled={discountLoading}
                     />
                   </div>
                   <div className="flex items-center">
@@ -317,22 +310,22 @@ const Admin = () => {
                       checked={newDiscount.isActive}
                       onChange={(e) => setNewDiscount({ ...newDiscount, isActive: e.target.checked })}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      disabled={isSubmittingDiscount}
+                      disabled={discountLoading}
                     />
                     <label htmlFor="isActive" className="ml-2 text-sm text-gray-700">Is Active</label>
                   </div>
                   <button
                     type="submit"
                     className="w-full bg-green-500 text-white py-2.5 px-4 rounded-lg font-medium transition-all duration-200 focus:ring-2 focus:ring-green-300 focus:outline-none shadow-sm flex items-center justify-center"
-                    disabled={isSubmittingDiscount}
+                    disabled={discountLoading}
                   >
-                    {isSubmittingDiscount ? (
+                    {discountLoading ? (
                       <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     ) : null}
-                    {isSubmittingDiscount ? 'Saving...' : 'Save Discount'}
+                    {discountLoading ? 'Saving...' : 'Save Discount'}
                   </button>
                 </form>
               </div>
@@ -357,7 +350,7 @@ const Admin = () => {
       <ConfirmationDialog
         isOpen={showDeleteConfirmation}
         onClose={() => setShowDeleteConfirmation(false)}
-        onConfirm={confirmRemoveDiscount}
+        onConfirm={handleDiscountDelete}
         title="Remove Discount"
         message="Are you sure you want to remove the active discount? This action cannot be undone."
         confirmText="Remove Discount"

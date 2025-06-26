@@ -130,13 +130,8 @@ export default function Qr() {
   // Fetch all UPI addresses from the database
   const fetchUpiAddresses = async () => {
     try {
-      const response = await api.get('/upi');
-      if (!response.ok) throw new Error('Failed to fetch UPI addresses');
-      
-      const data = await response.json();
+      const data = await api.get('/upi');
       setSavedUpiAddresses(data);
-      
-      // If addresses were found, select the default one
       if (data.length > 0) {
         const defaultAddress = data.find(addr => addr.isDefault) || data[0];
         setCurrentUpiAddress(defaultAddress);
@@ -185,7 +180,7 @@ export default function Qr() {
       setIsLoading(true);
       const response = await api.post('/upi', newUpiAddress);
       
-      const data = await response.json();
+      const data = await response;
       
       if (!response.ok) {
         throw new Error(data.message || 'Failed to create UPI address');
@@ -229,7 +224,7 @@ export default function Qr() {
       setIsLoading(true);
       const response = await api.put(`/upi/${currentUpiAddress._id}`, newUpiAddress);
       
-      const data = await response.json();
+      const data = await response;
       
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update UPI address');
@@ -255,8 +250,7 @@ export default function Qr() {
       const response = await api.delete(`/upi/${id}`);
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to delete UPI address');
+        throw new Error(response.message || 'Failed to delete UPI address');
       }
       
       await fetchUpiAddresses();
@@ -291,8 +285,7 @@ export default function Qr() {
       const response = await api.patch(`/upi/${id}/default`);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to set default UPI address');
+        throw new Error(response.message || 'Failed to set default UPI address');
       }
       
       await fetchUpiAddresses();
@@ -862,7 +855,7 @@ export default function Qr() {
                                   )}
                                 </p>
                                 {currentUpiAddress.description && (
-                                  <p className="text-xs text-gray-600 mt-1">{currentUpiAddress.description}</p>
+                                  <p className="text-xs text-gray-500 mt-1">{currentUpiAddress.description}</p>
                                 )}
                               </div>
                             ) : (

@@ -148,25 +148,13 @@ const Orders = () => {
     
     try {
       setDeleteLoading(true);
-      
-      const response = await api.delete(`/orders/${orderToDelete.orderId}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      // Show success notification
+      await api.delete(`/orders/${orderToDelete.orderId}`);
       setNotification({
         message: `Order #${orderToDelete.orderNumber} has been deleted successfully`,
         type: 'delete',
         duration: 2000
       });
-      
-      // Don't manually update stats, just reload orders to get the fresh data
       loadOrders();
-      
     } catch (error) {
       console.error('Error deleting order:', error);
       setNotification({

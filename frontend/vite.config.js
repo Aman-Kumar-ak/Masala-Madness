@@ -9,6 +9,12 @@ export default defineConfig({
   },
   server: {
     open: true,
+    host: '0.0.0.0', // Allow connections from LAN/other devices
+    port: 5173,
+    hmr: {
+      host: 'localhost', // Change to your LAN IP if accessing from another device
+      port: 5173,
+    },
   },
   preview: {
     port: 4173,        // <-- important!

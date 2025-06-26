@@ -10,7 +10,6 @@ export const fetchCategories = async () => {
     return data;
   } catch (error) {
     console.error("Error fetching categories:", error);
-    // Re-throw the error to be handled by the component
     throw error;
   }
 };

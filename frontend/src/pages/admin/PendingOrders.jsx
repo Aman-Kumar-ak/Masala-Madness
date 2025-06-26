@@ -76,7 +76,6 @@ export default function PendingOrders() {
       });
     } finally {
       setLoading(false);
-      // Restore scroll position after data loads
       setTimeout(restoreScrollPosition, 0);
     }
   }, [restoreScrollPosition]);
@@ -230,76 +229,66 @@ export default function PendingOrders() {
   // Update handleConfirmPayment to include manual discount
   const handleConfirmPayment = async (orderId, paymentMethod, options = {}) => {
     if (!paymentMethod) {
-      console.error('Payment method is not specified');
+      setNotification({ message: 'Payment method is not specified', type: 'error' });
       return;
     }
-    
     // Get the order data
     const order = pendingOrders.find(order => order.orderId === orderId);
-    
+    if (!order) {
+      setNotification({ message: 'Order not found', type: 'error' });
+      return;
+    }
     // Calculate discount if applicable
     const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(order);
     const discountedTotal = order.subtotal - totalDiscount;
-    
     // Immediately update UI to show payment confirmation
     setPaymentConfirmedOrderId(orderId);
     setPaymentOptionOrderId(null); 
     setPaymentMethodToConfirm(null);
-    
     // Update local state immediately to remove the confirmed order
     const newPendingOrders = pendingOrders.filter(order => order.orderId !== orderId);
     setPendingOrders(newPendingOrders);
-    
     let isOnline = paymentMethod === 'Online';
-    
     // Determine custom payment amounts if applicable
     let customCashAmount = 0;
     let customOnlineAmount = 0;
-    let finalPaymentMethod = paymentMethod; // Declare here
-
+    let finalPaymentMethod = paymentMethod;
     if (paymentMethod === "Custom") {
       customCashAmount = options.customCashAmount || 0;
       customOnlineAmount = options.customOnlineAmount || 0;
-      // Construct the paymentMethod string with amounts, similar to Cart.jsx
       finalPaymentMethod = `Custom (Cash: ₹${customCashAmount.toFixed(2)}, Online: ₹${customOnlineAmount.toFixed(2)})`;
     }
-
     if (isOnline || paymentMethod === "Custom") {
       setShowSplashScreen(true);
     }
-    
-    console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
+    // Always send all required fields, even if zero
+    const payload = {
+      paymentMethod: finalPaymentMethod || '',
+      isPaid: true,
+      discountAmount: typeof totalDiscount === 'number' ? totalDiscount : 0,
+      discountPercentage: typeof percentageDiscount === 'number' ? percentageDiscount : 0,
+      totalAmount: typeof discountedTotal === 'number' ? discountedTotal : 0,
+      customCashAmount: typeof customCashAmount === 'number' ? customCashAmount : 0,
+      customOnlineAmount: typeof customOnlineAmount === 'number' ? customOnlineAmount : 0,
+    };
     try {
-      const response = await api.post(`/pending-orders/confirm/${orderId}`);
-      
-      if (!response.ok) throw new Error('Failed to confirm payment');
-      
-      const data = await response.json();
-      // Remove the processing notification before showing success
+      const response = await api.post(`/pending-orders/confirm/${orderId}`, payload);
+      if (!response || (response.ok === false)) throw new Error('Failed to confirm payment');
+      let data = response;
+      // If response is a fetch Response, parse JSON
+      if (typeof response.json === 'function') {
+        data = await response.json();
+      }
       setNotification(null);
-      setNotification({ 
-        message: data.message, 
-        type: 'success' 
-      });
-      
-      // Trigger manual refresh to ensure all components update
+      setNotification({ message: data.message || 'Order confirmed', type: 'success' });
       triggerRefresh();
-      
       if (newPendingOrders.length === 0) {
-        setTimeout(() => navigate('/'), 1500); // Delay navigation to allow notification to be displayed
+        setTimeout(() => navigate('/'), 1500);
       }
     } catch (error) {
-      console.error('Error confirming payment:', error);
-      
-      // If there was an error, revert the UI changes
-      setNotification({ 
-        message: "Error confirming payment. Please try again.", 
-        type: "error" 
-      });
-      
-      // Put the order back in the list
-      const revertedOrders = [...pendingOrders];
-      setPendingOrders(revertedOrders);
+      console.error('Error confirming payment:', error, payload);
+      setNotification({ message: "Error confirming payment. Please try again.", type: "error" });
+      setPendingOrders([...pendingOrders]);
       setPaymentConfirmedOrderId(null);
     } finally {
       if (isOnline || paymentMethod === "Custom") {
@@ -375,38 +364,34 @@ export default function PendingOrders() {
   };
 
   const handleRemoveItemOrOrder = async (order, item, index) => {
-                              const isLastItem = order.items.length === 1;
-                              const confirmMsg = isLastItem
-                                ? `Removing last item will delete entire order. Continue?`
-                                : `Remove ${item.name} from order?`;
+    const isLastItem = order.items.length === 1;
+    const confirmMsg = isLastItem
+      ? `Removing last item will delete entire order. Continue?`
+      : `Remove ${item.name} from order?`;
 
     setConfirmDialog({
       isOpen: true,
       title: 'Confirm Removal',
       message: confirmMsg,
       onConfirm: async () => {
-                                try {
-                                  if (isLastItem) {
-                                    const response = await api.delete(`/pending-orders/${order.orderId}`);
-                                    // No response.ok, just check for error in response or rely on try/catch
-                                    if (response.error) throw new Error(response.error);
-                                    setPendingOrders(prevOrders =>
-                                      prevOrders.filter(o => o.orderId !== order.orderId)
-                                    );
-                                  } else {
-                                    const response = await api.delete(`/pending-orders/${order.orderId}/item/${index}`);
-                                    if (!response.ok) throw new Error('Failed to remove item');
-                                    const data = await response.json();
-                                    setPendingOrders(prevOrders =>
-                                      prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
-                                    );
-                                  }
-                                } catch (error) {
-                                  console.error('Error removing item/order:', error);
-                                  alert('Failed to remove item/order');
+        try {
+          if (isLastItem) {
+            await api.delete(`/pending-orders/${order.orderId}`);
+            setPendingOrders(prevOrders =>
+              prevOrders.filter(o => o.orderId !== order.orderId)
+            );
+          } else {
+            const data = await api.delete(`/pending-orders/${order.orderId}/item/${index}`);
+            setPendingOrders(prevOrders =>
+              prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
+            );
+          }
+        } catch (error) {
+          console.error('Error removing item/order:', error);
+          alert('Failed to remove item/order');
         } finally {
           setConfirmDialog(null);
-                              }
+        }
       },
       onCancel: () => setConfirmDialog(null),
     });
@@ -419,9 +404,7 @@ export default function PendingOrders() {
       message: `Are you sure you want to delete the entire order #${pendingOrders.length - pendingOrders.indexOf(order)}?`,
       onConfirm: async () => {
         try {
-          const response = await api.delete(`/pending-orders/${order.orderId}`);
-          // No response.ok, just check for error in response or rely on try/catch
-          if (response.error) throw new Error(response.error);
+          await api.delete(`/pending-orders/${order.orderId}`);
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)
           );

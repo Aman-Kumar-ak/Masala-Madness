@@ -66,23 +66,20 @@ export default function WorkerPendingOrders() {
 
   // Create a memoized fetchPendingOrders function that we can call from multiple places
   const fetchPendingOrders = useCallback(async () => {
-      try {
+    try {
       setLoading(true);
-        const response = await api.get('/pending-orders');
-        if (!response.ok) throw new Error('Failed to fetch pending orders');
-        const data = await response.json();
-        setPendingOrders(data);
-      } catch (error) {
-        console.error('Error fetching pending orders:', error);
+      const data = await api.get('/pending-orders');
+      setPendingOrders(data);
+    } catch (error) {
+      console.error('Error fetching pending orders:', error);
       setNotification({ 
         message: 'Failed to fetch pending orders. Please try again.', 
         type: 'error' 
       });
-      } finally {
-        setLoading(false);
-      // Restore scroll position after data loads
+    } finally {
+      setLoading(false);
       setTimeout(restoreScrollPosition, 0);
-      }
+    }
   }, [restoreScrollPosition]);
 
   // Listen for socket events
@@ -406,41 +403,34 @@ export default function WorkerPendingOrders() {
   };
 
   const handleRemoveItemOrOrder = async (order, item, index) => {
-                              const isLastItem = order.items.length === 1;
-                              const confirmMsg = isLastItem
-                                ? `Removing last item will delete entire order. Continue?`
-                                : `Remove ${item.name} from order?`;
+    const isLastItem = order.items.length === 1;
+    const confirmMsg = isLastItem
+      ? `Removing last item will delete entire order. Continue?`
+      : `Remove ${item.name} from order?`;
 
     setConfirmDialog({
       isOpen: true,
       title: 'Confirm Removal',
       message: confirmMsg,
       onConfirm: async () => {
-                                try {
-                                  if (isLastItem) {
-                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
-                                      method: 'DELETE',
-                                    });
-                                    if (!response.ok) throw new Error('Failed to delete order');
-                                    setPendingOrders(prevOrders =>
-                                      prevOrders.filter(o => o.orderId !== order.orderId)
-                                    );
-                                  } else {
-                                    const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}/item/${index}`, {
-                                      method: 'DELETE',
-                                    });
-                                    if (!response.ok) throw new Error('Failed to remove item');
-                                    const data = await response.json();
-                                    setPendingOrders(prevOrders =>
-                                      prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
-                                    );
-                                  }
-                                } catch (error) {
-                                  console.error('Error removing item/order:', error);
-                                  alert('Failed to remove item/order');
+        try {
+          if (isLastItem) {
+            await api.delete(`/pending-orders/${order.orderId}`);
+            setPendingOrders(prevOrders =>
+              prevOrders.filter(o => o.orderId !== order.orderId)
+            );
+          } else {
+            const data = await api.delete(`/pending-orders/${order.orderId}/item/${index}`);
+            setPendingOrders(prevOrders =>
+              prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
+            );
+          }
+        } catch (error) {
+          console.error('Error removing item/order:', error);
+          alert('Failed to remove item/order');
         } finally {
           setConfirmDialog(null);
-                              }
+        }
       },
       onCancel: () => setConfirmDialog(null),
     });
