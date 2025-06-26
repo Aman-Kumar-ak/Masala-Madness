@@ -139,14 +139,13 @@ router.patch('/:id/default', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await UpiAddress.deleteOne({ _id: req.params.id });
-    
     if (result.deletedCount === 0) {
-      return res.status(404).json({ message: 'UPI address not found' });
+      return res.status(404).json({ success: false, message: 'UPI address not found' });
     }
-    
-    res.json({ message: 'UPI address deleted successfully' });
+    // Always return 200 and a clear JSON response
+    res.status(200).json({ success: true, message: 'UPI address deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

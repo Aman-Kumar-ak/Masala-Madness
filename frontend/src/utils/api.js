@@ -58,9 +58,9 @@ const api = {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'PUT',
-        headers: getHeaders(authenticated)
+        headers: getHeaders(authenticated),
+        body: JSON.stringify(data) // <-- this was missing!
       });
-      
       return await handleResponse(response, suppressAuthRedirect);
     } catch (error) {
       handleError(error);
