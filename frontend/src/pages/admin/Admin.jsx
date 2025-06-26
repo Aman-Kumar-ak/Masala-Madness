@@ -21,8 +21,7 @@ const Admin = () => {
   const [activeDiscount, setActiveDiscount] = useState(null);
   const [newDiscount, setNewDiscount] = useState({
     percentage: '',
-    minOrderAmount: '',
-    isActive: true
+    minOrderAmount: ''
   });
   const [notification, setNotification] = useState(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -101,22 +100,14 @@ const Admin = () => {
     setDiscountLoading(true);
     setNotification(null);
     try {
-      // Add or update discount
+      // Add or update discount (no isActive field)
       const savedDiscount = await api.post('/discounts', {
-        ...newDiscount,
         percentage: Number(newDiscount.percentage),
         minOrderAmount: Number(newDiscount.minOrderAmount)
       });
       setShowDiscountForm(false);
-      setNewDiscount({ percentage: '', minOrderAmount: '', isActive: true });
-
-      // If the new discount is active, set it immediately
-      if (savedDiscount && savedDiscount.isActive) {
-        setActiveDiscount(savedDiscount);
-      } else {
-        await loadActiveDiscount();
-      }
-
+      setNewDiscount({ percentage: '', minOrderAmount: '' });
+      setActiveDiscount(savedDiscount);
       setNotification({ message: 'Discount saved successfully!', type: 'success' });
     } catch (error) {
       setNotification({ message: error.message || 'Failed to save discount.', type: 'error' });
@@ -301,17 +292,6 @@ const Admin = () => {
                       placeholder="Enter minimum amount"
                       disabled={discountLoading}
                     />
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="isActive"
-                      checked={newDiscount.isActive}
-                      onChange={(e) => setNewDiscount({ ...newDiscount, isActive: e.target.checked })}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      disabled={discountLoading}
-                    />
-                    <label htmlFor="isActive" className="ml-2 text-sm text-gray-700">Is Active</label>
                   </div>
                   <button
                     type="submit"

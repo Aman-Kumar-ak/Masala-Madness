@@ -26,12 +26,13 @@ router.get('/', async (req, res) => {
 // Create new discount
 router.post('/', async (req, res) => {
   try {
-    // If a new discount is being set as active, deactivate all other discounts
-    if (req.body.isActive) {
-      await Discount.updateMany({}, { isActive: false });
-    }
-    
-    const discount = new Discount(req.body);
+    // Always deactivate all other discounts
+    await Discount.updateMany({}, { isActive: false });
+    // Always set new discount as active
+    const discount = new Discount({
+      ...req.body,
+      isActive: true
+    });
     await discount.save();
     res.status(201).json(discount);
   } catch (error) {
@@ -39,24 +40,19 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update discount
+// Update discount (no more isActive toggle from UI, but keep for completeness)
 router.put('/:id', async (req, res) => {
   try {
-    // If this discount is being activated, deactivate all others
-    if (req.body.isActive) {
-      await Discount.updateMany({}, { isActive: false });
-    }
-
+    // If this discount is being updated, always keep it active and others inactive
+    await Discount.updateMany({}, { isActive: false });
     const discount = await Discount.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      { ...req.body, isActive: true },
       { new: true }
     );
-    
     if (!discount) {
       return res.status(404).json({ message: "Discount not found" });
     }
-    
     res.json(discount);
   } catch (error) {
     res.status(500).json({ message: "Error updating discount", error: error.message });
@@ -70,6 +66,8 @@ router.delete('/:id', async (req, res) => {
     if (!discount) {
       return res.status(404).json({ message: "Discount not found" });
     }
+    // After deletion, set all discounts to inactive (no active discount)
+    await Discount.updateMany({}, { isActive: false });
     res.json({ message: "Discount deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Error deleting discount", error: error.message });
