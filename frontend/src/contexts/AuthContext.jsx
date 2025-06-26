@@ -142,6 +142,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
   
+  // Fast optimistic auth check for instant redirect
+  useEffect(() => {
+    // If a token or deviceToken exists, optimistically set as authenticated
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('deviceToken');
+    if (token) {
+      setIsAuthenticated(true);
+      setLoading(false); // Allow fast navigation
+    }
+  }, []);
+
   // Check if user is already logged in (via token in sessionStorage or deviceToken in localStorage)
   useEffect(() => {
     const pageRefreshFlag = sessionStorage.getItem('pageRefreshFlag');
@@ -149,23 +159,21 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.setItem('pageRefreshFlag', 'true');
       sessionStorage.removeItem('jwtVerified');
     }
-    
+
     const verifyUser = async () => {
       if (isAuthOperationInProgress) {
         setLoading(false);
         return;
       }
-
       setLoading(true);
-
       try {
         if (!checkSessionExpiry()) {
           logoutUser();
+          setIsAuthenticated(false);
           setLoading(false);
           navigate('/login');
           return;
         }
-
         const jwtVerified = sessionStorage.getItem('jwtVerified');
         if (jwtVerified === 'true') {
           const userData = sessionStorage.getItem('user');
@@ -176,12 +184,12 @@ export const AuthProvider = ({ children }) => {
             updateLastActivityTime();
           } else {
             logoutUser();
+            setIsAuthenticated(false);
             setLoading(false);
             navigate('/login');
           }
           return;
         }
-
         const token = sessionStorage.getItem('token');
         if (token) {
           try {
@@ -194,11 +202,13 @@ export const AuthProvider = ({ children }) => {
               sessionStorage.setItem('user', JSON.stringify(data.user));
             } else {
               logoutUser();
+              setIsAuthenticated(false);
               setLoading(false);
               navigate('/login');
             }
           } catch (jwtError) {
             logoutUser();
+            setIsAuthenticated(false);
             setLoading(false);
             navigate('/login');
           }
@@ -207,13 +217,21 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         logoutUser();
+        setIsAuthenticated(false);
         setLoading(false);
         navigate('/login');
       } finally {
         setLoading(false);
       }
     };
-    verifyUser();
+    // Only run verifyUser in background if token exists
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('deviceToken');
+    if (token) {
+      verifyUser();
+    } else {
+      setIsAuthenticated(false);
+      setLoading(false);
+    }
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
         logoutUser();
@@ -337,4 +355,4 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export default AuthContext; 
+export default AuthContext;
