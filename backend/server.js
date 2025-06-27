@@ -16,14 +16,15 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Setup Socket.IO with CORS and increased timeouts
+// Setup Socket.IO with unified CORS
 const io = new Server(server, {
   cors: {
     origin: [
-      process.env.FRONTEND_URL || 'http://localhost:3000',
-      'http://localhost:5173',
       'https://masala-madness.vercel.app',
-      'https://masala-madness.onrender.com'
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://masala-madness.onrender.com',
+      process.env.FRONTEND_URL
     ],
     methods: ['GET', 'POST'],
     credentials: true
@@ -41,17 +42,16 @@ app.set('userSockets', userSockets);
 
 // Always allow the Vercel frontend, .env FRONTEND_URL, and localhost for CORS
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
   'https://masala-madness.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://masala-madness.onrender.com' // Add production backend for local testing if needed
-].filter(Boolean); // Remove undefined/null
+  'https://masala-madness.onrender.com',
+  process.env.FRONTEND_URL
+].filter(Boolean);
 
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
