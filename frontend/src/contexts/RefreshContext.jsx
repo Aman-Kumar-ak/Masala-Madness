@@ -34,56 +34,57 @@ export const RefreshProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
     let newSocket;
-    (async () => {
-      await wakeUpBackend();
-      if (!isMounted) return;
-      const token = getToken();
-      if (socket) {
-        socket.disconnect();
-      }
-      newSocket = io(SOCKET_URL, {
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 2000,
-        timeout: 30000,
-        autoConnect: true,
-        transports: ['websocket', 'polling'],
-        pingTimeout: 30000,
-        pingInterval: 10000,
-        auth: token ? { token } : undefined,
-      });
-      setSocket(newSocket);
+    // Connect immediately, don't wait for backend wakeup
+    const token = getToken();
+    if (socket) {
+      socket.disconnect();
+    }
+    newSocket = io(SOCKET_URL, {
+      reconnection: true,
+      reconnectionAttempts: 20, // More attempts for reliability
+      reconnectionDelay: 1000,  // Try every 1s for faster recovery
+      timeout: 10000,           // Fail fast if can't connect in 10s
+      autoConnect: true,
+      transports: ['websocket', 'polling'],
+      pingTimeout: 15000,       // Faster detection of dead connection
+      pingInterval: 7000,       // Ping more frequently
+      auth: token ? { token } : undefined,
+    });
+    setSocket(newSocket);
 
-      newSocket.on('connect', () => {
-        console.log('Connected to server socket:', newSocket.id);
-        setConnected(true);
-      });
+    newSocket.on('connect', () => {
+      console.log('Connected to server socket:', newSocket.id);
+      setConnected(true);
+    });
 
-      newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error.message);
-        setConnected(false);
-      });
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
+      setConnected(false);
+    });
 
-      newSocket.on('disconnect', (reason) => {
-        console.log('Disconnected from server socket. Reason:', reason);
-        setConnected(false);
-      });
+    newSocket.on('disconnect', (reason) => {
+      console.log('Disconnected from server socket. Reason:', reason);
+      setConnected(false);
+    });
 
-      newSocket.on('reconnect', (attemptNumber) => {
-        console.log(`Reconnected to server socket after ${attemptNumber} attempts`);
-        setConnected(true);
-        triggerRefresh();
-      });
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log(`Reconnected to server socket after ${attemptNumber} attempts`);
+      setConnected(true);
+      triggerRefresh();
+    });
 
-      newSocket.on('reconnect_attempt', (attemptNumber) => {
-        console.log(`Attempting to reconnect: attempt #${attemptNumber}`);
-      });
+    newSocket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`Attempting to reconnect: attempt #${attemptNumber}`);
+    });
 
-      newSocket.on('order-update', (data) => {
-        console.log('Received order update:', data.type);
-        triggerRefresh();
-      });
-    })();
+    newSocket.on('order-update', (data) => {
+      console.log('Received order update:', data.type);
+      triggerRefresh();
+    });
+
+    // Wake up backend in background (doesn't block socket connect)
+    wakeUpBackend();
+
     return () => {
       isMounted = false;
       if (newSocket) {
