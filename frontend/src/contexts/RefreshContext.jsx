@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
+import { useAuth } from './AuthContext';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const SOCKET_URL = 'https://masala-madness.onrender.com'; // Backend WebSocket endpoint
@@ -18,18 +19,29 @@ async function wakeUpBackend() {
 }
 
 export const RefreshProvider = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  // Helper to get the latest token
+  const getToken = () =>
+    sessionStorage.getItem('token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('deviceToken');
+
   const [refresh, setRefresh] = useState(0);
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
 
-  // Initialize Socket.IO connection
+  // Re-initialize Socket.IO connection on auth/token change
   useEffect(() => {
     let isMounted = true;
+    let newSocket;
     (async () => {
-      await wakeUpBackend(); // Wake up backend before connecting
+      await wakeUpBackend();
       if (!isMounted) return;
-      // Configure socket with increased timeouts and reconnection settings
-      const newSocket = io(SOCKET_URL, {
+      const token = getToken();
+      if (socket) {
+        socket.disconnect();
+      }
+      newSocket = io(SOCKET_URL, {
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 2000,
@@ -37,11 +49,11 @@ export const RefreshProvider = ({ children }) => {
         autoConnect: true,
         transports: ['websocket', 'polling'],
         pingTimeout: 30000,
-        pingInterval: 10000
+        pingInterval: 10000,
+        auth: token ? { token } : undefined,
       });
       setSocket(newSocket);
 
-      // Socket.IO event listeners
       newSocket.on('connect', () => {
         console.log('Connected to server socket:', newSocket.id);
         setConnected(true);
@@ -60,7 +72,6 @@ export const RefreshProvider = ({ children }) => {
       newSocket.on('reconnect', (attemptNumber) => {
         console.log(`Reconnected to server socket after ${attemptNumber} attempts`);
         setConnected(true);
-        // Trigger refresh on reconnect to ensure data is current
         triggerRefresh();
       });
 
@@ -70,16 +81,17 @@ export const RefreshProvider = ({ children }) => {
 
       newSocket.on('order-update', (data) => {
         console.log('Received order update:', data.type);
-        triggerRefresh(); // Trigger refresh when any order update is received
+        triggerRefresh();
       });
     })();
     return () => {
       isMounted = false;
-      if (socket) {
-        socket.disconnect();
+      if (newSocket) {
+        newSocket.disconnect();
       }
     };
-  }, []);
+    // Re-run when authentication or token changes
+  }, [isAuthenticated, loading, getToken()]);
 
   // Function to manually trigger a refresh
   const triggerRefresh = () => {
