@@ -647,4 +647,52 @@ router.post('/check-active', async (req, res) => {
   return res.json({ active: user.isActive });
 });
 
+// Refresh JWT using deviceToken
+router.post('/refresh-token', async (req, res) => {
+  try {
+    const { deviceToken } = req.body;
+    if (!deviceToken) {
+      return res.status(400).json({ message: 'Device token is required.' });
+    }
+    // Find user with this deviceToken
+    const user = await User.findOne({ 'devices.deviceId': deviceToken });
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid device token.' });
+    }
+    // Find the device
+    const device = user.devices.find(d => d.deviceId === deviceToken);
+    if (!device || !device.isActive) {
+      return res.status(403).json({ message: 'Device is not active.' });
+    }
+    // Check if device token is expired
+    if (device.expiresAt && device.expiresAt < new Date()) {
+      return res.status(403).json({ message: 'Device token expired.' });
+    }
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(403).json({ message: 'User account is disabled.' });
+    }
+    // Update lastLogin
+    device.lastLogin = getISTDate();
+    await user.save();
+    // Issue new JWT
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        role: user.role
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    res.json({
+      token,
+      user: user.getPublicProfile(),
+      deviceToken: device.deviceId
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router; 

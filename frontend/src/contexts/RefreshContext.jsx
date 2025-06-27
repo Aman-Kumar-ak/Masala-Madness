@@ -9,18 +9,39 @@ const RefreshContext = createContext();
 
 export const useRefresh = () => useContext(RefreshContext);
 
-// Helper to wake up backend before connecting socket
-async function wakeUpBackend() {
+// Helper to wake up backend before connecting socket, with timeout
+async function wakeUpBackendWithTimeout(timeoutMs = 2000) {
+  return Promise.race([
+    fetch('https://masala-madness.onrender.com/api/ping', { cache: 'no-store' }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Backend wakeup timeout')), timeoutMs))
+  ]);
+}
+
+// Helper to refresh token using deviceToken
+async function refreshTokenWithDeviceToken() {
+  const deviceToken = localStorage.getItem('deviceToken');
+  if (!deviceToken) return null;
   try {
-    await fetch('https://masala-madness.onrender.com/api/ping', { cache: 'no-store' });
-  } catch (err) {
-    // Ignore errors, just try to wake up
+    const res = await fetch('https://masala-madness.onrender.com/api/auth/refresh-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceToken })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.token) {
+      sessionStorage.setItem('token', data.token);
+      localStorage.setItem('token', data.token);
+      return data.token;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
 export const RefreshProvider = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-  // Helper to get the latest token
   const getToken = () =>
     sessionStorage.getItem('token') ||
     localStorage.getItem('token') ||
@@ -30,71 +51,101 @@ export const RefreshProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
 
-  // Re-initialize Socket.IO connection on auth/token change
   useEffect(() => {
     let isMounted = true;
     let newSocket;
-    // Connect immediately, don't wait for backend wakeup
-    const token = getToken();
-    if (socket) {
-      socket.disconnect();
-    }
-    newSocket = io(SOCKET_URL, {
-      reconnection: true,
-      reconnectionAttempts: 20, // More attempts for reliability
-      reconnectionDelay: 1000,  // Try every 1s for faster recovery
-      timeout: 10000,           // Fail fast if can't connect in 10s
-      autoConnect: true,
-      transports: ['websocket', 'polling'],
-      pingTimeout: 15000,       // Faster detection of dead connection
-      pingInterval: 7000,       // Ping more frequently
-      auth: token ? { token } : undefined,
-    });
-    setSocket(newSocket);
+    let connectionTimeout;
+    let socketConnectResolved = false;
 
-    newSocket.on('connect', () => {
-      console.log('Connected to server socket:', newSocket.id);
-      setConnected(true);
-    });
-
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error.message);
-      setConnected(false);
-    });
-
-    newSocket.on('disconnect', (reason) => {
-      console.log('Disconnected from server socket. Reason:', reason);
-      setConnected(false);
-    });
-
-    newSocket.on('reconnect', (attemptNumber) => {
-      console.log(`Reconnected to server socket after ${attemptNumber} attempts`);
-      setConnected(true);
-      triggerRefresh();
-    });
-
-    newSocket.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`Attempting to reconnect: attempt #${attemptNumber}`);
-    });
-
-    newSocket.on('order-update', (data) => {
-      console.log('Received order update:', data.type);
-      triggerRefresh();
-    });
-
-    // Wake up backend in background (doesn't block socket connect)
-    wakeUpBackend();
-
-    return () => {
-      isMounted = false;
-      if (newSocket) {
-        newSocket.disconnect();
+    async function connectSocketWithFastRecovery() {
+      // 1. Wake up backend (max 2s)
+      try {
+        await wakeUpBackendWithTimeout(2000);
+      } catch (e) {
+        // Backend may still be waking, proceed anyway
       }
+      // 2. Try to connect socket with current token
+      let token = getToken();
+      let triedRefresh = false;
+      let startTime = Date.now();
+      let maxTotalTime = 10000; // 10s max
+      let socketConnectPromise;
+      function createSocket(tokenToUse) {
+        if (newSocket) newSocket.disconnect();
+        return io(SOCKET_URL, {
+          reconnection: false,
+          timeout: Math.max(1000, maxTotalTime - (Date.now() - startTime)),
+          autoConnect: true,
+          transports: ['websocket', 'polling'],
+          pingTimeout: 8000,
+          pingInterval: 4000,
+          auth: tokenToUse ? { token: tokenToUse } : undefined,
+        });
+      }
+      async function tryConnect(tokenToUse) {
+        return new Promise((resolve, reject) => {
+          const s = createSocket(tokenToUse);
+          let resolved = false;
+          s.on('connect', () => {
+            if (!resolved) {
+              resolved = true;
+              resolve(s);
+            }
+          });
+          s.on('connect_error', async (error) => {
+            if (!resolved) {
+              resolved = true;
+              s.disconnect();
+              reject(error);
+            }
+          });
+        });
+      }
+      // Try with current token
+      try {
+        newSocket = await tryConnect(token);
+        socketConnectResolved = true;
+      } catch (err) {
+        // If auth error and not yet tried refresh, try refresh
+        if (!triedRefresh && err && err.message && err.message.toLowerCase().includes('authentication')) {
+          triedRefresh = true;
+          token = await refreshTokenWithDeviceToken();
+          if (token) {
+            try {
+              newSocket = await tryConnect(token);
+              socketConnectResolved = true;
+            } catch (err2) {
+              // Final fail
+            }
+          }
+        }
+      }
+      // If still not connected, show error
+      if (!socketConnectResolved) {
+        setConnected(false);
+        setSocket(null);
+        return;
+      }
+      setSocket(newSocket);
+      setConnected(true);
+      // Attach listeners
+      newSocket.on('disconnect', (reason) => {
+        setConnected(false);
+      });
+      newSocket.on('order-update', (data) => {
+        triggerRefresh();
+      });
+      newSocket.on('reconnect', () => {
+        setConnected(true);
+        triggerRefresh();
+      });
+    }
+    connectSocketWithFastRecovery();
+    return () => {
+      if (newSocket) newSocket.disconnect();
     };
-    // Re-run when authentication or token changes
   }, [isAuthenticated, loading, getToken()]);
 
-  // Function to manually trigger a refresh
   const triggerRefresh = () => {
     setRefresh(prev => prev + 1);
   };
