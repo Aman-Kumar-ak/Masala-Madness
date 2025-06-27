@@ -629,4 +629,22 @@ router.put('/secret-code/change', adminAuth, async (req, res) => {
   }
 });
 
+// Check if user is active by username or mobile number
+router.post('/check-active', async (req, res) => {
+  const { username, mobileNumber } = req.body;
+  if (!username && !mobileNumber) {
+    return res.status(400).json({ active: false, message: 'No identifier provided' });
+  }
+  const user = await User.findOne({
+    $or: [
+      { username: username },
+      { mobileNumber: mobileNumber }
+    ]
+  });
+  if (!user) {
+    return res.status(404).json({ active: false, message: 'User not found' });
+  }
+  return res.json({ active: user.isActive });
+});
+
 module.exports = router; 

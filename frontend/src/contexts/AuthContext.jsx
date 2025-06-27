@@ -436,6 +436,66 @@ export const AuthProvider = ({ children }) => {
     };
   }, [socket]);
   
+  // Add a fast, robust session restoration and user active check logic
+  useEffect(() => {
+    console.log('Session restoration: Checking session or database on page load.');
+    let intervalId;
+    let attempts = 0;
+    const maxAttempts = 3; // Try for 3 seconds
+    if (!isAuthenticated && !loading) {
+      intervalId = setInterval(async () => {
+        attempts++;
+        // Try to restore session as usual
+        let restored = false;
+        try {
+          await restoreSession();
+          if (sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('deviceToken')) {
+            setIsAuthenticated(true);
+            setLoading(false);
+            restored = true;
+            console.log('Session restoration: Session restored from token/session.');
+          }
+        } catch {}
+        if (!restored) {
+          // If not restored, check if user is still active
+          let identifier = null;
+          try {
+            const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+            if (userStr) {
+              const userObj = JSON.parse(userStr);
+              identifier = userObj.username || userObj.mobileNumber;
+            }
+          } catch {}
+          if (identifier) {
+            try {
+              const res = await api.post('/auth/check-active', { username: identifier });
+              if (res.active) {
+                setIsAuthenticated(false);
+                setLoading(false);
+                console.log('Session restoration: Connection established with database (user is active).');
+              } else {
+                logoutUser();
+                setIsAuthenticated(false);
+                setLoading(false);
+                showError('Your account has been disabled by the administrator.');
+                navigate('/login');
+                console.log('Session restoration: User is not active, forced logout.');
+              }
+            } catch {}
+          } else {
+            console.log('Session restoration: No identifier found for database check.');
+          }
+        }
+        if (restored || attempts >= maxAttempts) {
+          clearInterval(intervalId);
+        }
+      }, 1000); // 1 second interval for fast check
+    } else if (isAuthenticated) {
+      console.log('Session restoration: User is already authenticated.');
+    }
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, loading]);
+  
   // Provide auth data and functions to components
   const authContextValue = {
     isAuthenticated,
