@@ -201,10 +201,12 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       try {
         if (!checkSessionExpiry()) {
-          logoutUser();
-          setIsAuthenticated(false);
-          setLoading(false);
-          navigate('/login');
+          if (!window.__isPasswordDialogOpen) {
+            logoutUser();
+            setIsAuthenticated(false);
+            setLoading(false);
+            navigate('/login');
+          }
           return;
         }
         const jwtVerified = sessionStorage.getItem('jwtVerified');
@@ -216,10 +218,12 @@ export const AuthProvider = ({ children }) => {
             setIsAuthenticated(true);
             updateLastActivityTime();
           } else {
-            logoutUser();
-            setIsAuthenticated(false);
-            setLoading(false);
-            navigate('/login');
+            if (!window.__isPasswordDialogOpen) {
+              logoutUser();
+              setIsAuthenticated(false);
+              setLoading(false);
+              navigate('/login');
+            }
           }
           return;
         }
@@ -234,25 +238,31 @@ export const AuthProvider = ({ children }) => {
               sessionStorage.setItem('jwtVerified', 'true');
               sessionStorage.setItem('user', JSON.stringify(data.user));
             } else {
+              if (!window.__isPasswordDialogOpen) {
+                logoutUser();
+                setIsAuthenticated(false);
+                setLoading(false);
+                navigate('/login');
+              }
+            }
+          } catch (jwtError) {
+            if (!window.__isPasswordDialogOpen) {
               logoutUser();
               setIsAuthenticated(false);
               setLoading(false);
               navigate('/login');
             }
-          } catch (jwtError) {
-            logoutUser();
-            setIsAuthenticated(false);
-            setLoading(false);
-            navigate('/login');
           }
         } else {
           await restoreSession();
         }
       } catch (error) {
-        logoutUser();
-        setIsAuthenticated(false);
-        setLoading(false);
-        navigate('/login');
+        if (!window.__isPasswordDialogOpen) {
+          logoutUser();
+          setIsAuthenticated(false);
+          setLoading(false);
+          navigate('/login');
+        }
       } finally {
         setLoading(false);
       }
@@ -267,8 +277,10 @@ export const AuthProvider = ({ children }) => {
     }
     const sessionCheckInterval = setInterval(() => {
       if (isAuthenticated && !checkSessionExpiry()) {
-        logoutUser();
-        navigate('/login');
+        if (!window.__isPasswordDialogOpen) {
+          logoutUser();
+          navigate('/login');
+        }
       }
     }, 60000);
     return () => {

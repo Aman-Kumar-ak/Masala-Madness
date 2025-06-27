@@ -37,40 +37,42 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
   
   const handleVerify = async (e) => {
     e.preventDefault();
-    
+
     if (!password.trim()) {
       setError('Please enter the password');
+      setIsVerifying(false);
       return;
     }
-    
+
     setIsVerifying(true);
     setError('');
-    
+
     try {
-      let token = sessionStorage.getItem('token');
-      
-      if (!token) {
-        // Try device token if session token is not available
-        token = localStorage.getItem('deviceToken');
-        if (!token && verificationType === "personalPassword") {
-          console.log('No session token found, attempting mini-login for verification...');
-          if (!username) {
-            setError('User data missing. Cannot proceed with verification.');
-            setIsVerifying(false);
-            return;
-          }
-          // Use api utility for login
-          const loginData = await api.post('/auth/login', { username, password, rememberDevice: false });
-          if (!loginData || !loginData.token) {
-            setError('Incorrect password. Please try again.');
-            setIsVerifying(false);
-            return;
-          }
-          token = loginData.token;
-          console.log('Mini-login successful, proceeding with verification using new token.');
+      let token = null;
+      if (verificationType === "personalPassword") {
+        // Always do a mini-login for password verification
+        if (!username) {
+          setError('User data missing. Cannot proceed with verification.');
+          setIsVerifying(false);
+          return;
         }
+        const loginData = await api.post('/auth/login', { username, password, rememberDevice: false });
+        if (!loginData || !loginData.token) {
+          setError('Incorrect password. Please try again.');
+          setIsVerifying(false);
+          return;
+        }
+        token = loginData.token;
+        // Optionally update sessionStorage/localStorage here
+        sessionStorage.setItem('token', token);
+        if (loginData.deviceToken) {
+          localStorage.setItem('deviceToken', loginData.deviceToken);
+        }
+      } else {
+        // For secret code, use the current session token or device token
+        token = sessionStorage.getItem('token') || localStorage.getItem('deviceToken');
       }
-      
+
       let apiUrl, bodyData;
       if (verificationType === "secretCode") {
         apiUrl = '/auth/secret-code/verify';
@@ -115,15 +117,16 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
         
         setPassword('');
         setError('');
+        setIsVerifying(false);
         onSuccess();
       } else {
         console.error(`${verificationType} verification failed:`, data.message);
         setError(data.message || `Incorrect ${verificationType === "secretCode" ? "secret code" : "password"}. Please try again.`);
+        setIsVerifying(false);
       }
     } catch (error) {
       console.error(`${verificationType} verification process failed:`, error);
       setError(`Failed to verify ${verificationType === "secretCode" ? "secret code" : "password"}. Please try again.`);
-    } finally {
       setIsVerifying(false);
     }
   };
@@ -154,6 +157,18 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
     }
     return () => {
       document.body.classList.remove('no-scroll'); // Cleanup on unmount
+    };
+  }, [isOpen]);
+  
+  // Track open/close state on the global window object
+  useEffect(() => {
+    if (isOpen) {
+      window.__isPasswordDialogOpen = true;
+    } else {
+      window.__isPasswordDialogOpen = false;
+    }
+    return () => {
+      window.__isPasswordDialogOpen = false;
     };
   }, [isOpen]);
   
@@ -264,4 +279,4 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
   );
 };
 
-export default PasswordVerificationDialog; 
+export default PasswordVerificationDialog;
