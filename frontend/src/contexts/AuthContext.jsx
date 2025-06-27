@@ -294,7 +294,7 @@ export const AuthProvider = ({ children }) => {
       const body = { username, password, rememberDevice };
       if (deviceToken) body.deviceToken = deviceToken;
       // Use api utility for login
-      const data = await api.post('/auth/login', body, false);
+      const data = await api.post('/auth/login', body, false, true);
       if (data && data.token) {
         setUser(data.user);
         setIsAuthenticated(true);

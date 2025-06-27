@@ -403,7 +403,7 @@ export default function Qr() {
           lockoutMs={lockoutMs}
           lockoutMessage={lockoutMessage}
           lockoutTimer={lockoutTimer}
-          infoText="Once verified, you'll have access for 15 minutes. 3 failed attempts will lock you out for 30 minutes."
+          infoText="Once verified, you'll have access for 15 minutes."
         />
       )}
 

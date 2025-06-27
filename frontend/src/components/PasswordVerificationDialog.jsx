@@ -50,26 +50,32 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
     try {
       let token = null;
       if (verificationType === "personalPassword") {
-        // Always do a mini-login for password verification
         if (!username) {
           setError('User data missing. Cannot proceed with verification.');
           setIsVerifying(false);
           return;
         }
-        const loginData = await api.post('/auth/login', { username, password, rememberDevice: false });
+        let loginData;
+        try {
+          loginData = await api.post('/auth/login', { username, password, rememberDevice: false }, true, true);
+        } catch (error) {
+          if (error.status === 401 && error.data && error.data.message === 'Invalid credentials') {
+            setError('Incorrect password. Please try again.');
+          } else if (error.status === 500) {
+            setError('A server error occurred. Please try again later.');
+          } else {
+            setError(error.data?.message || 'An unexpected error occurred. Please try again.');
+          }
+          setIsVerifying(false);
+          return;
+        }
         if (!loginData || !loginData.token) {
           setError('Incorrect password. Please try again.');
           setIsVerifying(false);
           return;
         }
         token = loginData.token;
-        // Optionally update sessionStorage/localStorage here
-        sessionStorage.setItem('token', token);
-        if (loginData.deviceToken) {
-          localStorage.setItem('deviceToken', loginData.deviceToken);
-        }
       } else {
-        // For secret code, use the current session token or device token
         token = sessionStorage.getItem('token') || localStorage.getItem('deviceToken');
       }
 
@@ -89,24 +95,33 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
         bodyData = { password: password };
       }
 
-      console.log(`Attempting to verify ${verificationType}...`);
-      // Use api utility for verification
-      const data = await api.post(apiUrl, bodyData, true, false, token);
-      
-      if (data.message.includes('successfully')) {
-        // Store new session token if present
+      let data;
+      try {
+        data = await api.post(apiUrl, bodyData, true, true, token);
+      } catch (error) {
+        if (error.status === 401 && error.data && error.data.message && error.data.message.includes('Incorrect secret code')) {
+          setError('Incorrect secret code. Please try again.');
+        } else if (error.status === 423 && error.data && error.data.status === 'locked') {
+          setError(error.data.message || 'Too many failed attempts. Please try again later.');
+        } else if (error.status === 500) {
+          setError('A server error occurred. Please try again later.');
+        } else {
+          setError(error.data?.message || 'An unexpected error occurred. Please try again.');
+        }
+        setIsVerifying(false);
+        return;
+      }
+
+      if (data && data.message && data.message.includes('successfully')) {
+        // Only update sessionStorage/localStorage on success
         if (data.token) {
           sessionStorage.setItem('token', data.token);
         }
-        // If device token is present in response, update it
         if (data.deviceToken) {
           localStorage.setItem('deviceToken', data.deviceToken);
         }
-        console.log(`${verificationType} successfully verified.`);
-        
-        // Set the verification timestamp in localStorage with 10-minute expiry for QR/Settings access
         if (verificationType === "secretCode") {
-          const expiryTime = new Date().getTime() + (10 * 60 * 1000); // Current time + 10 minutes
+          const expiryTime = new Date().getTime() + (10 * 60 * 1000);
           localStorage.setItem('qr_verification_expiry', expiryTime.toString());
           if (usedWhere === 'QR Access') {
             localStorage.setItem('qr_unlock_expiry', expiryTime.toString());
@@ -114,19 +129,16 @@ const PasswordVerificationDialog = ({ isOpen, onClose, onSuccess, verificationTy
             localStorage.setItem('admin_unlock_expiry', expiryTime.toString());
           }
         }
-        
         setPassword('');
         setError('');
         setIsVerifying(false);
         onSuccess();
       } else {
-        console.error(`${verificationType} verification failed:`, data.message);
-        setError(data.message || `Incorrect ${verificationType === "secretCode" ? "secret code" : "password"}. Please try again.`);
+        setError((data && data.message) || `Incorrect ${verificationType === "secretCode" ? "secret code" : "password"}. Please try again.`);
         setIsVerifying(false);
       }
     } catch (error) {
-      console.error(`${verificationType} verification process failed:`, error);
-      setError(`Failed to verify ${verificationType === "secretCode" ? "secret code" : "password"}. Please try again.`);
+      setError('An unexpected error occurred. Please try again.');
       setIsVerifying(false);
     }
   };

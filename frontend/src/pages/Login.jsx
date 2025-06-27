@@ -82,6 +82,7 @@ const Login = () => {
     // Basic validation
     if (!username.trim() || !password.trim()) {
       setError('Please enter both username and password');
+      setShowForm(true); // Always keep the form open on error
       return;
     }
     
@@ -90,7 +91,8 @@ const Login = () => {
     
     try {
       const deviceToken = rememberDevice ? localStorage.getItem('deviceToken') : null;
-      const result = await login(username, password, rememberDevice, deviceToken);
+      // Use suppressAuthRedirect=true for login
+      const result = await login(username, password, rememberDevice, deviceToken, true);
       
       if (result.success) {
         if (result.deviceToken && rememberDevice) {
@@ -119,10 +121,12 @@ const Login = () => {
         if (result.message.includes('credentials') || result.message.includes('not found')) {
           setShowRecovery(true);
         }
+        setShowForm(true); // Always keep the form open on error
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
       setShowRecovery(true);
+      setShowForm(true); // Always keep the form open on error
     } finally {
       setIsLoading(false);
     }
@@ -521,7 +525,7 @@ const Login = () => {
                           className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
                           placeholder="Enter your username"
                           value={username}
-                          onChange={(e) => setUsername(e.target.value)}
+                          onChange={(e) => { setUsername(e.target.value); setError(''); }}
                           disabled={isLoading}
                           autoComplete="off"
                           autoCorrect="off"
@@ -542,10 +546,10 @@ const Login = () => {
                           name="password"
                           type={showPassword ? "text" : "password"}
                           required
-                          className="appearance-none block w-full pl-8 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
+                          className="appearance-none block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
                           placeholder="Enter your password"
                           value={password}
-                          onChange={(e) => setPassword(e.target.value)}
+                          onChange={(e) => { setPassword(e.target.value); setError(''); }}
                           disabled={isLoading}
                           autoComplete="new-password"
                         />
