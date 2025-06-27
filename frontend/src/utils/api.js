@@ -9,7 +9,7 @@ const getHeaders = (includeAuth = true, tokenOverride = null) => {
   const headers = {
     'Content-Type': 'application/json'
   };
-  
+ 
   if (includeAuth) {
     const token = tokenOverride || getToken();
     if (token) {
