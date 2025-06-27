@@ -2,6 +2,8 @@ import React, { createContext, useState, useEffect, useContext, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import OfflinePage from '../components/OfflinePage';
+import { io } from 'socket.io-client';
+import { useNotification } from '../components/NotificationContext';
 
 const AuthContext = createContext();
 
@@ -18,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthOperationInProgress, setIsAuthOperationInProgress] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const navigate = useNavigate();
+  const { showError } = useNotification();
   
   // Functions to manage auth operation in progress state
   const setAuthOperationInProgress = useCallback(() => {
@@ -214,6 +217,19 @@ export const AuthProvider = ({ children }) => {
           const userData = sessionStorage.getItem('user');
           if (userData) {
             const parsedUser = JSON.parse(userData);
+            if (parsedUser.isActive === false) {
+              // User is disabled, force logout and notify
+              logoutUser();
+              setIsAuthenticated(false);
+              setLoading(false);
+              if (window.showError) {
+                window.showError('Your account has been disabled by the administrator.');
+              } else if (typeof window !== 'undefined') {
+                alert('Your account has been disabled by the administrator.');
+              }
+              navigate('/login');
+              return;
+            }
             setUser(parsedUser);
             setIsAuthenticated(true);
             updateLastActivityTime();
@@ -232,6 +248,19 @@ export const AuthProvider = ({ children }) => {
           try {
             const data = await api.get('/auth/verify');
             if (data.user) {
+              if (data.user.isActive === false) {
+                // User is disabled, force logout and notify
+                logoutUser();
+                setIsAuthenticated(false);
+                setLoading(false);
+                if (window.showError) {
+                  window.showError('Your account has been disabled by the administrator.');
+                } else if (typeof window !== 'undefined') {
+                  alert('Your account has been disabled by the administrator.');
+                }
+                navigate('/login');
+                return;
+              }
               setUser(data.user);
               setIsAuthenticated(true);
               updateLastActivityTime();
@@ -378,6 +407,34 @@ export const AuthProvider = ({ children }) => {
       }
     }
   }, []);
+  
+  // Socket.io connection for real-time force logout
+  const [socket] = useState(() => io('https://masala-madness.onrender.com'));
+
+  // Register userId with socket on login
+  useEffect(() => {
+    if (user && user._id) {
+      socket.emit('register', user._id);
+    }
+  }, [user, socket]);
+
+  // Listen for force-logout event
+  useEffect(() => {
+    socket.on('force-logout', (data) => {
+      logoutUser();
+      setIsAuthenticated(false);
+      setLoading(false);
+      if (showError) {
+        showError('Your account has been disabled by the administrator.');
+      } else {
+        alert('Your account has been disabled by the administrator.');
+      }
+      navigate('/login');
+    });
+    return () => {
+      socket.off('force-logout');
+    };
+  }, [socket]);
   
   // Provide auth data and functions to components
   const authContextValue = {

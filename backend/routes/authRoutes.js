@@ -366,6 +366,16 @@ router.put('/users/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // If user was just disabled, emit force-logout via socket.io
+    if (typeof isActive === 'boolean' && isActive === false && user) {
+      const io = req.app.get('io');
+      const userSockets = req.app.get('userSockets');
+      const socketId = userSockets.get(user._id.toString());
+      if (socketId) {
+        io.to(socketId).emit('force-logout', { reason: 'disabled' });
+      }
+    }
+
     res.json({
       message: 'User updated successfully',
       user

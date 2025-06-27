@@ -32,8 +32,12 @@ const io = new Server(server, {
   pingInterval: 10000 // 10 seconds
 });
 
+// User <-> socket mapping for force logout
+const userSockets = new Map();
+
 // Make io available in routes
 app.set('io', io);
+app.set('userSockets', userSockets);
 
 // Always allow the Vercel frontend, .env FRONTEND_URL, and localhost for CORS
 const allowedOrigins = [
@@ -78,8 +82,16 @@ app.get('/api/ping', (req, res) => {
 
 // Socket.IO events
 io.on('connection', (socket) => {
+  socket.on('register', (userId) => {
+    if (userId) userSockets.set(userId, socket.id);
+  });
   socket.on('disconnect', () => {
-    // Removed noisy log: console.log('User disconnected:', socket.id);
+    for (const [userId, sockId] of userSockets.entries()) {
+      if (sockId === socket.id) {
+        userSockets.delete(userId);
+        break;
+      }
+    }
   });
 });
 
