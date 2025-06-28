@@ -507,7 +507,9 @@ export const AuthProvider = ({ children }) => {
     revokeDevice,
     setAuthOperationInProgress,
     clearAuthOperationInProgress,
-    restoreSession
+    restoreSession,
+    setUser,
+    setIsAuthenticated
   };
   
   return (
