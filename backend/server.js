@@ -95,6 +95,14 @@ io.on('connection', (socket) => {
   });
 });
 
+// CORS error handler (must be after all app.use and routes)
+app.use((err, req, res, next) => {
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS error: This origin is not allowed.' });
+  }
+  next(err);
+});
+
 // Database Connection and Server Start
 mongoose
   .connect(process.env.MONGO_URI)

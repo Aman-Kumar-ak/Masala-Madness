@@ -264,11 +264,21 @@ const Login = () => {
         setIsQuickLoginLoading(false);
       }
     } catch (err) {
-      setQuickLoginError('Session expired. Please log in again.');
-      removeAccount(account.username);
-      const updated = getSavedAccounts();
-      setSavedAccounts(updated);
-      if (updated.length === 0) setShowAccountList(false);
+      // Handle disabled account (403 or error message)
+      if ((err?.response?.status === 403) || (err?.message && err.message.toLowerCase().includes('disabled'))) {
+        setQuickLoginError('Your account is disabled. Please contact the administrator.');
+        if (typeof showError === 'function') showError('Your account is disabled. Please contact the administrator.');
+        removeAccount(account.username);
+        const updated = getSavedAccounts();
+        setSavedAccounts(updated);
+        if (updated.length === 0) setShowAccountList(false);
+      } else {
+        setQuickLoginError('Session expired. Please log in again.');
+        removeAccount(account.username);
+        const updated = getSavedAccounts();
+        setSavedAccounts(updated);
+        if (updated.length === 0) setShowAccountList(false);
+      }
       window.removeEventListener('beforeunload', blockRefresh);
       window.removeEventListener('keydown', blockF5);
       setIsQuickLoginLoading(false);
