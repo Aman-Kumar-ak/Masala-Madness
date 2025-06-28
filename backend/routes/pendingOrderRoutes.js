@@ -40,7 +40,6 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const pendingOrders = await PendingOrder.find().sort({ createdAt: -1 }).lean();
-    console.log('Fetched pending orders:', pendingOrders.map(order => order.orderId));
     res.status(200).json(pendingOrders);
   } catch (error) {
     console.error("Fetch pending orders error:", error);

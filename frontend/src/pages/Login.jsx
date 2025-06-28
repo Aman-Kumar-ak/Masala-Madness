@@ -54,6 +54,10 @@ const Login = () => {
   const [quickLoginError, setQuickLoginError] = useState('');
   const [forceShowForm, setForceShowForm] = useState(false);
   
+  // Add state at the top of the component:
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [accountToRemove, setAccountToRemove] = useState(null);
+  
   // Initial check for tokens to prevent login page flash
   useEffect(() => {
     const checkForExistingTokens = async () => {
@@ -309,34 +313,54 @@ const Login = () => {
       </div>
       
       {showAccountList ? (
-        <div className="w-full max-w-md p-8 space-y-8 z-10">
-          <h2 className="text-xl font-bold mb-4 text-center">Select an account</h2>
-          <div className="space-y-2">
+        <div className="w-full max-w-md p-8 space-y-8 z-10 relative">
+          {/* Decorative background for account selection */}
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-orange-100 via-yellow-50 to-red-50 opacity-80 blur-sm -z-10"></div>
+          {/* Logo and tagline */}
+          <div className="flex flex-col items-center mb-4">
+            <div className="relative bg-white p-2 rounded-full shadow-xl border-4 border-orange-200 mb-2" style={{ boxShadow: '0 8px 32px 0 rgba(251, 113, 32, 0.15)' }}>
+              <img 
+                src="/images/m_logo.png" 
+                alt="Masala Madness Logo" 
+                className="w-20 h-20 object-contain rounded-full animate-pulse"
+                style={{ filter: "drop-shadow(0 6px 16px rgba(251, 113, 32, 0.25))" }}
+              />
+            </div>
+            <div className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-500 mb-1">Masala Madness</div>
+            <div className="text-xs text-orange-600 font-semibold tracking-wide mb-2">Quick Account Login</div>
+          </div>
+          <h2 className="text-lg font-bold mb-4 text-center text-orange-700 flex items-center justify-center gap-2">
+            <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 01-8 0" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 14v7m0 0H9m3 0h3" /></svg>
+            Saved accounts  
+          </h2>
+          <div className="space-y-3">
             {savedAccounts.map(account => (
               <div
                 key={account.username}
-                className="flex items-center justify-between bg-white border rounded-lg px-4 py-3 cursor-pointer hover:bg-orange-50 transition"
+                className="flex items-center justify-between bg-white border rounded-xl px-5 py-4 shadow-lg cursor-pointer hover:bg-orange-100 hover:shadow-xl transition group relative overflow-hidden"
                 onClick={() => handleQuickLogin(account)}
+                style={{ position: 'relative' }}
               >
-                <span className="font-medium text-gray-800">{account.username}</span>
+                {/* Username only, no avatar/circle */}
+                <span className="font-semibold text-gray-800 text-base tracking-wide group-hover:text-orange-600 transition">{account.username}</span>
+                {/* Delete button with tooltip */}
                 <button
-                  className="text-red-500 hover:text-red-700"
                   onClick={e => {
                     e.stopPropagation();
-                    removeAccount(account.username);
-                    const updated = getSavedAccounts();
-                    setSavedAccounts(updated);
-                    if (updated.length === 0) {
-                      setShowAccountList(false);
-                      setForceShowForm(false); // reset to splash if no accounts left
-                    }
+                    setAccountToRemove(account.username);
+                    setShowRemoveDialog(true);
                   }}
                   aria-label="Delete account"
+                  tabIndex={0}
+                  type="button"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  {/* Trash can icon for remove */}
+                  <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h2a2 2 0 012 2v2" />
                   </svg>
                 </button>
+                {/* Ripple effect */}
+                <span className="absolute inset-0 rounded-xl bg-orange-100 opacity-0 group-active:opacity-30 transition duration-200 pointer-events-none"></span>
               </div>
             ))}
           </div>
@@ -344,13 +368,16 @@ const Login = () => {
             <div className="text-red-500 text-center mt-2">{quickLoginError}</div>
           )}
           <button
-            className="mt-6 w-full py-2 rounded-lg border border-orange-400 text-orange-600 hover:bg-orange-50 transition"
+            className="mt-6 w-full py-3 rounded-xl border-none text-white font-bold bg-gradient-to-r from-orange-500 to-red-500 shadow-lg hover:from-red-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden group"
+            style={{ boxShadow: '0 4px 16px 0 rgba(251, 113, 32, 0.15)' }}
             onClick={() => {
               setShowAccountList(false);
               setForceShowForm(true);
             }}
           >
+            <svg className="w-5 h-5 mr-2 text-white group-hover:scale-110 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
             Login with another account
+            <span className="absolute left-0 top-0 w-full h-full bg-white opacity-0 group-hover:opacity-10 transition duration-300 pointer-events-none"></span>
           </button>
         </div>
       ) : forceShowForm ? (
@@ -1151,6 +1178,29 @@ const Login = () => {
         message={disabledAccountMessage}
         confirmText="Ok, I understand"
         cancelText={null}
+      />
+
+      {/* Remove Account Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showRemoveDialog}
+        onClose={() => setShowRemoveDialog(false)}
+        onCancel={() => setShowRemoveDialog(false)}
+        onConfirm={() => {
+          removeAccount(accountToRemove);
+          const updated = getSavedAccounts();
+          setSavedAccounts(updated);
+          setShowRemoveDialog(false);
+          setAccountToRemove(null);
+          if (updated.length === 0) {
+            setShowAccountList(false);
+            setForceShowForm(false);
+          }
+        }}
+        title="Remove Saved Account?"
+        message={`Are you sure you want to remove the saved account${accountToRemove ? `: ${accountToRemove}` : ''}? This cannot be undone.`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        type="danger"
       />
     </div>
   );
