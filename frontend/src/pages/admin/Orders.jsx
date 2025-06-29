@@ -124,10 +124,9 @@ const Orders = () => {
       return;
     }
     const url = `${api.API_BASE_URL}/orders/excel/${selectedDate}`;
-    // Use a method more compatible with WebViews for triggering downloads
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `orders-${selectedDate}.xlsx`); // Optional: suggest a filename
+    link.setAttribute('download', `orders-${selectedDate}.xlsx`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -18,6 +18,7 @@ import WorkerSettings from './pages/worker/WorkerSettings';
 import WorkerOrders from './pages/worker/WorkerOrders';
 import WorkerPendingOrders from './pages/worker/WorkerPendingOrders';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Component to redirect based on authentication
 const RedirectBasedOnAuth = () => {
@@ -133,6 +134,7 @@ const App = () => {
           <OfflineDetector />
         </div>
         <Analytics />
+        <SpeedInsights />
       </NotificationProvider>
     </AuthProvider>
   );
