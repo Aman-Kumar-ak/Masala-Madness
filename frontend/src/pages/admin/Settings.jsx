@@ -524,6 +524,20 @@ const Settings = () => {
     e.preventDefault();
     setAddUserLoading(true);
     setUserError('');
+
+    // Mobile number validation: 10 digits only
+    if (!/^\d{10}$/.test(addUserForm.mobileNumber)) {
+      setUserError('Mobile number must be exactly 10 digits.');
+      setAddUserLoading(false);
+      return;
+    }
+    // Duplicate mobile number check
+    if (users.some(u => u.mobileNumber === addUserForm.mobileNumber)) {
+      setUserError('A user with this mobile number already exists.');
+      setAddUserLoading(false);
+      return;
+    }
+
     try {
       await api.post('/auth/register', addUserForm);
       showSuccess('User added successfully!');
@@ -562,6 +576,14 @@ const Settings = () => {
       }
     }
 
+    // Helper for edit form duplicate check
+    const isEditUserMobileDuplicate = () => {
+      return (
+        editUserForm.mobileNumber &&
+        users.some(u => u.mobileNumber === editUserForm.mobileNumber && u._id !== selectedUser?._id)
+      );
+    };
+
     setEditUserLoading(true);
     try {
       const updateData = { ...editUserForm };
@@ -569,6 +591,12 @@ const Settings = () => {
       // If password is provided, but no confirm password, it's an error on client side, should not happen with required field
       if (updateData.password && updateData.password !== confirmEditPassword) {
         setUserError('Passwords do not match. Please re-enter.');
+        setEditUserLoading(false);
+        return;
+      }
+      // In the Edit User Modal customContent, after the mobile number input:
+      if (editUserForm.mobileNumber && isEditUserMobileDuplicate()) {
+        setUserError('Mobile number already exists.');
         setEditUserLoading(false);
         return;
       }
@@ -996,6 +1024,30 @@ const Settings = () => {
     );
   }
 
+  // Add this helper function before the return in Settings
+  const isAddUserFormValid = () => {
+    return (
+      addUserForm.name.trim().length > 0 &&
+      /^\d{10}$/.test(addUserForm.mobileNumber) &&
+      !users.some(u => u.mobileNumber === addUserForm.mobileNumber) &&
+      addUserForm.password.length >= 8 &&
+      addUserForm.password === confirmAddUserPassword &&
+      addUserForm.role
+    );
+  };
+
+  // Helper for edit form validation
+  const isEditUserFormValid = () => {
+    return (
+      editUserForm.name.trim().length > 0 &&
+      /^\d{10}$/.test(editUserForm.mobileNumber) &&
+      !users.some(u => u.mobileNumber === editUserForm.mobileNumber && u._id !== selectedUser?._id) &&
+      (!editUserForm.password || editUserForm.password.length >= 8) &&
+      (editUserForm.password === confirmEditPassword) &&
+      editUserForm.role
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-900">
       <BackButton />
@@ -1180,7 +1232,23 @@ const Settings = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Mobile Number</label>
-                        <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.mobileNumber} onChange={e => setAddUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+                        <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.mobileNumber} 
+                          onChange={e => {
+                            // Only allow numbers and max 10 digits
+                            let value = e.target.value.replace(/[^0-9]/g, '');
+                            if (value.length > 10) value = value.slice(0, 10);
+                            setAddUserForm(f => ({ ...f, mobileNumber: value }));
+                          }}
+                          maxLength={10}
+                        />
+                        {/* Live validation for 10 digits */}
+                        {addUserForm.mobileNumber && addUserForm.mobileNumber.length !== 10 && (
+                          <p className="text-red-500 text-sm mt-1">Mobile number must be exactly 10 digits.</p>
+                        )}
+                        {/* Live validation for duplicate number */}
+                        {addUserForm.mobileNumber && users.some(u => u.mobileNumber === addUserForm.mobileNumber) && (
+                          <p className="text-red-500 text-sm mt-1">Mobile number already exists.</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Password</label>
@@ -1240,7 +1308,7 @@ const Settings = () => {
                         </select>
                       </div>
                       <div className="md:col-span-4 flex justify-end mt-2">
-                        <button type="submit" className="px-6 py-2 rounded bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition" disabled={addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
+                        <button type="submit" className={`px-6 py-2 rounded font-semibold shadow transition w-full md:w-auto ${isAddUserFormValid() && !addUserLoading ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-400 text-white cursor-not-allowed'}`} disabled={!isAddUserFormValid() || addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
                       </div>
                     </form>
                   </div>
@@ -1629,7 +1697,28 @@ const Settings = () => {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Mobile Number</label>
-              <input type="text" className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required value={editUserForm.mobileNumber} onChange={e => setEditUserForm(f => ({ ...f, mobileNumber: e.target.value }))} />
+              <input
+                type="text"
+                className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+                value={editUserForm.mobileNumber}
+                onChange={e => {
+                  // Only allow numbers and max 10 digits
+                  let value = e.target.value.replace(/[^0-9]/g, '');
+                  if (value.length > 10) value = value.slice(0, 10);
+                  setEditUserForm(f => ({ ...f, mobileNumber: value }));
+                }}
+                maxLength={10}
+              />
+              {/* Live validation for only numbers (handled by input) */}
+              {/* Live validation for 10 digits */}
+              {editUserForm.mobileNumber && editUserForm.mobileNumber.length !== 10 && (
+                <p className="text-red-500 text-sm mt-1">Mobile number must be exactly 10 digits.</p>
+              )}
+              {/* Live validation for duplicate number */}
+              {editUserForm.mobileNumber && users.some(u => u.mobileNumber === editUserForm.mobileNumber && u._id !== selectedUser?._id) && (
+                <p className="text-red-500 text-sm mt-1">Already Exists</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Enter New Password</label>
@@ -1695,7 +1784,7 @@ const Settings = () => {
             </div>
             <div className="md:col-span-2 flex justify-end gap-2 mt-4">
               <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowEditUserModal(false)}>Cancel</button>
-              <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
+              <button type="submit" className={`px-4 py-2 rounded font-semibold shadow transition w-full md:w-auto ${isEditUserFormValid() && !editUserLoading ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-400 text-white cursor-not-allowed'}`} disabled={!isEditUserFormValid() || editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
             </div>
           </form>
         ), [editUserForm, confirmEditPassword, showEditUserPassword, editUserLoading, handleEditUser, setShowEditUserModal])}
