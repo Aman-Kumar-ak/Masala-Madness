@@ -257,7 +257,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
 
           {/* Category Tabs */}
           <div className="relative">
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" ref={categoryBarRef}>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide hide-scrollbar" ref={categoryBarRef}>
               {categories.map((category) => (
                 <button
                   key={category._id}
