@@ -544,6 +544,12 @@ const Settings = () => {
     e.preventDefault();
     setUserError('');
 
+    // Prevent changing the last admin's role to worker
+    if (selectedUser && selectedUser.role === 'admin' && editUserForm.role !== 'admin' && getAdminCount() === 1) {
+      setUserError('At least one admin must remain. You cannot change the last admin to a worker.');
+      return;
+    }
+
     // Client-side validation for password fields
     if (editUserForm.password) { // Only validate if password is being changed
       if (editUserForm.password.length < 8) {
@@ -581,6 +587,10 @@ const Settings = () => {
 
   // Enable/disable user
   const handleToggleActive = async (userObj) => {
+    if (user && (userObj._id === user._id || userObj.username === user.username)) {
+      showError("You cannot disable your own account while logged in.");
+      return;
+    }
     if (userObj.isActive) { // If user is active, confirm before disabling
       setUserToToggle(userObj);
       setShowToggleUserConfirm(true);
@@ -644,6 +654,15 @@ const Settings = () => {
 
   // Delete user handler
   const handleDeleteUser = async (userObj) => {
+    if (user && (userObj._id === user._id || userObj.username === user.username)) {
+      showError("You cannot delete your own account while logged in.");
+      return;
+    }
+    // Prevent deleting the last admin
+    if (userObj.role === 'admin' && getAdminCount() === 1) {
+      showError("At least one admin must remain. You cannot delete the last admin account.");
+      return;
+    }
     setUserToDelete(userObj);
     setShowDeleteUserConfirm(true);
   };
@@ -962,6 +981,9 @@ const Settings = () => {
     }
   }, [adminSecretCodeLockout]);
 
+  // Utility to count admins
+  const getAdminCount = () => users.filter(u => u.role === 'admin').length;
+
   // At the top of the return statement, show a spinner if loading
   if (loading) {
     return (
@@ -1010,7 +1032,7 @@ const Settings = () => {
                     A secret access code is required to manage devices and user roles.
                   </p>
                   <p className="text-gray-500 mb-4 text-sm">
-                    Once verified, you'll have access for 15 minutes without re-entering the code. 3 failed attempts will lock you out for 30 minutes.
+                    Once verified, you'll have access for 15 minutes without re-entering the code. 3 failed attempts will lock you out for 24 Hours.
                   </p>
                   <form onSubmit={(e) => { e.preventDefault(); handleAdminControlSecretCodeVerification(); }} className="space-y-4">
                     <div>
@@ -1076,8 +1098,8 @@ const Settings = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {users && users.length > 0 ? users.map(u => {
                           const isExpanded = expandedUsers.has(u._id);
-                          // Determine if details should be displayed (always on desktop, or if expanded on mobile)
                           const shouldDisplayDetails = isDesktopView || isExpanded;
+                          const isCurrentUser = user && (u._id === user._id || u.username === user.username);
 
                           return (
                             <div
@@ -1086,9 +1108,7 @@ const Settings = () => {
                               onClick={isDesktopView ? null : () => toggleExpandUser(u._id)}
                             >
                               <div className="absolute top-3 right-3 flex items-center gap-2">
-                                {/* Active/Disabled Status Indicator */}
                                 <div className={`w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`} title={u.isActive ? 'Active' : 'Disabled'}></div>
-                                {/* Conditionally render arrow icon only on non-desktop views */}
                                 {!isDesktopView && (
                                   <span className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-0' : 'rotate-180'}`}>
                                     <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1098,15 +1118,14 @@ const Settings = () => {
                                 )}
                               </div>
                               <div className="flex items-center justify-start mb-2">
-                                <p className="text-2xl font-extrabold text-gray-900">{u.name}</p>
-                                
+                                <p className="text-2xl font-extrabold text-gray-900 flex items-center gap-2">{u.name}
+                                  {isCurrentUser && (
+                                    <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">Current Account</span>
+                                  )}
+                                </p>
                               </div>
                               <p className="text-base text-gray-600 font-medium capitalize">Role: {u.role}</p>
-
-                              <div
-                                className={`overflow-hidden transition-all duration-300 ease-in-out ${shouldDisplayDetails ? 'opacity-100' : 'opacity-0'}`}
-                                style={{ maxHeight: shouldDisplayDetails ? '500px' : '0' }}
-                              >
+                              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${shouldDisplayDetails ? 'opacity-100' : 'opacity-0'}`} style={{ maxHeight: shouldDisplayDetails ? '500px' : '0' }}>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Mobile:</span> {u.mobileNumber}</p>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Last Login:</span> {u.lastLogin ? new Date(u.lastLogin).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'}</p>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Created:</span> {new Date(u.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
