@@ -96,6 +96,23 @@ const api = {
       handleError(error);
       throw error;
     }
+  },
+  
+  // Download Excel file (returns blob)
+  async downloadExcel(endpoint, authenticated = true, token = null) {
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'GET',
+        headers: getHeaders(authenticated, token),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to download Excel file');
+      }
+      return await response.blob();
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
   }
 };
 

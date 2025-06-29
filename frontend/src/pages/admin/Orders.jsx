@@ -119,19 +119,6 @@ const Orders = () => {
     });
   };
 
-  const handleDownloadExcel = () => {
-    if (orders.length === 0) {
-      return;
-    }
-    const url = `${api.API_BASE_URL}/orders/excel/${selectedDate}`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `orders-${selectedDate}.xlsx`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const resetToCurrentDate = () => {
     const today = getCurrentDate();
     setSelectedDate(today);
@@ -171,6 +158,32 @@ const Orders = () => {
   const handleCancelDelete = () => {
     setShowDeleteConfirmation(false);
     setOrderToDelete(null);
+  };
+
+  // Excel download handler
+  const handleDownloadExcel = async () => {
+    try {
+      const blob = await api.downloadExcel(`/orders/excel/${selectedDate}`);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders_${selectedDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setNotification({
+        message: 'Excel file downloaded!',
+        type: 'success',
+        duration: 2000
+      });
+    } catch (error) {
+      setNotification({
+        message: 'Failed to download Excel file',
+        type: 'error',
+        duration: 2000
+      });
+    }
   };
 
   if (loading) {
@@ -243,15 +256,13 @@ const Orders = () => {
                 </button>
                 <button
                   onClick={handleDownloadExcel}
+                  className="bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 flex-shrink-0 flex items-center whitespace-nowrap text-xs sm:text-sm"
+                  title="Download Excel"
                   disabled={orders.length === 0}
-                  className={`relative group flex items-center flex-shrink-0 whitespace-nowrap text-xs sm:text-sm ${
-                    orders.length === 0
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-500 hover:bg-green-600 text-white'
-                  } font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200`}
+                  style={{ opacity: orders.length === 0 ? 0.5 : 1 }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 4v12" />
                   </svg>
                   <span>Download Excel</span>
                 </button>
