@@ -346,14 +346,15 @@ router.get('/users', adminAuth, async (req, res) => {
 router.put('/users/:id', adminAuth, async (req, res) => {
   try {
     const { name, mobileNumber, password, role, isActive } = req.body;
-
+    const io = req.app.get('io');
+    const userSockets = req.app.get('userSockets');
+    let user;
     if (password) {
-      // Fetch the user, set the password, and save (to trigger pre-save hook)
-      const user = await User.findById(req.params.id);
+      user = await User.findById(req.params.id);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
-      user.password = password; // This will be hashed by the pre-save hook
+      user.password = password;
       if (name) user.name = name;
       if (mobileNumber) {
         user.mobileNumber = mobileNumber;
@@ -362,15 +363,7 @@ router.put('/users/:id', adminAuth, async (req, res) => {
       if (role) user.role = role;
       if (typeof isActive === 'boolean') user.isActive = isActive;
       await user.save();
-      // Remove password from response
-      const userObj = user.toObject();
-      delete userObj.password;
-      return res.json({
-        message: 'User updated successfully',
-        user: userObj
-      });
     } else {
-      // No password update, use findByIdAndUpdate for other fields
       const updates = {};
       if (name) updates.name = name;
       if (mobileNumber) {
@@ -379,22 +372,28 @@ router.put('/users/:id', adminAuth, async (req, res) => {
       }
       if (role) updates.role = role;
       if (typeof isActive === 'boolean') updates.isActive = isActive;
-
-      const user = await User.findByIdAndUpdate(
+      user = await User.findByIdAndUpdate(
         req.params.id,
         { $set: updates },
         { new: true, runValidators: true }
       ).select('-password');
-
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
-
-      return res.json({
-        message: 'User updated successfully',
-        user
-      });
     }
+    // Emit user-disabled event if user is now inactive
+    if (typeof isActive === 'boolean' && isActive === false && user) {
+      const socketId = userSockets.get(user._id.toString());
+      if (socketId) {
+        io.to(socketId).emit('user-disabled', { reason: 'Your account has been disabled by an admin.' });
+      }
+    }
+    const userObj = user.toObject ? user.toObject() : user;
+    delete userObj.password;
+    return res.json({
+      message: 'User updated successfully',
+      user: userObj
+    });
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({ message: 'Server error' });

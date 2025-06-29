@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }) => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const navigate = useNavigate();
   const { showError } = useNotification();
+  const [socket, setSocket] = useState(null);
   
   // Functions to manage auth operation in progress state
   const setAuthOperationInProgress = useCallback(() => {
@@ -54,6 +55,7 @@ export const AuthProvider = ({ children }) => {
   // Function to handle logout
   const logoutUser = async (keepDeviceToken = false, isSilentLogout = false) => {
     try {
+      if (socket) socket.disconnect();
       if (!keepDeviceToken) {
           localStorage.removeItem('deviceToken');
       }
@@ -408,33 +410,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
   
-  // Socket.io connection for real-time force logout
-  const [socket] = useState(() => io('https://masala-madness.onrender.com'));
-
-  // Register userId with socket on login
+  // Setup socket.io connection after login
   useEffect(() => {
     if (user && user._id) {
-      socket.emit('register', user._id);
+      // Use backend base URL (remove /api)
+      const backendUrl = 'https://masala-madness.onrender.com';
+      const sock = io(backendUrl, {
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        auth: { userId: user._id }
+      });
+      setSocket(sock);
+      sock.emit('register', user._id);
+      sock.on('user-disabled', (data) => {
+        showError(data?.reason || 'Your account has been disabled.');
+        logoutUser();
+        navigate('/login');
+      });
+      return () => {
+        sock.disconnect();
+      };
     }
-  }, [user, socket]);
-
-  // Listen for force-logout event
-  useEffect(() => {
-    socket.on('force-logout', (data) => {
-      logoutUser();
-      setIsAuthenticated(false);
-      setLoading(false);
-      if (showError) {
-        showError('Your account has been disabled by the administrator.');
-      } else {
-        alert('Your account has been disabled by the administrator.');
-      }
-      navigate('/login');
-    });
-    return () => {
-      socket.off('force-logout');
-    };
-  }, [socket]);
+  }, [user, showError, navigate]);
   
   // Add a fast, robust session restoration and user active check logic
   useEffect(() => {
