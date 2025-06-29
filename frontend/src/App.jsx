@@ -17,6 +17,7 @@ import WorkerCart from './pages/worker/WorkerCart';
 import WorkerSettings from './pages/worker/WorkerSettings';
 import WorkerOrders from './pages/worker/WorkerOrders';
 import WorkerPendingOrders from './pages/worker/WorkerPendingOrders';
+import { Analytics } from '@vercel/analytics/react';
 
 // Component to redirect based on authentication
 const RedirectBasedOnAuth = () => {
@@ -131,6 +132,7 @@ const App = () => {
           {/* Offline detector will show a notification when user is offline */}
           <OfflineDetector />
         </div>
+        <Analytics />
       </NotificationProvider>
     </AuthProvider>
   );
