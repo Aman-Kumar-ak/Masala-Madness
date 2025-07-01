@@ -678,8 +678,9 @@ router.post('/refresh-token', async (req, res) => {
     if (!user.isActive) {
       return res.status(403).json({ message: 'User account is disabled.' });
     }
-    // Update lastLogin
+    // Update lastLogin for both device and user
     device.lastLogin = new Date();
+    user.lastLogin = new Date();
     await user.save();
     // Issue new JWT
     const token = jwt.sign(
@@ -697,6 +698,22 @@ router.post('/refresh-token', async (req, res) => {
     });
   } catch (error) {
     console.error('Refresh token error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update lastClosed when user closes the website
+router.post('/last-closed', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ message: 'userId is required' });
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    user.lastClosed = new Date();
+    await user.save();
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('Error updating lastClosed:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

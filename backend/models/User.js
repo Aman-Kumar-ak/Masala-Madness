@@ -49,6 +49,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  lastClosed: {
+    type: Date,
+    default: null
+  },
   devices: [
     {
       deviceId: {

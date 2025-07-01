@@ -494,6 +494,32 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(intervalId);
   }, [isAuthenticated, loading]);
   
+  // Update lastClosed on window/tab close
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (isAuthenticated && user && user._id) {
+        // Use sendBeacon for reliability if available
+        const url = `${api.baseURL || ''}/auth/last-closed`;
+        const payload = JSON.stringify({ userId: user._id });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url, payload);
+        } else {
+          // Fallback to fetch (may not always complete)
+          fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true
+          });
+        }
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isAuthenticated, user]);
+  
   // Provide auth data and functions to components
   const authContextValue = {
     isAuthenticated,

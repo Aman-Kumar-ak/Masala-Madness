@@ -1181,6 +1181,7 @@ const Settings = () => {
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Mobile:</span> {u.mobileNumber}</p>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Last Login:</span> {u.lastLogin ? new Date(u.lastLogin).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'}</p>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Created:</span> {new Date(u.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
+                                <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Last Closed:</span> {u.lastClosed ? new Date(u.lastClosed).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'}</p>
                                 <div className="mt-4 flex flex-row justify-start items-center gap-2">
                                   <button
                                     className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors duration-200 shadow-sm"
