@@ -117,7 +117,7 @@ setInterval(async () => {
     });
     io.emit('user-online-status', onlineStatus);
   } catch (e) { /* ignore */ }
-}, 10000); // every 10s
+}, 5000); // every 5s
 
 // CORS error handler (must be after all app.use and routes)
 app.use((err, req, res, next) => {

@@ -25,6 +25,89 @@ const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
   );
 };
 
+// Tooltip component for indicators
+const IndicatorTooltip = ({ text, children }) => {
+  const [visible, setVisible] = useState(false);
+  const timeoutRef = useRef();
+  const outsideListenerRef = useRef();
+  const tooltipRef = useRef();
+  // Track if tooltip was just hidden by timeout
+  const justHiddenRef = useRef(false);
+
+  const hideTooltip = () => {
+    clearTimeout(timeoutRef.current);
+    setVisible(false);
+    if (outsideListenerRef.current) {
+      document.removeEventListener('touchstart', outsideListenerRef.current, true);
+      document.removeEventListener('mousedown', outsideListenerRef.current, true);
+      outsideListenerRef.current = null;
+    }
+    // Mark as just hidden for a short time to allow re-show
+    justHiddenRef.current = true;
+    setTimeout(() => { justHiddenRef.current = false; }, 100);
+  };
+
+  const showTooltip = () => {
+    clearTimeout(timeoutRef.current);
+    setVisible(true);
+    // Add global listener to close on outside tap/click
+    if (!outsideListenerRef.current) {
+      outsideListenerRef.current = (e) => {
+        if (tooltipRef.current && !tooltipRef.current.contains(e.target)) {
+          hideTooltip();
+        }
+      };
+      document.addEventListener('touchstart', outsideListenerRef.current, true);
+      document.addEventListener('mousedown', outsideListenerRef.current, true);
+    }
+    // Auto-hide after 1s for accessibility
+    timeoutRef.current = setTimeout(hideTooltip, 1000);
+  };
+
+  const handleTouchStart = (e) => {
+    e.stopPropagation();
+    if (justHiddenRef.current) return; // Prevent flicker if just hidden
+    showTooltip();
+  };
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (justHiddenRef.current) return; // Prevent flicker if just hidden
+    if (visible) hideTooltip();
+    else showTooltip();
+  };
+  useEffect(() => () => {
+    clearTimeout(timeoutRef.current);
+    if (outsideListenerRef.current) {
+      document.removeEventListener('touchstart', outsideListenerRef.current, true);
+      document.removeEventListener('mousedown', outsideListenerRef.current, true);
+    }
+  }, []);
+  return (
+    <span
+      className="relative"
+      ref={tooltipRef}
+      onMouseEnter={showTooltip}
+      onMouseLeave={hideTooltip}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={e => e.stopPropagation()}
+      onClick={handleClick}
+      tabIndex={0}
+      aria-label={text}
+      role="button"
+      style={{ outline: 'none' }}
+    >
+      {children}
+      {visible && (
+        <span className="absolute z-50 left-1/2 -translate-x-1/2 mt-2 px-2 py-1 rounded bg-gray-900 text-white text-xs whitespace-nowrap shadow-lg pointer-events-none select-none animate-fade-in"
+          style={{ bottom: '-2.2rem', minWidth: 'max-content' }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+};
+
 const Settings = () => {
   useKeyboardScrollAdjustment();
   const { user, isAuthenticated, logout, getUserDevices, revokeDevice, setAuthOperationInProgress, clearAuthOperationInProgress, loading } = useAuth();
@@ -1218,19 +1301,29 @@ const Settings = () => {
                                   </span>
                                 )}
                                 {/* Online status dot */}
-                                <div
-                                  className={`w-4 h-4 rounded-full border-2 shadow-md flex items-center justify-center transition-colors duration-300 ${userOnlineStatus[u._id] ? 'bg-green-400 border-green-600' : 'bg-red-400 border-red-600'}`}
-                                  title={userOnlineStatus[u._id] ? 'Online (App Open)' : 'Offline (App Closed)'}
-                                >
-                                  <span className="sr-only">{userOnlineStatus[u._id] ? 'Online' : 'Offline'}</span>
-                                </div>
+                                <IndicatorTooltip text={userOnlineStatus[u._id] ? 'User Online' : 'User Offline'}>
+                                  <div
+                                    className={`w-4 h-4 rounded-full border-2 shadow-md flex items-center justify-center transition-colors duration-300 ${userOnlineStatus[u._id] ? 'bg-green-400 border-green-600' : 'bg-red-400 border-red-600'}`}
+                                    tabIndex={0}
+                                    aria-label={userOnlineStatus[u._id] ? 'Online (App Open)' : 'Offline (App Closed)'}
+                                    onClick={e => e.stopPropagation()}
+                                    onTouchStart={e => e.stopPropagation()}
+                                  >
+                                    <span className="sr-only">{userOnlineStatus[u._id] ? 'Online' : 'Offline'}</span>
+                                  </div>
+                                </IndicatorTooltip>
                                 {/* Account active/disabled dot */}
-                                <div
-                                  className={`w-4 h-4 rounded-full border-2 shadow-md flex items-center justify-center transition-colors duration-300 ${u.isActive ? 'bg-green-400 border-green-600' : 'bg-red-400 border-red-600'}`}
-                                  title={u.isActive ? 'Account Active' : 'Account Disabled'}
-                                >
-                                  <span className="sr-only">{u.isActive ? 'Active' : 'Disabled'}</span>
-                                </div>
+                                <IndicatorTooltip text={u.isActive ? 'Account Active' : 'Account Disabled'}>
+                                  <div
+                                    className={`w-4 h-4 rounded-full border-2 shadow-md flex items-center justify-center transition-colors duration-300 ${u.isActive ? 'bg-green-400 border-green-600' : 'bg-red-400 border-red-600'}`}
+                                    tabIndex={0}
+                                    aria-label={u.isActive ? 'Account Active' : 'Account Disabled'}
+                                    onClick={e => e.stopPropagation()}
+                                    onTouchStart={e => e.stopPropagation()}
+                                  >
+                                    <span className="sr-only">{u.isActive ? 'Active' : 'Disabled'}</span>
+                                  </div>
+                                </IndicatorTooltip>
                               </div>
                               <div className="flex items-center justify-start mb-2">
                                 <p className="text-2xl font-extrabold text-gray-900 flex items-center gap-2">{u.name}
