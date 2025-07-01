@@ -428,8 +428,13 @@ export const AuthProvider = ({ children }) => {
         logoutUser();
         navigate('/login');
       });
+      // Heartbeat: emit user-active every 10s
+      const heartbeat = setInterval(() => {
+        sock.emit('user-active', user._id);
+      }, 10000);
       return () => {
         sock.disconnect();
+        clearInterval(heartbeat);
       };
     }
   }, [user, showError, navigate]);

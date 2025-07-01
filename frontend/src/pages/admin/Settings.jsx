@@ -6,6 +6,7 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
 import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
+import io from 'socket.io-client';
 
 const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
   return (
@@ -1076,6 +1077,25 @@ const Settings = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
+  // Add state for real-time online status
+  const [userOnlineStatus, setUserOnlineStatus] = useState({});
+
+  // Setup socket.io for admin online status updates
+  useEffect(() => {
+    const backendUrl = 'https://masala-madness.onrender.com';
+    const sock = io(backendUrl, {
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5
+    });
+    sock.on('user-online-status', (statusMap) => {
+      setUserOnlineStatus(statusMap);
+    });
+    return () => {
+      sock.disconnect();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-900">
       <BackButton />
@@ -1187,8 +1207,9 @@ const Settings = () => {
                               className={`bg-white border border-gray-200 rounded-lg shadow-sm p-4 relative transition-all duration-200 ${!isDesktopView ? 'cursor-pointer hover:border-blue-300 hover:shadow-lg hover:scale-[1.01]' : ''}`}
                               onClick={isDesktopView ? null : () => toggleExpandUser(u._id)}
                             >
-                              <div className="absolute top-3 right-3 flex items-center gap-2">
-                                <div className={`w-3 h-3 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`} title={u.isActive ? 'Active' : 'Disabled'}></div>
+                              <div className={`absolute top-3 right-3 flex items-center gap-2 ${!isDesktopView ? 'flex-col-reverse items-end gap-1' : ''}`}
+                                style={!isDesktopView ? {right: '0.75rem', top: '0.75rem'} : {}}>
+                                {/* Arrow for mobile */}
                                 {!isDesktopView && (
                                   <span className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-0' : 'rotate-180'}`}>
                                     <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1196,6 +1217,20 @@ const Settings = () => {
                                     </svg>
                                   </span>
                                 )}
+                                {/* Online status dot */}
+                                <div
+                                  className={`w-4 h-4 rounded-full border-2 shadow-md flex items-center justify-center transition-colors duration-300 ${userOnlineStatus[u._id] ? 'bg-green-400 border-green-600' : 'bg-red-400 border-red-600'}`}
+                                  title={userOnlineStatus[u._id] ? 'Online (App Open)' : 'Offline (App Closed)'}
+                                >
+                                  <span className="sr-only">{userOnlineStatus[u._id] ? 'Online' : 'Offline'}</span>
+                                </div>
+                                {/* Account active/disabled dot */}
+                                <div
+                                  className={`w-4 h-4 rounded-full border-2 shadow-md flex items-center justify-center transition-colors duration-300 ${u.isActive ? 'bg-green-400 border-green-600' : 'bg-red-400 border-red-600'}`}
+                                  title={u.isActive ? 'Account Active' : 'Account Disabled'}
+                                >
+                                  <span className="sr-only">{u.isActive ? 'Active' : 'Disabled'}</span>
+                                </div>
                               </div>
                               <div className="flex items-center justify-start mb-2">
                                 <p className="text-2xl font-extrabold text-gray-900 flex items-center gap-2">{u.name}

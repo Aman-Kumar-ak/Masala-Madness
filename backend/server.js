@@ -10,6 +10,7 @@ const discountRoutes = require('./routes/discountRoutes');
 const pendingOrderRoutes = require('./routes/pendingOrderRoutes');
 const upiRoutes = require('./routes/upiRoutes');
 const authRoutes = require('./routes/authRoutes');
+const User = require('./models/User');
 
 dotenv.config();
 
@@ -84,7 +85,17 @@ app.get('/api/ping', (req, res) => {
 io.on('connection', (socket) => {
   socket.on('register', (userId) => {
     if (userId) userSockets.set(userId, socket.id);
+    socket.userId = userId;
   });
+
+  // Listen for user-active heartbeat
+  socket.on('user-active', async (userId) => {
+    if (!userId) return;
+    try {
+      await User.findByIdAndUpdate(userId, { lastActiveAt: new Date() });
+    } catch (e) { /* ignore */ }
+  });
+
   socket.on('disconnect', () => {
     for (const [userId, sockId] of userSockets.entries()) {
       if (sockId === socket.id) {
@@ -94,6 +105,19 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+// Periodically broadcast online status to all admins
+setInterval(async () => {
+  try {
+    const users = await User.find({}, '_id lastActiveAt');
+    const now = Date.now();
+    const onlineStatus = {};
+    users.forEach(u => {
+      onlineStatus[u._id] = u.lastActiveAt && (now - new Date(u.lastActiveAt).getTime() < 30000); // 30s window
+    });
+    io.emit('user-online-status', onlineStatus);
+  } catch (e) { /* ignore */ }
+}, 10000); // every 10s
 
 // CORS error handler (must be after all app.use and routes)
 app.use((err, req, res, next) => {

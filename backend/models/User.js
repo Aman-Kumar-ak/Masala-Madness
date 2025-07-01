@@ -53,6 +53,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  lastActiveAt: {
+    type: Date,
+    default: null
+  },
   devices: [
     {
       deviceId: {
