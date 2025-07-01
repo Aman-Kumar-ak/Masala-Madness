@@ -97,8 +97,22 @@ router.get('/verify', authenticateToken, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    // Find the latest lastClosed from all devices
+    let latestLastClosed = null;
+    if (user.devices && user.devices.length > 0) {
+      user.devices.forEach(device => {
+        if (device.lastClosed) {
+          if (!latestLastClosed || new Date(device.lastClosed) > new Date(latestLastClosed)) {
+            latestLastClosed = device.lastClosed;
+          }
+        }
+      });
+    }
+    // Attach lastClosed at the top level
+    const userObj = user.toObject();
+    userObj.lastClosed = latestLastClosed;
     return res.status(200).json({ 
-      user: user // This will include role, name, etc.
+      user: userObj // This will include role, name, etc. and lastClosed at top level
     });
   } catch (error) {
     console.error('Verify user error:', error);
