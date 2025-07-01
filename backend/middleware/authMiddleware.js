@@ -77,7 +77,7 @@ const authenticateToken = async (req, res, next) => {
           device.statusHistory.push({
             status: 'inactive',
             reason,
-            timestamp: new Date()
+            timestamp: getISTDate()
           });
           await userWithDevice.save();
         }
@@ -93,7 +93,7 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ status: 'error', message: 'Device not found.' });
     }
     // Update last login time and record user agent if changed
-    const currentDate = new Date();
+    const currentDate = getISTDate();
     device.lastLogin = currentDate;
     if (device.userAgent !== userAgent) {
       device.statusHistory.push({

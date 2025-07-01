@@ -8,14 +8,6 @@ const { auth, adminAuth } = require('../middleware/authMiddleware');
 const SecretCode = require('../models/SecretCode');
 const bcrypt = require('bcryptjs');
 
-// Helper to get current IST date
-function getISTDate() {
-  const now = new Date();
-  // IST is UTC+5:30
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  return new Date(now.getTime() + istOffset - now.getTimezoneOffset() * 60000);
-}
-
 // Admin login
 router.post('/login', async (req, res) => {
   try {
