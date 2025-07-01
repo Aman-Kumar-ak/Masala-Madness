@@ -45,7 +45,7 @@ router.post('/login', async (req, res) => {
     }
     
     // Update last login
-    user.lastLogin = getISTDate();
+    user.lastLogin = new Date();
     await user.save();
 
     // Generate JWT token
@@ -65,7 +65,7 @@ router.post('/login', async (req, res) => {
         // Update existing device token in user's devices array
         const deviceIndex = user.devices.findIndex(d => d.deviceId === deviceToken);
         if (deviceIndex !== -1) {
-          user.devices[deviceIndex].lastLogin = getISTDate();
+          user.devices[deviceIndex].lastLogin = new Date();
           user.devices[deviceIndex].isActive = true;
           newDeviceToken = deviceToken;
         }
@@ -73,12 +73,12 @@ router.post('/login', async (req, res) => {
         // Create new device token in user's devices array
         const newDevice = {
           deviceId: require('crypto').randomBytes(32).toString('hex'),
-          lastLogin: getISTDate(),
+          lastLogin: new Date(),
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
           isActive: true,
           userAgent: req.headers['user-agent'],
-          createdAt: getISTDate(),
-          statusHistory: [{ status: 'active', timestamp: getISTDate(), reason: 'login' }]
+          createdAt: new Date(),
+          statusHistory: [{ status: 'active', timestamp: new Date(), reason: 'login' }]
         };
         user.devices.push(newDevice);
         newDeviceToken = newDevice.deviceId;
@@ -126,7 +126,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
       const deviceIndex = user.devices.findIndex(d => d.deviceId === token);
       if (deviceIndex !== -1) {
         user.devices[deviceIndex].isActive = false;
-        user.devices[deviceIndex].statusHistory.push({ status: 'inactive', reason: 'explicit logout', timestamp: getISTDate() });
+        user.devices[deviceIndex].statusHistory.push({ status: 'inactive', reason: 'explicit logout', timestamp: new Date() });
         await user.save();
         console.log(`[Device Auth] Device deactivated (logout): deviceId=${token.substring(0, 8)}...`);
       }
@@ -174,7 +174,7 @@ router.post('/revoke-device', authenticateToken, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Device not found or already revoked' });
     }
     user.devices[deviceIndex].isActive = false;
-    user.devices[deviceIndex].statusHistory.push({ status: 'inactive', reason: 'manually revoked', timestamp: getISTDate() });
+    user.devices[deviceIndex].statusHistory.push({ status: 'inactive', reason: 'manually revoked', timestamp: new Date() });
     await user.save();
     const isCurrentDevice = req.tokenType === 'device' && req.deviceId === deviceId;
     return res.status(200).json({ status: 'success', message: 'Device revoked successfully', isCurrentDevice });
@@ -446,7 +446,7 @@ router.put('/devices/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'Device not found' });
     }
     user.devices[deviceIndex].isActive = isActive;
-    user.devices[deviceIndex].statusHistory.push({ status: isActive ? 'active' : 'inactive', reason: isActive ? 'admin enabled' : 'admin disabled', timestamp: getISTDate() });
+    user.devices[deviceIndex].statusHistory.push({ status: isActive ? 'active' : 'inactive', reason: isActive ? 'admin enabled' : 'admin disabled', timestamp: new Date() });
     await user.save();
     res.json({ message: 'Device updated', device: user.devices[deviceIndex] });
   } catch (error) {
@@ -491,7 +491,7 @@ router.post('/secret-code/initialize', adminAuth, async (req, res) => {
       // If code exists, update it
       existingSecretCode.secretCode = secretCode; // Mongoose pre-save hook will hash this
       existingSecretCode.updatedBy = currentUserId;
-      existingSecretCode.lastUsedAt = getISTDate(); // Update last used time to current time for clarity
+      existingSecretCode.lastUsedAt = new Date(); // Update last used time to current time for clarity
       existingSecretCode.lastUsedBy = currentUserId;
       
       // Ensure auditTrail is an array before pushing
@@ -499,7 +499,7 @@ router.post('/secret-code/initialize', adminAuth, async (req, res) => {
         existingSecretCode.auditTrail = [];
       }
       existingSecretCode.auditTrail.push({
-        timestamp: getISTDate(),
+        timestamp: new Date(),
         action: 'Secret code updated',
         changedBy: currentUserId,
       });
@@ -513,11 +513,11 @@ router.post('/secret-code/initialize', adminAuth, async (req, res) => {
       const newSecretCode = new SecretCode({
         secretCode: secretCode, // Mongoose pre-save hook will hash this
         createdBy: currentUserId,
-        lastUsedAt: getISTDate(),
+        lastUsedAt: new Date(),
         lastUsedBy: currentUserId,
         auditTrail: [
           {
-            timestamp: getISTDate(),
+            timestamp: new Date(),
             action: 'Secret code initialized',
             changedBy: currentUserId,
           },
@@ -587,7 +587,7 @@ router.post('/secret-code/verify', authenticateToken, async (req, res) => {
       await req.user.save();
     }
     // Update lastUsedAt, lastUsedBy, and lastUsedWhere
-    secretCodeDoc.lastUsedAt = getISTDate();
+    secretCodeDoc.lastUsedAt = new Date();
     secretCodeDoc.lastUsedBy = currentUserId; // Store the user who used it
     secretCodeDoc.lastUsedWhere = usedWhere; // Store where it was used (e.g., QR, Settings)
     await secretCodeDoc.save();
@@ -627,7 +627,7 @@ router.put('/secret-code/change', adminAuth, async (req, res) => {
     secretCodeDoc.secretCode = newSecretCode; // Mongoose pre-save hook will hash this
     secretCodeDoc.updatedBy = currentUserId;
     secretCodeDoc.auditTrail.push({
-      timestamp: getISTDate(),
+      timestamp: new Date(),
       action: 'Secret code changed',
       changedBy: currentUserId,
     });
@@ -687,7 +687,7 @@ router.post('/refresh-token', async (req, res) => {
       return res.status(403).json({ message: 'User account is disabled.' });
     }
     // Update lastLogin
-    device.lastLogin = getISTDate();
+    device.lastLogin = new Date();
     await user.save();
     // Issue new JWT
     const token = jwt.sign(
