@@ -498,11 +498,13 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const handleBeforeUnload = (event) => {
       if (isAuthenticated && user && user._id) {
-        // Use sendBeacon for reliability if available
-        const url = `${api.baseURL || ''}/auth/last-closed`;
+          // Use the full backend URL for the API endpoint
+        const url = 'https://masala-madness.onrender.com/api/auth/last-closed';
         const payload = JSON.stringify({ userId: user._id });
+        console.log('Sending lastClosed update', user._id);
         if (navigator.sendBeacon) {
-          navigator.sendBeacon(url, payload);
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon(url, blob);
         } else {
           // Fallback to fetch (may not always complete)
           fetch(url, {
