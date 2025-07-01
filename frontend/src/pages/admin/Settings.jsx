@@ -210,7 +210,7 @@ const Settings = () => {
       const initialPromises = [];
       // Fetch version information
       initialPromises.push(
-        fetch('/version.json')
+        fetch(`/version.json?_=${Date.now()}`)
           .then(response => response.json())
           .then(data => setVersionInfo({ ...data, environment: process.env.NODE_ENV || 'development' }))
           .catch(error => {
@@ -518,6 +518,17 @@ const Settings = () => {
       fetchAllDevices();
     }
   }, [activeTab, user, isSecretCodeAuthenticated, fetchUsers, fetchAllDevices]); // Add fetchUsers, fetchAllDevices as dependencies
+
+  // Add this effect to refresh users when tab becomes visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && activeTab === 'adminControl' && user?.role === 'admin' && isSecretCodeAuthenticated) {
+        fetchUsers();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [activeTab, user, isSecretCodeAuthenticated, fetchUsers]);
 
   // Add user handler
   const handleAddUser = async (e) => {
@@ -1048,6 +1059,23 @@ const Settings = () => {
     );
   };
 
+  // Add this effect to refresh version info when tab becomes visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetch(`/version.json?_=${Date.now()}`)
+          .then(response => response.json())
+          .then(data => setVersionInfo({ ...data, environment: process.env.NODE_ENV || 'development' }))
+          .catch(error => {
+            console.error('Error fetching version info:', error);
+            setVersionInfo({ version: 'Unknown', buildDate: 'Unknown', environment: process.env.NODE_ENV || 'development' });
+          });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-900">
       <BackButton />
@@ -1172,7 +1200,10 @@ const Settings = () => {
                               <div className="flex items-center justify-start mb-2">
                                 <p className="text-2xl font-extrabold text-gray-900 flex items-center gap-2">{u.name}
                                   {isCurrentUser && (
-                                    <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">Current Account</span>
+                                    <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200
+                                      sm:text-xs sm:px-2 sm:py-0.5
+                                      max-[380px]:text-[10px] max-[380px]:px-1.5 max-[380px]:py-0
+                                    ">Current Account</span>
                                   )}
                                 </p>
                               </div>
