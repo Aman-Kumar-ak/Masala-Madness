@@ -86,6 +86,16 @@ Masala-Madness/
 
 ## Key Features
 
+### Admin Authentication & Recovery
+- JWT-based authentication, bcrypt password hashing, and secure token handling
+- Multiple admin accounts, password reset, activation/deactivation, and last login tracking
+- Automatic and manual admin recovery tools (see [`backend/ADMIN_AUTH_README.md`](backend/ADMIN_AUTH_README.md))
+- Default admin credentials are created on first run or after recovery (**change immediately!**)
+
+### Worker Interface
+- Dedicated worker pages for home, cart, orders, pending orders, and settings
+- Worker dashboard with stats (orders, revenue, etc.), pending orders, and order management
+
 ### Menu Management
 - Category-based menu organization
 - Dynamic dish filtering by category
@@ -111,6 +121,15 @@ Masala-Madness/
 - Default UPI selection
 - QR code generation for payments
 - Encryption for secure UPI data storage
+
+### Notification System
+- Centralized notification context for success, error, info, and warning messages
+- Queue-based, non-overlapping notifications (`NotificationContext.jsx`)
+
+### Offline Support & PWA
+- Service worker for caching, offline fallback (`offline.html`), and versioned static/dynamic cache
+- Versioning system with `version.json` and update script (`frontend/scripts/update-version.js`)
+- User-friendly offline page and auto-reload when back online
 
 ### UI & UX
 - Responsive design for all device sizes
@@ -141,14 +160,23 @@ Masala-Madness/
 3. Create a `.env` file in the backend directory with:
    ```
    MONGO_URI=your_mongodb_connection_string
-   CRYPTO_SECRET_KEY=your_secret_key_for_encryption
+   JWT_SECRET=your_secret_key_for_jwt
+   FRONTEND_URL=http://localhost:5173
    ```
+   See [`backend/ENV_SETUP.md`](backend/ENV_SETUP.md) for details and security recommendations.
 
 4. Start the backend server:
    ```bash
    npm run dev
    ```
    The server will run on http://localhost:5000
+
+#### Admin Authentication & Recovery
+- Default admin credentials are created on first run or after recovery:
+  - Username: `admin`
+  - Password: `MasalaMadness2024!`
+- **Change these credentials immediately after your first login!**
+- For admin management and recovery, see [`backend/ADMIN_AUTH_README.md`](backend/ADMIN_AUTH_README.md).
 
 ### Frontend Setup
 
@@ -173,7 +201,12 @@ Masala-Madness/
    ```
    The frontend will be available at http://localhost:5173
 
+#### Versioning
+- Use `frontend/scripts/update-version.js` to bump version and update build date in `frontend/public/version.json`.
+
 ## API Endpoints
+
+See [`backend/API_ROUTES.md`](backend/API_ROUTES.md) for full details.
 
 ### Categories and Dishes
 - `GET /api/dishes` - Get all categories with their dishes
@@ -199,83 +232,24 @@ Masala-Madness/
 ### Discounts
 - `GET /api/discounts/active` - Get active discount
 
-## Key Files and Their Purposes
+## Security Recommendations
+- Change default admin password after first login
+- Use a strong, random value for `JWT_SECRET` in production
+- Admin backups are encrypted using a key derived from `JWT_SECRET`
+- Use environment-specific .env files and never commit them to version control
+- For production:
+  - Use a separate database for admin credentials
+  - Implement IP-based restrictions for admin login attempts
+  - Set up audit logging for all admin actions
+  - Configure automated alerts for unauthorized access attempts
+  - Use a password manager or secret management service
 
-### Backend
-- `server.js`: Main server configuration, database connection, and middleware setup
-- `models/DishCategory.js`: MongoDB schema for categories and dishes
-- `models/PendingOrder.js`: MongoDB schema for pending orders
-- `models/UPI.js`: MongoDB schema for UPI addresses
-- `routes/dishRoutes.js`: API routes for dishes management
-- `routes/pendingOrderRoutes.js`: API routes for order management
-- `routes/upiRoutes.js`: API routes for UPI management
-- `utils/crypto.js`: Utility for encryption/decryption
+## Documentation
+- For advanced admin/auth features, see [`backend/ADMIN_AUTH_README.md`](backend/ADMIN_AUTH_README.md)
+- For API details, see [`backend/API_ROUTES.md`](backend/API_ROUTES.md)
+- For environment setup, see [`backend/ENV_SETUP.md`](backend/ENV_SETUP.md)
 
-### Frontend
-- `src/App.jsx`: Main app component with routes
-- `src/components/Menu.jsx`: Main menu component that displays categories and dishes
-- `src/components/MenuCard.jsx`: Individual dish card component
-- `src/components/CartContext.jsx`: Context provider for shopping cart
-- `src/pages/Home.jsx`: Main page with menu
-- `src/pages/Cart.jsx`: Shopping cart page
-- `src/pages/PendingOrders.jsx`: Pending orders management page
-- `src/pages/Qr.jsx`: UPI QR code management page
-- `src/pages/Admin.jsx`: Admin panel for dishes management
-- `src/contexts/RefreshContext.jsx`: Context for real-time updates
-
-## Database Structure
-
-### DishCategory Schema
-```javascript
-{
-  categoryName: String,
-  dishes: [{
-    name: String,
-    priceHalf: Number,
-    priceFull: Number,
-    price: Number
-  }]
-}
-```
-
-### PendingOrder Schema
-```javascript
-{
-  orderId: String,
-  items: [{
-    name: String,
-    type: String,
-    price: Number,
-    quantity: Number,
-    totalPrice: Number
-  }],
-  subtotal: Number,
-  discountAmount: Number,
-  discountPercentage: Number,
-  totalAmount: Number,
-  status: String,
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-### UPI Schema
-```javascript
-{
-  name: String,
-  upiId: String,
-  isDefault: Boolean,
-  createdAt: Date
-}
-```
-
-## Adding Test Data
-
-You can add test data using the provided script:
-```bash
-cd backend
-node scripts/addTestData.js
-```
+*This README is up to date as of the latest project changes.*
 
 ## Development Notes
 - Backend runs on port 5000

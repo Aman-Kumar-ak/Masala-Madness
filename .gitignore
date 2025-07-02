@@ -1,2 +1,25 @@
 node_modules/
 dist/
+# Backend
+backend/node_modules/
+backend/.env
+backend/data/
+backend/data/admin_backup.enc
+backend/scripts/
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/public/version.json
+# Image and icon backups, temp, and fallbacks
+frontend/public/images/icons-backup/
+frontend/public/images/svg-backup/
+frontend/public/images/temp-icons/
+frontend/public/images/fallbacks/
+# Platform-specific generated images
+frontend/public/images/AppImages/
+# System files
+.DS_Store
+Thumbs.db
+# Log files
+*.log
