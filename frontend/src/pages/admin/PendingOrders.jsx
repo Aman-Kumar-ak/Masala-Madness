@@ -8,7 +8,7 @@ import Notification from '../../components/Notification';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
-import { formatKOTReceipt, printKOTViaBluetooth } from '../../utils/bluetoothPrinter';
+import { formatKOT, printKOT } from '../../utils/bluetoothPrinter';
 
 export default function PendingOrders() {
   useKeyboardScrollAdjustment();
@@ -287,13 +287,13 @@ export default function PendingOrders() {
           .filter(idx => idx !== null);
         if (unprintedIndexes.length > 0) {
           const kotNumber = (order.kotSequence || 0) + 1;
-          const receiptText = formatKOTReceipt({
+          const receiptText = formatKOT({
             orderNumber: order.orderNumber || orderId,
             kotNumber,
             date: new Date(),
             items: order.items.filter((item, idx) => unprintedIndexes.includes(idx)).map(item => ({ name: item.name, quantity: item.quantity }))
           });
-          await printKOTViaBluetooth(receiptText);
+          printKOT(receiptText);
           await api.post(`/orders/${orderId}/mark-kot`, { itemIndexes: unprintedIndexes });
         }
       }
