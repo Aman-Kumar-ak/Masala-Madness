@@ -7,8 +7,6 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
-import { formatKOT, printKOT } from '../../utils/bluetoothPrinter';
-import { useBluetooth } from '../../contexts/BluetoothContext';
 
 export default function Cart() {
   useKeyboardScrollAdjustment();
@@ -29,7 +27,6 @@ export default function Cart() {
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
-  const { isConnected, connect } = useBluetooth();
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -183,33 +180,12 @@ export default function Cart() {
   };
 
   const handleConfirmWithKOT = async () => {
-    if (!isConnected) {
-      showError('POS printer not connected');
-      return;
-    }
     setShowPaymentConfirm(false);
     setShowPaymentOptions(false);
     setShowQrCode(false);
     setShowCustomPaymentDialog(false);
     setShowSplashScreen(true);
     await processPayment(true, true); // true = isPaid, true = printKOT
-  };
-
-  // Unified print function for all payment types
-  const printReceipt = async (order, orderId, totalAmount) => {
-    try {
-      const kotNumber = (order.kotSequence || 0) + 1;
-      const receiptText = formatKOT({
-        orderNumber: order.orderNumber || orderId,
-        kotNumber,
-        date: new Date(),
-        items: order.items.map(item => ({ name: item.name, quantity: item.quantity }))
-      });
-      await printKOT(receiptText);
-      showSuccess('Receipt printed successfully!');
-    } catch (err) {
-      showError('Failed to print receipt: ' + (err.message || err));
-    }
   };
 
   const processPayment = async (isPaid, printKOT = false) => {
@@ -252,17 +228,6 @@ export default function Cart() {
         const res = await api.post('/orders/confirm', payload);
         const data = res;
         if (data && data.message) {
-          // --- KOT Print Integration ---
-          const orderId = data.orderId;
-          const order = await api.get(`/orders/${orderId}`);
-          // Always print after payment, regardless of printKOT flag
-          if (isConnected) {
-            await printReceipt(order, orderId, totalAmount);
-            await api.post(`/orders/${orderId}/mark-kot`, { itemIndexes: order.items.map((_, idx) => idx) });
-          } else {
-            showError('POS printer not connected. Please connect and try again.');
-          }
-          // --- End KOT Print Integration ---
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
           clearCart();
           setTimeout(() => {
@@ -557,15 +522,10 @@ export default function Cart() {
             <div className="flex flex-col gap-3 w-full mt-2">
               <button
                 onClick={async () => {
-                  if (!isConnected) {
-                    showError('POS printer not connected. Please connect the printer or use Confirm Payment (No KOT).');
-                    return;
-                  }
                   setShowQrCode(false);
                   setShowPaymentOptions(false);
                   setShowPaymentConfirm(false);
                   setShowCustomPaymentDialog(false);
-                  setShowSplashScreen(true);
                   await processPayment(true, true); // printKOT = true
                 }}
                 className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
@@ -698,10 +658,6 @@ export default function Cart() {
                   const totalPaid = manualPayment.cash + manualPayment.online;
                   if (Math.abs(totalPaid - totalAmount) > 0.01) {
                     showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
-                    return;
-                  }
-                  if (!isConnected) {
-                    showError('POS printer not connected. Please connect the printer or use Confirm Payment (No KOT).');
                     return;
                   }
                   setShowCustomPaymentDialog(false);

@@ -6,7 +6,6 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
 import { api } from '../../utils/api';
 import OptimizedImage from "../../components/OptimizedImage";
-import PosStatusIndicator from '../../components/PosStatusIndicator';
 
 export default function Home() {
   const { cartItems, clearCart } = useCart();
@@ -256,9 +255,8 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            {/* Icons row: POS indicator, QR, settings, admin panel */}
+            {/* Icons row: QR, settings, admin panel */}
             <div className="flex flex-nowrap items-center gap-2 sm:gap-3 min-w-0">
-              <PosStatusIndicator />
               <Link
                 to="/qr"
                 className="w-10 h-10 rounded-full bg-yellow-100 hover:bg-yellow-200 transition-colors duration-200 flex items-center justify-center shadow-sm"
