@@ -428,8 +428,13 @@ export const AuthProvider = ({ children }) => {
         logoutUser();
         navigate('/login');
       });
+      // Log connection errors
+      sock.on('connect_error', (err) => {
+        console.error('Socket.IO connection error:', err);
+      });
       // Heartbeat: emit user-active every 10s
       const heartbeat = setInterval(() => {
+        console.log('Sending heartbeat', user._id);
         sock.emit('user-active', user._id);
       }, 10000);
       return () => {

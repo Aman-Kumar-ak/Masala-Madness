@@ -63,7 +63,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Convenience methods for different notification types
   const showSuccess = (message, duration = 1000) => queueNotification(message, 'success', duration);
-  const showError = (message, duration = 1000) => queueNotification(message, 'error', duration);
+  const showError = (message, duration = 1500) => queueNotification(message, 'error', duration);
   const showWarning = (message, duration = 1000) => queueNotification(message, 'warning', duration);
   const showInfo = (message, duration = 1000) => queueNotification(message, 'info', duration);
 

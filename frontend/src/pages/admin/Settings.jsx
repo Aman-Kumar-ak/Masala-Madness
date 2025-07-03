@@ -7,6 +7,7 @@ import { useNotification } from '../../components/NotificationContext';
 import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
 import io from 'socket.io-client';
+import OptimizedImage from '../../components/OptimizedImage';
 
 const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
   return (
@@ -1266,9 +1267,11 @@ const Settings = () => {
                   {/* User Management Section */}
                   <div className="bg-emerald-50 shadow-md rounded-xl p-4 sm:p-6 border border-emerald-200 mb-6">
                     <div className="flex items-center gap-3 mb-6">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 text-2xl">
-                        <i className="fas fa-users-cog"></i>
-                      </span>
+                      {/* User Management Section icon */}
+                      <div className="relative w-10 h-10 flex-shrink-0">
+                        <div className="absolute inset-0 rounded-full bg-emerald-100" />
+                        <OptimizedImage src="/images/management.png" alt="User Management" className="w-10 h-10 rounded-full relative z-10" />
+                      </div>
                       <h2 className="text-2xl font-bold text-emerald-700">User Management</h2>
                     </div>
                     {/* User List/Cards */}
@@ -1379,9 +1382,11 @@ const Settings = () => {
                   {/* Add User Section */}
                   <div className="bg-blue-50 shadow-md rounded-xl p-4 sm:p-6 border border-blue-200 mb-6">
                     <div className="flex items-center gap-3 mb-6">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 text-2xl">
-                        <i className="fas fa-user-plus"></i>
-                      </span>
+                      {/* Add New User Section icon */}
+                      <div className="relative w-10 h-10 flex-shrink-0">
+                        <div className="absolute inset-0 rounded-full bg-blue-100" />
+                        <OptimizedImage src="/images/new-user.png" alt="Add New User" className="w-10 h-10 rounded-full relative z-10" />
+                      </div>
                       <h2 className="text-2xl font-bold text-blue-700">Add New User</h2>
                     </div>
                     {/* Add User Form */}

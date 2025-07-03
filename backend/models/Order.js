@@ -17,6 +17,7 @@ const OrderSchema = new mongoose.Schema({
       price: { type: Number, required: true }, // Original price per unit
       quantity: { type: Number, required: true },
       totalPrice: { type: Number, required: true }, // price * quantity
+      kotNumber: { type: Number, default: null }, // NEW: which KOT this item was printed on
     },
   ],
   subtotal: { type: Number, required: true }, // Original amount before discount
@@ -27,6 +28,7 @@ const OrderSchema = new mongoose.Schema({
   isPaid: { type: Boolean, required: true },
   customCashAmount: { type: Number, default: 0 },
   customOnlineAmount: { type: Number, default: 0 },
+  kotSequence: { type: Number, default: 0 }, // NEW: tracks latest KOT number
   createdAt: {
     type: Date,
     default: () => new Date(),

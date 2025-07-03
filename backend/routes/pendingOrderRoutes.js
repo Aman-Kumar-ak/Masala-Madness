@@ -418,4 +418,31 @@ router.post("/:orderId/append-items", async (req, res) => {
   }
 });
 
+// @route   POST /api/pending-orders/:orderId/mark-kot
+// Mark selected items as printed on a new KOT and increment kotSequence
+router.post('/:orderId/mark-kot', async (req, res) => {
+  try {
+    const { itemIndexes } = req.body; // Array of item indexes to mark as printed
+    if (!Array.isArray(itemIndexes) || itemIndexes.length === 0) {
+      return res.status(400).json({ message: 'itemIndexes array required' });
+    }
+    const order = await PendingOrder.findOne({ orderId: req.params.orderId });
+    if (!order) {
+      return res.status(404).json({ message: 'Pending order not found' });
+    }
+    const newKOT = (order.kotSequence || 0) + 1;
+    itemIndexes.forEach(idx => {
+      if (order.items[idx] && order.items[idx].kotNumber == null) {
+        order.items[idx].kotNumber = newKOT;
+      }
+    });
+    order.kotSequence = newKOT;
+    await order.save();
+    res.status(200).json({ message: 'KOT marked', kotNumber: newKOT, order });
+  } catch (error) {
+    console.error('Mark KOT error:', error);
+    res.status(500).json({ message: 'Failed to mark KOT', error: error.message });
+  }
+});
+
 module.exports = router;

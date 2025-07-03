@@ -143,6 +143,14 @@ const OptimizedImage = ({
           setError(true);
           setImgSrc(defaultPlaceholder);
         }}
+        onContextMenu={e => e.preventDefault()}
+        style={{
+          ...props.style,
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+          pointerEvents: 'auto',
+        }}
         {...props}
       />
       {!isLoaded && !error && (

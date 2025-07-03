@@ -13,6 +13,7 @@ const PendingOrderSchema = new mongoose.Schema({
       price: { type: Number, required: true },
       quantity: { type: Number, required: true },
       totalPrice: { type: Number, required: true },
+      kotNumber: { type: Number, default: null },
     },
   ],
   subtotal: { type: Number, required: true },
@@ -30,6 +31,7 @@ const PendingOrderSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  kotSequence: { type: Number, default: 0 },
 });
 
 const PendingOrder = mongoose.model("PendingOrder", PendingOrderSchema);

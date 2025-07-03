@@ -19,6 +19,7 @@ import WorkerOrders from './pages/worker/WorkerOrders';
 import WorkerPendingOrders from './pages/worker/WorkerPendingOrders';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { BluetoothProvider } from './contexts/BluetoothContext';
 
 // Component to redirect based on authentication
 const RedirectBasedOnAuth = () => {
@@ -50,93 +51,95 @@ const RedirectBasedOnAuth = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <div className="min-h-screen flex flex-col select-none">
-          <div className="flex-grow">
-            <Routes>  {/* Routes for handling different paths */}
-              {/* Root Route - Redirects based on auth state */}
-              <Route path="/" element={<RedirectBasedOnAuth />} />
-              
-              {/* Auth Routes */}
-              <Route path="/login" element={<Login />} />
-              
-              {/* Protected Routes */}
-              <Route path="/home" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Home />
-                </ProtectedRoute>
-              } />
-              <Route path="/cart" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Cart />
-                </ProtectedRoute>
-              } />
-              <Route path="/orders" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Orders />
-                </ProtectedRoute>
-              } />
-              <Route path="/pending-orders" element={
-                <ProtectedRoute requiredRole="admin">
-                  <PendingOrders />
-                </ProtectedRoute>
-              } />
-              <Route path="/qr" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Qr />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Admin />
-                </ProtectedRoute>
-              } />
-              
-              {/* Worker Protected Routes */}
-              <Route path="/worker-home" element={
-                <ProtectedRoute requiredRole="worker">
-                  <WorkerHome />
-                </ProtectedRoute>
-              } />
-              <Route path="/worker-cart" element={
-                <ProtectedRoute requiredRole="worker">
-                  <WorkerCart />
-                </ProtectedRoute>
-              } />
-              <Route path="/worker-orders" element={
-                <ProtectedRoute requiredRole="worker">
-                  <WorkerOrders />
-                </ProtectedRoute>
-              } />
-              <Route path="/worker-pending-orders" element={
-                <ProtectedRoute requiredRole="worker">
-                  <WorkerPendingOrders />
-                </ProtectedRoute>
-              } />
-              <Route path="/worker-settings" element={
-                <ProtectedRoute requiredRole="worker">
-                  <WorkerSettings />
-                </ProtectedRoute>
-              } />
-              
-              {/* Catch-all redirect to root */}
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+    <BluetoothProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <div className="min-h-screen flex flex-col select-none">
+            <div className="flex-grow">
+              <Routes>  {/* Routes for handling different paths */}
+                {/* Root Route - Redirects based on auth state */}
+                <Route path="/" element={<RedirectBasedOnAuth />} />
+                
+                {/* Auth Routes */}
+                <Route path="/login" element={<Login />} />
+                
+                {/* Protected Routes */}
+                <Route path="/home" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Home />
+                  </ProtectedRoute>
+                } />
+                <Route path="/cart" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Cart />
+                  </ProtectedRoute>
+                } />
+                <Route path="/orders" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Orders />
+                  </ProtectedRoute>
+                } />
+                <Route path="/pending-orders" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <PendingOrders />
+                  </ProtectedRoute>
+                } />
+                <Route path="/qr" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Qr />
+                  </ProtectedRoute>
+                } />
+                <Route path="/settings" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Admin />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Worker Protected Routes */}
+                <Route path="/worker-home" element={
+                  <ProtectedRoute requiredRole="worker">
+                    <WorkerHome />
+                  </ProtectedRoute>
+                } />
+                <Route path="/worker-cart" element={
+                  <ProtectedRoute requiredRole="worker">
+                    <WorkerCart />
+                  </ProtectedRoute>
+                } />
+                <Route path="/worker-orders" element={
+                  <ProtectedRoute requiredRole="worker">
+                    <WorkerOrders />
+                  </ProtectedRoute>
+                } />
+                <Route path="/worker-pending-orders" element={
+                  <ProtectedRoute requiredRole="worker">
+                    <WorkerPendingOrders />
+                  </ProtectedRoute>
+                } />
+                <Route path="/worker-settings" element={
+                  <ProtectedRoute requiredRole="worker">
+                    <WorkerSettings />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Catch-all redirect to root */}
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </div>
+            
+            {/* Offline detector will show a notification when user is offline */}
+            <OfflineDetector />
           </div>
-          
-          {/* Offline detector will show a notification when user is offline */}
-          <OfflineDetector />
-        </div>
-        <Analytics />
-        <SpeedInsights />
-      </NotificationProvider>
-    </AuthProvider>
+          <Analytics />
+          <SpeedInsights />
+        </NotificationProvider>
+      </AuthProvider>
+    </BluetoothProvider>
   );
 };
 
