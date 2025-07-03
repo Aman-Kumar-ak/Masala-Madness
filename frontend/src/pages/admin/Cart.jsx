@@ -7,7 +7,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
-import { formatKOTReceipt, printKOTViaBluetooth } from '../../utils/bluetoothPrinter';
+import { formatKOT, printKOT } from '../../utils/bluetoothPrinter';
 import { useBluetooth } from '../../contexts/BluetoothContext';
 
 export default function Cart() {
@@ -199,13 +199,13 @@ export default function Cart() {
   const printReceipt = async (order, orderId, totalAmount) => {
     try {
       const kotNumber = (order.kotSequence || 0) + 1;
-      const receiptText = formatKOTReceipt({
+      const receiptText = formatKOT({
         orderNumber: order.orderNumber || orderId,
         kotNumber,
         date: new Date(),
         items: order.items.map(item => ({ name: item.name, quantity: item.quantity }))
       });
-      await printKOTViaBluetooth(receiptText);
+      await printKOT(receiptText);
       showSuccess('Receipt printed successfully!');
     } catch (err) {
       showError('Failed to print receipt: ' + (err.message || err));
