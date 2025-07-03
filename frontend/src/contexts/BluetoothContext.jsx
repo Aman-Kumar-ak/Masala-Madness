@@ -1,35 +1,22 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { connectToPrinter, disconnectPrinter, isPrinterConnected } from '../utils/bluetoothPrinter';
 
+// Dummy Bluetooth context for compatibility after removing BLE logic
 const BluetoothContext = createContext();
 
 export function BluetoothProvider({ children }) {
+  // Always not connected, since printing is now handled natively in Android
   const [isConnected, setIsConnected] = useState(false);
   const [deviceName, setDeviceName] = useState(null);
   const [error, setError] = useState(null);
 
-  // Real connect logic
-  const connect = useCallback(async () => {
-    try {
-      const success = await connectToPrinter();
-      if (success) {
-        setIsConnected(true);
-        setDeviceName('MPT-II');
-        setError(null);
-      } else {
-        setIsConnected(false);
-        setDeviceName(null);
-        setError('Connection failed');
-      }
-    } catch (err) {
-      setIsConnected(false);
-      setDeviceName(null);
-      setError('Connection failed');
-    }
+  // Dummy connect/disconnect functions
+  const connect = useCallback(() => {
+    setIsConnected(false);
+    setDeviceName(null);
+    setError(null);
   }, []);
 
   const disconnect = useCallback(() => {
-    disconnectPrinter();
     setIsConnected(false);
     setDeviceName(null);
     setError(null);
