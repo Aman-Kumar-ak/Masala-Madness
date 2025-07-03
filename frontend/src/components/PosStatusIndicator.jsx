@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { useBluetooth } from '../contexts/BluetoothContext';
 
 export default function PosStatusIndicator() {
-  const { isConnected, error } = useBluetooth();
+  const { isConnected, error, connect } = useBluetooth();
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const [showNotification, setShowNotification] = useState(false);
   const timeoutRef = useRef(null);
   const dotRef = useRef(null);
 
@@ -19,6 +20,15 @@ export default function PosStatusIndicator() {
     colorClass = 'bg-yellow-300 border-yellow-500';
     statusText = 'POS Error';
   }
+
+  // Show notification when connected
+  useEffect(() => {
+    if (isConnected) {
+      setShowNotification(true);
+      const timer = setTimeout(() => setShowNotification(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected]);
 
   // Show tooltip for 1 second on hover or click
   const showStatus = () => {
@@ -70,6 +80,14 @@ export default function PosStatusIndicator() {
         onClick={showStatus}
         onTouchStart={showStatus}
       />
+      {!isConnected && (
+        <button
+          className="ml-2 px-2 py-1 bg-blue-500 text-white rounded text-xs"
+          onClick={connect}
+        >
+          Connect POS
+        </button>
+      )}
       {showTooltip && typeof window !== 'undefined' && createPortal(
         <span
           className="fixed z-[99999] px-2 py-1 rounded bg-gray-900 text-white text-xs sm:text-sm whitespace-nowrap shadow-lg animate-fade-in"
@@ -86,6 +104,16 @@ export default function PosStatusIndicator() {
           {statusText}
         </span>,
         document.body
+      )}
+      {showNotification && (
+        <div className="absolute left-1/2 -translate-x-1/2 mt-2 px-4 py-2 bg-green-600 text-white rounded shadow-lg text-xs animate-fade-in">
+          POS Connected
+        </div>
+      )}
+      {error && !isConnected && (
+        <div className="absolute left-1/2 -translate-x-1/2 mt-2 px-4 py-2 bg-yellow-500 text-white rounded shadow-lg text-xs animate-fade-in">
+          {error}
+        </div>
       )}
     </span>
   );

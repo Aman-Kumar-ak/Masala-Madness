@@ -29,7 +29,7 @@ export default function Cart() {
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
-  const { isConnected } = useBluetooth();
+  const { isConnected, connect } = useBluetooth();
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -195,6 +195,23 @@ export default function Cart() {
     await processPayment(true, true); // true = isPaid, true = printKOT
   };
 
+  // Unified print function for all payment types
+  const printReceipt = async (order, orderId, totalAmount) => {
+    try {
+      const kotNumber = (order.kotSequence || 0) + 1;
+      const receiptText = formatKOTReceipt({
+        orderNumber: order.orderNumber || orderId,
+        kotNumber,
+        date: new Date(),
+        items: order.items.map(item => ({ name: item.name, quantity: item.quantity }))
+      });
+      await printKOTViaBluetooth(receiptText);
+      showSuccess('Receipt printed successfully!');
+    } catch (err) {
+      showError('Failed to print receipt: ' + (err.message || err));
+    }
+  };
+
   const processPayment = async (isPaid, printKOT = false) => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -236,23 +253,14 @@ export default function Cart() {
         const data = res;
         if (data && data.message) {
           // --- KOT Print Integration ---
-          if (printKOT) {
-            const orderId = data.orderId;
-            const order = await api.get(`/orders/${orderId}`);
-            const unprintedIndexes = order.items
-              .map((item, idx) => (item.kotNumber == null ? idx : null))
-              .filter(idx => idx !== null);
-            if (unprintedIndexes.length > 0) {
-              const kotNumber = (order.kotSequence || 0) + 1;
-              const receiptText = formatKOTReceipt({
-                orderNumber: order.orderNumber || orderId,
-                kotNumber,
-                date: new Date(),
-                items: order.items.filter((item, idx) => unprintedIndexes.includes(idx)).map(item => ({ name: item.name, quantity: item.quantity }))
-              });
-              await printKOTViaBluetooth(receiptText);
-              await api.post(`/orders/${orderId}/mark-kot`, { itemIndexes: unprintedIndexes });
-            }
+          const orderId = data.orderId;
+          const order = await api.get(`/orders/${orderId}`);
+          // Always print after payment, regardless of printKOT flag
+          if (isConnected) {
+            await printReceipt(order, orderId, totalAmount);
+            await api.post(`/orders/${orderId}/mark-kot`, { itemIndexes: order.items.map((_, idx) => idx) });
+          } else {
+            showError('POS printer not connected. Please connect and try again.');
           }
           // --- End KOT Print Integration ---
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
