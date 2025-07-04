@@ -68,6 +68,27 @@ export default function PendingOrders() {
       setLoading(true);
       const data = await api.get('/pending-orders');
       setPendingOrders(data);
+      if (window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+        const kotData = {
+          orderNumber: data.order.orderNumber,
+          createdAt: data.order.createdAt,
+          items: (data.order.items || []).map(item => ({
+            name: item.name,
+            type: item.type,
+            quantity: item.quantity
+          }))
+        };
+        if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
+          try {
+            console.log('[KOT] Sending to app:', kotData);
+            window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+          } catch (err) {
+            console.error('Failed to send KOT to app:', err);
+          }
+        } else {
+          console.warn('KOT data missing required fields, not sending to app:', kotData);
+        }
+      }
     } catch (error) {
       console.error('Error fetching pending orders:', error);
       setNotification({ 
@@ -519,6 +540,16 @@ export default function PendingOrders() {
     // Close the payment options dialog after selection
     setPaymentOptionOrderId(null);
   };
+
+  // Add global handlers for handshake
+  if (typeof window !== 'undefined') {
+    window.onKOTReceived = function() {
+      console.log('[KOT] App acknowledged receipt of KOT data');
+    };
+    window.onKOTPrinted = function() {
+      console.log('[KOT] App reports KOT printed');
+    };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 pt-20 pb-12">

@@ -23,6 +23,7 @@ export default function Home() {
   const [showHeader, setShowHeader] = useState(true);
   const headerRef = useRef(null);
   const menuSectionRef = useRef(null);
+  const [printerStatus, setPrinterStatus] = useState("Not connected");
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -254,6 +255,21 @@ export default function Home() {
                   {getCurrentDate()}
                 </p>
               </div>
+              {/* Printer Button - now in date banner */}
+              <button
+                onClick={() => {
+                  if (window.AndroidBridge && window.AndroidBridge.openPrinterManager) {
+                    window.AndroidBridge.openPrinterManager();
+                  } else {
+                    alert("Printer manager not available on this platform.");
+                  }
+                }}
+                className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center transition-all duration-200 hover:bg-green-200 ml-2"
+                title="Manage Printer"
+                style={{ minWidth: 40, minHeight: 40 }}
+              >
+                <img src="/images/printer.png" alt="Manage Printer" className="w-6 h-6 object-contain" width={24} height={24} />
+              </button>
             </div>
             {/* Icons row: QR, settings, admin panel */}
             <div className="flex flex-nowrap items-center gap-2 sm:gap-3 min-w-0">

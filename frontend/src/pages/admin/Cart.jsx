@@ -229,6 +229,28 @@ export default function Cart() {
         const data = res;
         if (data && data.message) {
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
+          // Send KOT data to app if available
+          if (window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+            const kotData = {
+              orderNumber: data.order.orderNumber,
+              createdAt: data.order.createdAt,
+              items: (data.order.items || []).map(item => ({
+                name: item.name,
+                type: item.type,
+                quantity: item.quantity
+              }))
+            };
+            if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
+              try {
+                console.log('[KOT] Sending to app:', kotData);
+                window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+              } catch (err) {
+                console.error('Failed to send KOT to app:', err);
+              }
+            } else {
+              console.warn('KOT data missing required fields, not sending to app:', kotData);
+            }
+          }
           clearCart();
           setTimeout(() => {
             navigate("/");
@@ -277,6 +299,16 @@ export default function Cart() {
     }
     setManualDiscount(val);
   };
+
+  // Add global handlers for handshake
+  if (typeof window !== 'undefined') {
+    window.onKOTReceived = function() {
+      console.log('[KOT] App acknowledged receipt of KOT data');
+    };
+    window.onKOTPrinted = function() {
+      console.log('[KOT] App reports KOT printed');
+    };
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
