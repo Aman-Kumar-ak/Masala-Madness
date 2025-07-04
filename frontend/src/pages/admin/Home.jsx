@@ -151,6 +151,22 @@ export default function Home() {
     showInfo("Cart cleared successfully");
   };
 
+  // Add global handlers for handshake and print status
+  if (typeof window !== 'undefined') {
+    window.onKOTReceived = function() {
+      console.log('[KOT] App acknowledged receipt of KOT data');
+      // Optionally show a notification: Printing started...
+    };
+    window.onKOTPrinted = function() {
+      console.log('[KOT] App reports KOT printed');
+      // Optionally show a notification: Printing successful!
+    };
+    window.onKOTPrintFailed = function() {
+      console.log('[KOT] App reports KOT print failed');
+      // Optionally show a notification: Printing failed!
+    };
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100">
       {/* Header */}
