@@ -274,17 +274,17 @@ export default function Home() {
               {/* Printer Button - now in date banner */}
               <button
                 onClick={() => {
-                  if (window.AndroidBridge && window.AndroidBridge.openPrinterManager) {
-                    window.AndroidBridge.openPrinterManager();
+                  if (window.AndroidBridge && window.AndroidBridge.openPrinterSettings) {
+                    window.AndroidBridge.openPrinterSettings();
                   } else {
-                    alert("Printer manager not available on this platform.");
+                    alert("Printer settings not available on this platform.");
                   }
                 }}
                 className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center transition-all duration-200 hover:bg-green-200 ml-2"
-                title="Manage Printer"
+                title="Printer Settings"
                 style={{ minWidth: 40, minHeight: 40 }}
               >
-                <img src="/images/printer.png" alt="Manage Printer" className="w-6 h-6 object-contain" width={24} height={24} />
+                <img src="/images/printer.png" alt="Printer Settings" className="w-6 h-6 object-contain" width={24} height={24} />
               </button>
             </div>
             {/* Icons row: QR, settings, admin panel */}
