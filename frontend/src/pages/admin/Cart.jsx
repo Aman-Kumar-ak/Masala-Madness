@@ -243,6 +243,7 @@ export default function Cart() {
             if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
               try {
                 console.log('[KOT] Sending to app:', kotData);
+                console.log('[KOT][DEBUG] About to call window.AndroidBridge.sendOrderDetails with:', JSON.stringify(kotData));
                 window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
               } catch (err) {
                 console.error('Failed to send KOT to app:', err);
