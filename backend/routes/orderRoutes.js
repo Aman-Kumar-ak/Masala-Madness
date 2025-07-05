@@ -78,8 +78,7 @@ router.post("/confirm", async (req, res) => {
 
       return res.status(201).json({ 
         message: "Order saved successfully", 
-        orderId: newOrder.orderId,
-        orderNumber
+        order: newOrder
       });
     } else {
       // Logic for adding to pending orders

@@ -88,6 +88,16 @@ export default function Cart() {
     fetchDefaultUpiAddress();
   }, []);
 
+  useEffect(() => {
+    if (!window.AndroidBridge) {
+      window.AndroidBridge = {
+        sendOrderDetails: (details) => {
+          console.log('[MOCK AndroidBridge] sendOrderDetails called with:', details);
+        }
+      };
+    }
+  }, []);
+
   const handlePaymentMethodSelect = (method) => {
     setPaymentMethod(method);
     setManualPayment({ cash: 0, online: 0 }); // Reset manual payment on method change
@@ -242,9 +252,16 @@ export default function Cart() {
             };
             if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
               try {
+                console.log('[DEBUG] data from /orders/confirm:', data);
+                console.log('[DEBUG] window.AndroidBridge:', window.AndroidBridge);
                 console.log('[KOT] Sending to app:', kotData);
                 console.log('[KOT][DEBUG] About to call window.AndroidBridge.sendOrderDetails with:', JSON.stringify(kotData));
-                window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+                if (!window.AndroidBridge) {
+                  alert('AndroidBridge is not available! Order cannot be sent to the app.');
+                  console.error('AndroidBridge is not available!');
+                } else {
+                  window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+                }
               } catch (err) {
                 console.error('Failed to send KOT to app:', err);
               }
