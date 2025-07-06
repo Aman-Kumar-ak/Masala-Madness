@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useCart } from "../../components/CartContext";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
@@ -7,6 +7,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
+import { AuthContext } from '../../contexts/AuthContext';
 
 export default function Cart() {
   useKeyboardScrollAdjustment();
@@ -27,6 +28,7 @@ export default function Cart() {
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
+  const { user } = useContext(AuthContext);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -227,6 +229,7 @@ export default function Cart() {
       isPaid,
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
       customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
+      confirmedBy: user?.name || user?.username || user?.mobileNumber,
     };
     try {
       if (isPaid) {

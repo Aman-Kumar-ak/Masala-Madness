@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import Menu from "../../components/Menu";
@@ -8,6 +8,7 @@ import Notification from '../../components/Notification';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
+import { AuthContext } from '../../contexts/AuthContext';
 
 export default function WorkerPendingOrders() {
   useKeyboardScrollAdjustment();
@@ -51,6 +52,8 @@ export default function WorkerPendingOrders() {
   const [manualDiscounts, setManualDiscounts] = useState({});
 
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const { user } = useContext(AuthContext);
 
   // Save the scroll position before updates
   const saveScrollPosition = () => {
@@ -276,7 +279,7 @@ export default function WorkerPendingOrders() {
     
     console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
     try {
-      const data = await api.post(`/orders/confirm`, {
+      const data = await api.post('/orders/confirm', {
         orderId,
         paymentMethod: finalPaymentMethod,
         isPaid: true,
@@ -286,6 +289,7 @@ export default function WorkerPendingOrders() {
         totalAmount: discountedTotal,
         customCashAmount: paymentMethod === "Custom" ? customCashAmount : undefined,
         customOnlineAmount: paymentMethod === "Custom" ? customOnlineAmount : undefined,
+        confirmedBy: user?.name || user?.username || user?.mobileNumber,
       });
       // Optimistically remove the order immediately
       setPendingOrders(prev => prev.filter(order => order.orderId !== orderId));
@@ -347,6 +351,7 @@ export default function WorkerPendingOrders() {
         discountAmount,
         discountPercentage,
         totalAmount,
+        confirmedBy: user?.name || user?.username || user?.mobileNumber,
       });
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
@@ -436,6 +441,7 @@ export default function WorkerPendingOrders() {
               discountAmount,
               discountPercentage,
               totalAmount,
+              confirmedBy: user?.name || user?.username || user?.mobileNumber,
             });
             setPendingOrders(prevOrders =>
               prevOrders.map(o => o.orderId === order.orderId ? data.order : o)

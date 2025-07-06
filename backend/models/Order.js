@@ -37,6 +37,10 @@ const OrderSchema = new mongoose.Schema({
     type: Date,
     default: () => new Date(),
   },
+  confirmedBy: {
+    type: String,
+    default: null,
+  },
 });
 
 // Add compound indexes for better query performance

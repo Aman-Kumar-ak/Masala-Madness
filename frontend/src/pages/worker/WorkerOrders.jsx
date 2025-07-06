@@ -60,6 +60,9 @@ function WorkerOrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDa
           <p className="text-gray-500 text-sm mt-1">
             {formatDateIST(order.createdAt)}
           </p>
+          {order.confirmedBy && (
+            <p className="text-xs text-gray-400 mt-1">Confirmed by: {order.confirmedBy}</p>
+          )}
         </div>
         <div className="text-right">
           {order.isPaid ? (

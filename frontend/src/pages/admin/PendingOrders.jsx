@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import Menu from "../../components/Menu";
@@ -8,6 +8,7 @@ import Notification from '../../components/Notification';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
+import { AuthContext } from '../../contexts/AuthContext';
 
 export default function PendingOrders() {
   useKeyboardScrollAdjustment();
@@ -49,6 +50,8 @@ export default function PendingOrders() {
   const [manualDiscounts, setManualDiscounts] = useState({});
 
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const { user } = useContext(AuthContext);
 
   // Save the scroll position before updates
   const saveScrollPosition = () => {
@@ -275,6 +278,7 @@ export default function PendingOrders() {
       customCashAmount: typeof customCashAmount === 'number' ? customCashAmount : 0,
       customOnlineAmount: typeof customOnlineAmount === 'number' ? customOnlineAmount : 0,
       items: order.items,
+      confirmedBy: user?.name || user?.username || user?.mobileNumber,
     };
     try {
       const response = await api.post('/orders/confirm', payload);
@@ -325,7 +329,7 @@ export default function PendingOrders() {
         discountPercentage,
         totalAmount,
       };
-      const data = await api.post('/orders/confirm', updatePayload);
+      const data = await api.post('/orders/confirm', { ...updatePayload, confirmedBy: user?.name || user?.username || user?.mobileNumber });
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
@@ -418,7 +422,7 @@ export default function PendingOrders() {
               discountPercentage,
               totalAmount,
             };
-            const data = await api.post('/orders/confirm', updatePayload);
+            const data = await api.post('/orders/confirm', { ...updatePayload, confirmedBy: user?.name || user?.username || user?.mobileNumber });
             setPendingOrders(prevOrders =>
               prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
             );

@@ -24,7 +24,7 @@ const getDateRange = (dateStr) => {
 // Confirm and create a new order or add to pending
 router.post("/confirm", async (req, res) => {
   try {
-    const { orderId, items, totalAmount, subtotal, discountAmount, discountPercentage, manualDiscount, paymentMethod, isPaid, customCashAmount, customOnlineAmount } = req.body;
+    const { orderId, items, totalAmount, subtotal, discountAmount, discountPercentage, manualDiscount, paymentMethod, isPaid, customCashAmount, customOnlineAmount, confirmedBy } = req.body;
     const now = new Date();
     // If orderId is provided, update existing order (for confirming a pending order)
     let order;
@@ -44,6 +44,7 @@ router.post("/confirm", async (req, res) => {
       order.isPaid = isPaid !== undefined ? isPaid : order.isPaid;
       order.customCashAmount = customCashAmount !== undefined ? customCashAmount : order.customCashAmount;
       order.customOnlineAmount = customOnlineAmount !== undefined ? customOnlineAmount : order.customOnlineAmount;
+      if (confirmedBy) order.confirmedBy = confirmedBy;
       order.updatedAt = now;
       await order.save();
     } else {
@@ -78,7 +79,8 @@ router.post("/confirm", async (req, res) => {
         customCashAmount: customCashAmount || 0,
         customOnlineAmount: customOnlineAmount || 0,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        confirmedBy: confirmedBy || null,
       });
       await order.save();
     }
