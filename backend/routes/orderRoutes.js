@@ -2,7 +2,6 @@ const express = require("express");
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
-const DeletedOrder = require('../models/DeletedOrder');
 
 const router = express.Router();
 
