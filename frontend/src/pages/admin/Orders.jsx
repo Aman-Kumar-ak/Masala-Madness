@@ -163,7 +163,7 @@ const Orders = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false); // Only used to disable delete button, not for global loading
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [notification, setNotification] = useState(null);
@@ -230,11 +230,21 @@ const Orders = () => {
     const handleOrderUpdate = (data) => {
       if (!isMounted.current) return;
       if (data?.type === 'order-deleted' && data?.orderId) {
-        setOrders(prevOrders => prevOrders.filter(order => order.orderId !== data.orderId));
-        setStats(prevStats => ({
-          ...prevStats,
-          totalOrders: prevStats.totalOrders - 1
-        }));
+        setOrders(prevOrders => {
+          const newOrders = prevOrders.filter(order => order.orderId !== data.orderId);
+          // Recalculate stats
+          const paidOrders = newOrders.filter(o => o.isPaid);
+          const totalPaidOrders = paidOrders.length;
+          const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+          const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0;
+          setStats({
+            totalOrders: newOrders.length,
+            totalPaidOrders,
+            totalRevenue,
+            avgOrderValue
+          });
+          return newOrders;
+        });
       } else if (data?.order?.orderId) {
         setLastUpdatedOrderId(data.order.orderId);
         setOrders(prevOrders => {
@@ -320,7 +330,6 @@ const Orders = () => {
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
-    
     try {
       setDeleteLoading(true);
       await api.delete(`/orders/${orderToDelete.orderId}`);
@@ -329,8 +338,7 @@ const Orders = () => {
         type: 'delete',
         duration: 2000
       });
-      loadOrders();
-      setSelectedDate(getCurrentDate());
+      // No need to call loadOrders() or setSelectedDate here; socket will update the list
     } catch (error) {
       console.error('Error deleting order:', error);
       setNotification({
@@ -547,26 +555,18 @@ const Orders = () => {
             {filteredOrders.length === 0 ? (
               <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
             ) : (
-              <AnimatePresence>
-                {filteredOrders.map(order => (
-                  <motion.div
-                    key={order.orderId}
-                    initial={{ opacity: 0, y: 40 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -40 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <OrderCard
-                      order={order}
-                      isUpdated={order.orderId === lastUpdatedOrderId}
-                      parseCustomPaymentAmounts={parseCustomPaymentAmounts}
-                      formatDateIST={formatDateIST}
-                      handleDeleteClick={handleDeleteClick}
-                      deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+              filteredOrders.map(order => (
+                <div key={order.orderId}>
+                  <OrderCard
+                    order={order}
+                    isUpdated={order.orderId === lastUpdatedOrderId}
+                    parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                    formatDateIST={formatDateIST}
+                    handleDeleteClick={handleDeleteClick}
+                    deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
+                  />
+                </div>
+              ))
             )}
           </div>
         </div>

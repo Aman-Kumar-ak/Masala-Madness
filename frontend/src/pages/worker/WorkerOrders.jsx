@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from '../../utils/api';
 // import DeleteOrderConfirmation from "../../components/DeleteOrderConfirmation"; // Removed
 import Notification from "../../components/Notification";
-import { AnimatePresence, motion } from 'framer-motion';
+// import { AnimatePresence, motion } from 'framer-motion';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -401,24 +401,16 @@ export default function WorkerOrders() {
             {filteredOrders.length === 0 ? (
               <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
             ) : (
-              <AnimatePresence>
-                {filteredOrders.map(order => (
-                  <motion.div
-                    key={order.orderId}
-                    initial={{ opacity: 0, y: 40 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -40 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <WorkerOrderCard
-                      order={order}
-                      isUpdated={order.orderId === lastUpdatedOrderId}
-                      parseCustomPaymentAmounts={parseCustomPaymentAmounts}
-                      formatDateIST={formatDateIST}
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+              filteredOrders.map(order => (
+                <div key={order.orderId}>
+                  <WorkerOrderCard
+                    order={order}
+                    isUpdated={order.orderId === lastUpdatedOrderId}
+                    parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                    formatDateIST={formatDateIST}
+                  />
+                </div>
+              ))
             )}
           </div>
         </div>
