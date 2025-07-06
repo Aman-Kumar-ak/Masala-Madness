@@ -230,21 +230,8 @@ const Orders = () => {
     const handleOrderUpdate = (data) => {
       if (!isMounted.current) return;
       if (data?.type === 'order-deleted' && data?.orderId) {
-        setOrders(prevOrders => {
-          const newOrders = prevOrders.filter(order => order.orderId !== data.orderId);
-          // Recalculate stats
-          const paidOrders = newOrders.filter(o => o.isPaid);
-          const totalPaidOrders = paidOrders.length;
-          const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-          const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0;
-          setStats({
-            totalOrders: newOrders.length,
-            totalPaidOrders,
-            totalRevenue,
-            avgOrderValue
-          });
-          return newOrders;
-        });
+        // Refetch orders to update order numbers and details live for all users
+        loadOrders();
       } else if (data?.order?.orderId) {
         setLastUpdatedOrderId(data.order.orderId);
         setOrders(prevOrders => {
