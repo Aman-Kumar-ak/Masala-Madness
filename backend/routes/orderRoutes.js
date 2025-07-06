@@ -361,10 +361,27 @@ router.get("/excel/:date", async (req, res) => {
 router.delete("/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
-    const result = await Order.deleteOne({ orderId });
-    if (result.deletedCount === 0) {
+    // Find the order to get its date and orderNumber before deletion
+    const order = await Order.findOne({ orderId });
+    if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+    const orderDate = new Date(order.createdAt);
+    const startOfDay = new Date(orderDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(orderDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    const deletedOrderNumber = order.orderNumber;
+    // Delete the order
+    await Order.deleteOne({ orderId });
+    // Resequence orderNumbers for orders on the same day with higher orderNumber
+    await Order.updateMany(
+      {
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        orderNumber: { $gt: deletedOrderNumber }
+      },
+      { $inc: { orderNumber: -1 } }
+    );
     // Emit socket event for live deletion
     const io = req.app.get('io');
     if (io) {
@@ -374,7 +391,7 @@ router.delete("/:orderId", async (req, res) => {
       });
     }
     res.status(200).json({ 
-      message: "Order deleted successfully",
+      message: "Order deleted and order numbers resequenced successfully",
       orderId: orderId
     });
   } catch (error) {
