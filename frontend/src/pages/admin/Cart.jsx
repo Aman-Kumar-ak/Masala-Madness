@@ -243,7 +243,7 @@ export default function Cart() {
         if (data && data.message) {
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
           // Send KOT data to app if available
-          if (window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+          if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
             const kotData = {
               orderNumber: data.order.orderNumber,
               createdAt: data.order.createdAt,

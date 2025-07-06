@@ -184,7 +184,7 @@ export default function WorkerCart() {
     setShowPendingConfirm(false);
   };
 
-  const processPayment = async (isPaid) => {
+  const processPayment = async (isPaid, printKOT = false) => {
     // Prevent multiple simultaneous submissions
     if (isProcessing) return;
     setIsProcessing(true);
@@ -233,6 +233,25 @@ export default function WorkerCart() {
         if (data && data.message) {
           // Handle successful payment
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
+          // Send KOT data to app if printKOT is true
+          if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+            const kotData = {
+              orderNumber: data.order.orderNumber,
+              createdAt: data.order.createdAt,
+              items: (data.order.items || []).map(item => ({
+                name: item.name,
+                type: item.type,
+                quantity: item.quantity
+              }))
+            };
+            if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
+              try {
+                window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+              } catch (err) {
+                console.error('Failed to send KOT to app:', err);
+              }
+            }
+          }
           clearCart();
           setTimeout(() => {
             navigate("/worker-home");
@@ -501,13 +520,13 @@ export default function WorkerCart() {
         title="Scan QR Code to Pay"
         message={`Total Amount: ₹${totalAmount.toFixed(2)}`}
         customContent={
-          <div className="flex flex-col items-center gap-4 w-full">
-            <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4 w-full max-w-[95vw] sm:max-w-[400px] mx-auto">
+            <div className="bg-white p-5 sm:p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center w-full">
               {qrCodeUrl ? (
                 <img
                   src={qrCodeUrl}
                   alt="Payment QR Code"
-                  className="w-64 h-64 object-contain"
+                  className="w-[200px] h-[200px] sm:w-64 sm:h-64 object-contain"
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = "/images/qr-code.png";
@@ -515,7 +534,7 @@ export default function WorkerCart() {
                   }}
                 />
               ) : (
-                <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+                <div className="w-[180px] h-[180px] sm:w-64 sm:h-64 flex items-center justify-center bg-gray-100 rounded-lg">
                   <div className="animate-spin h-12 w-12 border-4 border-orange-500 rounded-full border-t-transparent"></div>
                 </div>
               )}
@@ -525,15 +544,34 @@ export default function WorkerCart() {
               <p className="font-medium text-blue-600 text-lg">{defaultUpiAddress?.upiId}</p>
               <p className="text-sm text-gray-600 mt-1">{defaultUpiAddress?.name}</p>
             </div>
-            <button
-              onClick={handleQrConfirmPayment}
-              className="w-full py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Confirm Payment Received
-            </button>
+            <div className="flex flex-col gap-3 w-full mt-2">
+              <button
+                onClick={async () => {
+                  setShowQrCode(false);
+                  setShowPaymentOptions(false);
+                  setShowPaymentConfirm(false);
+                  setShowCustomPaymentDialog(false);
+                  await processPayment(true, true); // printKOT = true
+                }}
+                className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                disabled={isProcessing}
+              >
+                Confirm and Print
+              </button>
+              <button
+                onClick={async () => {
+                  setShowQrCode(false);
+                  setShowPaymentOptions(false);
+                  setShowPaymentConfirm(false);
+                  setShowCustomPaymentDialog(false);
+                  await processPayment(true, false); // printKOT = false
+                }}
+                className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                disabled={isProcessing}
+              >
+                Confirm
+              </button>
+            </div>
           </div>
         }
         confirmText={null}
@@ -589,13 +627,33 @@ export default function WorkerCart() {
       <ConfirmationDialog
         isOpen={showCashConfirmDialog}
         onClose={() => setShowCashConfirmDialog(false)}
-        onConfirm={() => {
-          setShowCashConfirmDialog(false); // Close this dialog
-          processPayment(true, 'Cash'); // Process the cash payment
-        }}
         title="Confirm Cash Payment"
         message={`Confirm cash payment of ₹${totalAmount.toFixed(2)}?`}
-        confirmText="Yes, Payment Received"
+        customContent={
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={async () => {
+                setShowCashConfirmDialog(false);
+                await processPayment(true, true); // printKOT = true
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              disabled={isProcessing}
+            >
+              Confirm and Print
+            </button>
+            <button
+              onClick={async () => {
+                setShowCashConfirmDialog(false);
+                await processPayment(true, false); // printKOT = false
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              disabled={isProcessing}
+            >
+              Confirm
+            </button>
+          </div>
+        }
+        confirmText={null}
         cancelText="Cancel"
         type="warning"
         isLoading={isProcessing}
@@ -605,15 +663,6 @@ export default function WorkerCart() {
       <ConfirmationDialog
         isOpen={showCustomPaymentDialog}
         onClose={() => setShowCustomPaymentDialog(false)}
-        onConfirm={() => {
-          const totalPaid = manualPayment.cash + manualPayment.online;
-          if (Math.abs(totalPaid - totalAmount) > 0.01) { // Allow for minor floating point inaccuracies
-            showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
-            return;
-          }
-          setShowCustomPaymentDialog(false);
-          processPayment(true);
-        }}
         title="Enter Custom Payment Amounts"
         message={`Order Total: ₹${totalAmount.toFixed(2)}`}
         customContent={
@@ -631,7 +680,6 @@ export default function WorkerCart() {
                   setManualPayment({ cash: newCash, online: newOnline });
                 }}
                 onBlur={(e) => {
-                  // Ensure the value is formatted nicely on blur if it's empty
                   if (e.target.value === '') {
                     setManualPayment(prev => ({ ...prev, cash: 0 }));
                   }
@@ -639,7 +687,7 @@ export default function WorkerCart() {
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                 step="any"
                 min="0"
-                max={totalAmount} // Set max to totalAmount
+                max={totalAmount}
               />
             </div>
             <div>
@@ -655,7 +703,6 @@ export default function WorkerCart() {
                   setManualPayment({ cash: newCash, online: newOnline });
                 }}
                 onBlur={(e) => {
-                  // Ensure the value is formatted nicely on blur if it's empty
                   if (e.target.value === '') {
                     setManualPayment(prev => ({ ...prev, online: 0 }));
                   }
@@ -663,12 +710,51 @@ export default function WorkerCart() {
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
                 step="any"
                 min="0"
-                max={totalAmount} // Set max to totalAmount
+                max={totalAmount}
               />
+            </div>
+            <div className="flex flex-col gap-3 w-full mt-2">
+              <button
+                onClick={async () => {
+                  const totalPaid = manualPayment.cash + manualPayment.online;
+                  if (Math.abs(totalPaid - totalAmount) > 0.01) {
+                    showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
+                    return;
+                  }
+                  setShowCustomPaymentDialog(false);
+                  setShowPaymentOptions(false);
+                  setShowPaymentConfirm(false);
+                  setShowQrCode(false);
+                  setShowSplashScreen(true);
+                  await processPayment(true, true); // printKOT = true
+                }}
+                className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                disabled={isProcessing}
+              >
+                Confirm and Print
+              </button>
+              <button
+                onClick={async () => {
+                  const totalPaid = manualPayment.cash + manualPayment.online;
+                  if (Math.abs(totalPaid - totalAmount) > 0.01) {
+                    showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
+                    return;
+                  }
+                  setShowCustomPaymentDialog(false);
+                  setShowPaymentOptions(false);
+                  setShowPaymentConfirm(false);
+                  setShowQrCode(false);
+                  await processPayment(true, false); // printKOT = false
+                }}
+                className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                disabled={isProcessing}
+              >
+                Confirm
+              </button>
             </div>
           </div>
         }
-        confirmText="Confirm Custom Payment"
+        confirmText={null}
         cancelText="Cancel"
         type="info"
         isLoading={isProcessing}
@@ -678,14 +764,35 @@ export default function WorkerCart() {
       <ConfirmationDialog
         isOpen={showPaymentConfirm}
         onClose={() => setShowPaymentConfirm(false)}
-        onConfirm={() => {
-          setShowPaymentConfirm(false);
-          setShowPaymentOptions(false);
-          processPayment(true);
-        }}
         title="Confirm Payment"
         message={`Confirm ${paymentMethod} payment of ₹${totalAmount.toFixed(2)}?`}
-        confirmText="Yes, Payment Received"
+        customContent={
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={async () => {
+                setShowPaymentConfirm(false);
+                setShowPaymentOptions(false);
+                await processPayment(true, true); // printKOT = true
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              disabled={isProcessing}
+            >
+              Confirm and Print
+            </button>
+            <button
+              onClick={async () => {
+                setShowPaymentConfirm(false);
+                setShowPaymentOptions(false);
+                await processPayment(true, false); // printKOT = false
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              disabled={isProcessing}
+            >
+              Confirm
+            </button>
+          </div>
+        }
+        confirmText={null}
         cancelText="Cancel"
         type="warning"
         isLoading={isProcessing}

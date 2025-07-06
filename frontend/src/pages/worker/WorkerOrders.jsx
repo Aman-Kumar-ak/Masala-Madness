@@ -187,12 +187,8 @@ export default function WorkerOrders() {
     if (!socket) return;
     const handleOrderUpdate = (data) => {
       if (data?.type === 'order-deleted' && data?.orderId) {
-        setOrders(prevOrders => prevOrders.filter(order => order.orderId !== data.orderId));
-        setStats(prevStats => ({
-          ...prevStats,
-          totalOrders: prevStats.totalOrders - 1
-        }));
-        setPendingOrdersCount(prevCount => prevCount - 1);
+        // Refetch orders to update order numbers and details live for all users
+        loadOrders();
       } else if (data?.order?.orderId) {
         setLastUpdatedOrderId(data.order.orderId);
         setOrders(prevOrders => {
