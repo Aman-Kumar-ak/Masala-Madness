@@ -611,7 +611,7 @@ export default function PendingOrders() {
                       <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-4 border-b border-gray-200 flex justify-between items-start">
                         <div>
                           <h2 className="font-bold text-xl text-gray-800 flex items-center gap-2">
-                            <span>Order #{pendingOrders.length - pendingOrders.indexOf(order)}</span>
+                            <span>Order #{order.orderNumber}</span>
                           </h2>
                           <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -787,7 +787,7 @@ export default function PendingOrders() {
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span>{paymentOptionOrderId === order.orderId ? 'Cancel' : 'Confirm Payment'}</span>
+                          <span>Confirm</span>
                         </button>
                         </div>
 
@@ -923,7 +923,7 @@ export default function PendingOrders() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Confirm Payment Received
+              Confirm Payment
             </button>
           </div>
         }

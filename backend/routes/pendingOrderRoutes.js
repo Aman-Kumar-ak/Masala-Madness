@@ -10,8 +10,22 @@ const router = express.Router();
 router.post("/", async (req, res) => {
   try {
     const { items, subtotal, discountAmount, discountPercentage, totalAmount, customCashAmount, customOnlineAmount } = req.body;
+    // Find the max orderNumber among today's confirmed and pending orders
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const [maxConfirmed, maxPending] = await Promise.all([
+      Order.findOne({ createdAt: { $gte: startOfDay, $lte: endOfDay } }).sort({ orderNumber: -1 }).select('orderNumber').lean(),
+      PendingOrder.findOne({ createdAt: { $gte: startOfDay, $lte: endOfDay } }).sort({ orderNumber: -1 }).select('orderNumber').lean()
+    ]);
+    const maxOrderNumber = Math.max(
+      maxConfirmed ? maxConfirmed.orderNumber : 0,
+      maxPending ? maxPending.orderNumber : 0
+    );
+    const newOrderNumber = maxOrderNumber + 1;
     const newPendingOrder = new PendingOrder({
       orderId: uuidv4(),
+      orderNumber: newOrderNumber,
       items,
       subtotal,
       discountAmount: discountAmount || 0,
@@ -127,7 +141,7 @@ router.post("/confirm/:id", async (req, res) => {
     
     const newOrder = new Order({
       orderId: pendingOrder.orderId,
-      orderNumber: dailyOrderCount + 1,
+      orderNumber: pendingOrder.orderNumber,
       items,
       subtotal,
       discountAmount: finalDiscountAmount,

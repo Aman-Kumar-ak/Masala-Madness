@@ -24,6 +24,7 @@ export default function Home() {
   const headerRef = useRef(null);
   const menuSectionRef = useRef(null);
   const [printerStatus, setPrinterStatus] = useState("Not connected");
+  const [showPrinterDialog, setShowPrinterDialog] = useState(false);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -277,7 +278,7 @@ export default function Home() {
                   if (window.AndroidBridge && window.AndroidBridge.openPrinterSettings) {
                     window.AndroidBridge.openPrinterSettings();
                   } else {
-                    alert("Printer settings not available on this platform.");
+                    setShowPrinterDialog(true);
                   }
                 }}
                 className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center transition-all duration-200 hover:bg-green-200 ml-2"
@@ -449,6 +450,17 @@ export default function Home() {
         confirmText="Yes, Clear Cart"
         cancelText="Cancel"
         type="danger"
+      />
+
+      <ConfirmationDialog
+        isOpen={showPrinterDialog}
+        onClose={() => setShowPrinterDialog(false)}
+        onConfirm={() => setShowPrinterDialog(false)}
+        title="Printer settings"
+        message="Printer settings not available on this platform."
+        confirmText="Close"
+        cancelText={null}
+        type="info"
       />
     </div>
   );

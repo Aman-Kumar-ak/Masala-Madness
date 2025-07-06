@@ -871,34 +871,10 @@ const Settings = () => {
         setChangeSecretCodeLockout(null);
         setChangeSecretCodeAttempts(0);
       } else {
-        // Wrong code: increment attempts
-        const newAttempts = changeSecretCodeAttempts + 1;
-        setChangeSecretCodeAttempts(newAttempts);
-        if (newAttempts >= 3) {
-          // Lockout for 24 hours
-          const lockoutUntil = Date.now() + 24 * 60 * 60 * 1000;
-          setChangeSecretCodeLockout(lockoutUntil);
-          setSecretCodeError('Too many failed attempts. Locked out for 24 hours.');
-        } else {
-          setSecretCodeError(`Incorrect secret code. ${3 - newAttempts} attempt${3 - newAttempts === 1 ? '' : 's'} left.`);
-        }
+        setSecretCodeError('Incorrect secret code. Please try again.');
       }
     } catch (error) {
-      if (error.status === 423) {
-        setChangeSecretCodeLockout(error.data?.lockoutMs ? Date.now() + error.data.lockoutMs : Date.now() + 24 * 60 * 60 * 1000);
-        setSecretCodeError(error.data?.message || 'Too many failed attempts. Locked out.');
-        return;
-      }
-      // Instead, treat as a failed attempt
-      const newAttempts = changeSecretCodeAttempts + 1;
-      setChangeSecretCodeAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        const lockoutUntil = Date.now() + 24 * 60 * 60 * 1000;
-        setChangeSecretCodeLockout(lockoutUntil);
-        setSecretCodeError('Too many failed attempts. Locked out for 24 hours.');
-      } else {
-        setSecretCodeError(`Incorrect secret code. ${3 - newAttempts} attempt${3 - newAttempts === 1 ? '' : 's'} left.`);
-      }
+      setSecretCodeError('Incorrect secret code. Please try again.');
     } finally {
       setIsSecretCodeChanging(false);
       clearAuthOperationInProgress();
@@ -945,35 +921,10 @@ const Settings = () => {
         setAdminSecretCodeAttempts(0); // reset attempts on success
         setAdminSecretCodeLockout(null);
       } else {
-        // Wrong code: increment attempts
-        const newAttempts = adminSecretCodeAttempts + 1;
-        setAdminSecretCodeAttempts(newAttempts);
-        if (newAttempts >= 3) {
-          // Lockout for 24 hours
-          const lockoutUntil = Date.now() + 24 * 60 * 60 * 1000;
-          setAdminSecretCodeLockout(lockoutUntil);
-          setSecretCodeError('Too many failed attempts. Locked out for 24 hours.');
-        } else {
-          setSecretCodeError(`Incorrect secret code. ${3 - newAttempts} attempt${3 - newAttempts === 1 ? '' : 's'} left.`);
-        }
+        setSecretCodeError('Incorrect secret code. Please try again.');
       }
     } catch (error) {
-      // Do NOT log out or redirect on 401/403 for this case
-      if (error.status === 423) {
-        setChangeSecretCodeLockout(error.data?.lockoutMs ? Date.now() + error.data.lockoutMs : Date.now() + 24 * 60 * 60 * 1000);
-        setSecretCodeError(error.data?.message || 'Too many failed attempts. Locked out.');
-        return;
-      }
-      // Instead, treat as a failed attempt
-      const newAttempts = adminSecretCodeAttempts + 1;
-      setAdminSecretCodeAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        const lockoutUntil = Date.now() + 24 * 60 * 60 * 1000;
-        setAdminSecretCodeLockout(lockoutUntil);
-        setSecretCodeError('Too many failed attempts. Locked out for 24 hours.');
-      } else {
-        setSecretCodeError(`Incorrect secret code. ${3 - newAttempts} attempt${3 - newAttempts === 1 ? '' : 's'} left.`);
-      }
+      setSecretCodeError('Incorrect secret code. Please try again.');
     } finally {
       setIsSecretCodeChanging(false);
       clearAuthOperationInProgress();

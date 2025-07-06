@@ -532,6 +532,27 @@ export const AuthProvider = ({ children }) => {
     };
   }, [isAuthenticated, user]);
   
+  // Update lastClosed when user goes offline
+  useEffect(() => {
+    if (isOffline && isAuthenticated && user && user._id) {
+      // Use the full backend URL for the API endpoint
+      const url = 'https://masala-madness.onrender.com/api/auth/last-closed';
+      const payload = JSON.stringify({ userId: user._id });
+      console.log('Sending lastClosed update due to offline', user._id);
+      if (navigator.sendBeacon) {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon(url, blob);
+      } else {
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true
+        });
+      }
+    }
+  }, [isOffline, isAuthenticated, user]);
+  
   // Provide auth data and functions to components
   const authContextValue = {
     isAuthenticated,
