@@ -65,27 +65,30 @@ function WorkerOrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDa
           )}
         </div>
         <div className="text-right">
-          {order.isPaid ? (
-            <span className="text-gray-500 text-sm">
-              Paid
-              {order.paymentMethod.startsWith('Custom') ? (
-                <span className="font-medium"> Custom</span>
-              ) : (
-                <span className="font-medium"> {order.paymentMethod}</span>
-              )}
+          <div className="flex flex-col items-end">
+            {order.isPaid ? (
+              <span className="text-gray-500 text-sm">
+                Paid
+                {order.paymentMethod.startsWith('Custom') ? (
+                  <span className="font-medium"> Custom</span>
+                ) : (
+                  <span className="font-medium"> {order.paymentMethod}</span>
+                )}
+              </span>
+            ) : null}
+            <span
+              ref={amountRef}
+              className="text-xl font-bold text-gray-800 mt-1 block"
+              style={{ marginTop: 4 }}
+            >
+              ₹{displayAmount.toFixed(2)}
             </span>
-          ) : null}
-          <span
-            ref={amountRef}
-            className="text-xl font-bold text-gray-800 mt-1 inline-block"
-          >
-            ₹{displayAmount.toFixed(2)}
-          </span>
-          {order.discountAmount > 0 && (
-            <p className="text-sm text-gray-500 line-through">
-              ₹{order.subtotal.toFixed(2)}
-            </p>
-          )}
+            {order.discountAmount > 0 && (
+              <p className="text-sm text-gray-500 line-through">
+                ₹{order.subtotal.toFixed(2)}
+              </p>
+            )}
+          </div>
         </div>
       </div>
       <div className="mt-3 bg-gray-50 p-3 rounded-lg">

@@ -8,7 +8,7 @@ import Notification from '../../components/Notification';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
-import { AuthContext } from '../../contexts/AuthContext';
+import AuthContext from '../../contexts/AuthContext';
 
 export default function WorkerPendingOrders() {
   useKeyboardScrollAdjustment();
