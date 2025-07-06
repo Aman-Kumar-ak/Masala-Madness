@@ -568,292 +568,294 @@ export default function PendingOrders() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 pt-20 pb-12">
-      <BackButton />
-      
-      <div className="container mx-auto px-4 max-w-5xl">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
-            <span className="text-2xl">📋</span>
-            <span>Pending Orders</span>
-            {pendingOrders.length > 0 && (
-              <span className="ml-2 bg-orange-500 text-white text-sm rounded-full h-6 w-6 flex items-center justify-center">
-                {pendingOrders.length}
-              </span>
-            )}
-          </h1>
-        </div>
+    <div className="relative z-0">
+      <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 pt-20 pb-12">
+        <BackButton />
         
-        {loading ? (
-          <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200">
-            <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mb-4"></div>
-            <p className="text-gray-600">Loading pending orders...</p>
+        <div className="container mx-auto px-4 max-w-5xl">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+              <span className="text-2xl">📋</span>
+              <span>Pending Orders</span>
+              {pendingOrders.length > 0 && (
+                <span className="ml-2 bg-orange-500 text-white text-sm rounded-full h-6 w-6 flex items-center justify-center">
+                  {pendingOrders.length}
+                </span>
+              )}
+            </h1>
           </div>
-        ) : (
-          <div 
-            ref={ordersContainerRef} 
-            className="space-y-6 overflow-y-auto max-h-[calc(100vh-160px)]"
-          >
-            {pendingOrders.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200">
-                <div className="text-5xl mb-4">🍽️</div>
-                <p className="text-xl text-gray-600 mb-2">No pending orders found</p>
-                <p className="text-gray-500 mb-6">All orders have been processed</p>
-                <Link
-                  to="/"
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-lg font-medium shadow-sm transition-all duration-200"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
-                  </svg>
-                  <span>Return to Menu</span>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {pendingOrders.map(order => {
-                  const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(order);
-                  const maxManual = Math.max(0, order.subtotal - percentageDiscount);
-                  const totalAmount = order.subtotal - totalDiscount;
-                  return (
-                    <div key={order.orderId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
-                      {/* Header Section */}
-                      <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-4 border-b border-gray-200 flex justify-between items-start">
-                        <div>
-                          <h2 className="font-bold text-xl text-gray-800 flex items-center gap-2">
-                            <span>Order #{order.orderNumber}</span>
-                          </h2>
-                          <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {new Date(order.createdAt).toLocaleString("en-IN", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              hour12: true,
-                            })}
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={() => handleRemoveEntireOrder(order)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-colors duration-200 font-medium text-sm"
-                          aria-label="Delete entire order"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          <span>Delete</span>
-                        </button>
-                      </div>
-
-                      {/* Price Summary */}
-                      <div className="p-4 bg-white">
-                        <div className="mb-4 bg-gray-50 p-4 rounded-lg">
-                          <div className="flex justify-between mb-2">
-                            <span className="text-gray-700 font-medium">Subtotal:</span>
-                            <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
+          
+          {loading ? (
+            <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200">
+              <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mb-4"></div>
+              <p className="text-gray-600">Loading pending orders...</p>
+            </div>
+          ) : (
+            <div 
+              ref={ordersContainerRef} 
+              className="space-y-6 overflow-y-auto max-h-[calc(100vh-160px)]"
+            >
+              {pendingOrders.length === 0 ? (
+                <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200">
+                  <div className="text-5xl mb-4">🍽️</div>
+                  <p className="text-xl text-gray-600 mb-2">No pending orders found</p>
+                  <p className="text-gray-500 mb-6">All orders have been processed</p>
+                  <Link
+                    to="/"
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-lg font-medium shadow-sm transition-all duration-200"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+                    </svg>
+                    <span>Return to Menu</span>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {pendingOrders.map(order => {
+                    const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(order);
+                    const maxManual = Math.max(0, order.subtotal - percentageDiscount);
+                    const totalAmount = order.subtotal - totalDiscount;
+                    return (
+                      <div key={order.orderId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
+                        {/* Header Section */}
+                        <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-4 border-b border-gray-200 flex justify-between items-start">
+                          <div>
+                            <h2 className="font-bold text-xl text-gray-800 flex items-center gap-2">
+                              <span>Order #{order.orderNumber}</span>
+                            </h2>
+                            <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {new Date(order.createdAt).toLocaleString("en-IN", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              })}
+                            </p>
                           </div>
-                          {activeDiscount && order.subtotal >= activeDiscount.minOrderAmount && (
-                            <div className="flex justify-between text-green-600 mb-2">
-                              <span className="font-medium flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                </svg>
-                                Discount ({activeDiscount.percentage}%):
-                              </span>
-                              <span className="font-medium">-₹{percentageDiscount.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {/* Manual Discount Input */}
-                          <div className="flex justify-between items-center text-gray-600 mb-2">
-                            <span className="font-medium">Discount:</span>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                value={getManualDiscount(order.orderId) || ''}
-                                onChange={e => {
-                                  const val = Math.max(0, parseFloat(e.target.value) || 0);
-                                  handleManualDiscountChange(order, val);
-                                }}
-                                className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
-                                placeholder="0.00"
-                                min="0"
-                                max={maxManual}
-                                step="any"
-                              />
-                              {getManualDiscount(order.orderId) > 0 && (
-                                <button
-                                  onClick={() => handleRemoveManualDiscount(order.orderId)}
-                                  className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
-                                  aria-label="Remove manual discount"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex justify-between font-bold text-green-700 pt-2 border-t border-gray-200">
-                            <span>Total Discount:</span>
-                            <span className="text-green-600">-₹{totalDiscount.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between font-bold text-green-700 pt-2">
-                            <span>Amount:</span>
-                            <span>₹{totalAmount.toFixed(2)}</span>
-                          </div>
-                        </div>
 
-                        {/* Items List */}
-                        <h3 className="font-medium text-gray-700 mb-3">Order Items</h3>
-                        <ul className="space-y-2 mb-4">
-                          {order.items.map((item, index) => (
-                            <li key={index} className="bg-gray-50 rounded-lg p-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-2">
-                              <div className="flex flex-col min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-medium text-gray-800 break-words line-clamp-2 w-full sm:w-auto">{item.name}</span>
-                                  {item.type !== 'Fixed' && item.type !== 'FIXED' && (
-                                    <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
-                                      {item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[11px] xxs:text-xs sm:text-sm text-gray-600 mt-1 overflow-hidden text-ellipsis">
-                                  <span className="whitespace-nowrap">₹{item.price.toFixed(2)} × {item.quantity} = ₹{(item.price * item.quantity).toFixed(2)}</span>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                <button
-                                  onClick={() => handleQuantityChange(order.orderId, index, -1)}
-                                  disabled={item.quantity === 1}
-                                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
-                                    item.quantity === 1
-                                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                      : 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-200'
-                                  }`}
-                                  aria-label={`Decrease quantity of ${item.name}`}
-                                >
-                                  -
-                                </button>
-                                
-                                <div className="inline-flex justify-center items-center bg-white border border-gray-200 rounded-md px-2 min-w-[1.75rem] sm:min-w-[2rem] h-7 sm:h-8 text-center">
-                                  {item.quantity}
-                                </div>
-                                
-                                <button
-                                  onClick={() => handleQuantityChange(order.orderId, index, 1)}
-                                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
-                                  aria-label={`Increase quantity of ${item.name}`}
-                                >
-                                  +
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleRemoveItemOrOrder(order, item, index)}
-                                  className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
-                                  aria-label={`Remove ${item.name}`}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-3 border-t border-gray-200 pt-4">
                           <button
-                            onClick={() => { 
-                              setShowMenu(true); 
-                              setCurrentOrderId(order.orderId); 
-                            }}
-                            className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                            onClick={() => handleRemoveEntireOrder(order)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-colors duration-200 font-medium text-sm"
+                            aria-label="Delete entire order"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            <span>Add Items</span>
+                            <span>Delete</span>
                           </button>
-                          
-                        <button
-                          onClick={() => {
-                            setPaymentOptionOrderId(order.orderId); // Open payment options dialog
-                            setCurrentOrderForQr(order); // Ensure current order is set for dialogs
-                          }}
-                          className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2 ${
-                        paymentConfirmedOrderId === order.orderId
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : paymentOptionOrderId === order.orderId
-                              ? 'bg-gray-700 text-white'
-                              : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
-                      }`}
-                      disabled={paymentConfirmedOrderId === order.orderId}
-                    >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span>Confirm</span>
-                        </button>
                         </div>
 
-                        {/* Payment Options Dialog */}
-                        {paymentOptionOrderId && (
-                          <ConfirmationDialog
-                            isOpen={!!paymentOptionOrderId}
-                            onClose={() => setPaymentOptionOrderId(null)}
-                            title="Select Payment Method"
-                            message="How would the customer like to pay?"
-                            customContent={
-                              <div className="flex flex-wrap justify-center gap-3 w-full">
-                                <button
-                                  onClick={() => handlePaymentMethodSelect("Cash", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
-                                  className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        {/* Price Summary */}
+                        <div className="p-4 bg-white">
+                          <div className="mb-4 bg-gray-50 p-4 rounded-lg">
+                            <div className="flex justify-between mb-2">
+                              <span className="text-gray-700 font-medium">Subtotal:</span>
+                              <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
+                            </div>
+                            {activeDiscount && order.subtotal >= activeDiscount.minOrderAmount && (
+                              <div className="flex justify-between text-green-600 mb-2">
+                                <span className="font-medium flex items-center gap-1">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                   </svg>
-                                  Cash
-                                </button>
-                                <button
-                                  onClick={() => handlePaymentMethodSelect("Online", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
-                                  className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-yellow-500 hover:bg-yellow-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                  </svg>
-                                  Online
-                                </button>
-                                <button
-                                  onClick={() => handlePaymentMethodSelect("Custom", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
-                                  className="w-full py-3 px-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                  </svg>
-                                  Custom
-                                </button>
+                                  Discount ({activeDiscount.percentage}%):
+                                </span>
+                                <span className="font-medium">-₹{percentageDiscount.toFixed(2)}</span>
                               </div>
-                            }
-                            confirmText={null}
-                            cancelText="Cancel"
-                            type="info"
-                            isLoading={false}
-                          />
-                        )}
+                            )}
+                            {/* Manual Discount Input */}
+                            <div className="flex justify-between items-center text-gray-600 mb-2">
+                              <span className="font-medium">Discount:</span>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  value={getManualDiscount(order.orderId) || ''}
+                                  onChange={e => {
+                                    const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                    handleManualDiscountChange(order, val);
+                                  }}
+                                  className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
+                                  placeholder="0.00"
+                                  min="0"
+                                  max={maxManual}
+                                  step="any"
+                                />
+                                {getManualDiscount(order.orderId) > 0 && (
+                                  <button
+                                    onClick={() => handleRemoveManualDiscount(order.orderId)}
+                                    className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
+                                    aria-label="Remove manual discount"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex justify-between font-bold text-green-700 pt-2 border-t border-gray-200">
+                              <span>Total Discount:</span>
+                              <span className="text-green-600">-₹{totalDiscount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-green-700 pt-2">
+                              <span>Amount:</span>
+                              <span>₹{totalAmount.toFixed(2)}</span>
+                            </div>
+                          </div>
+
+                          {/* Items List */}
+                          <h3 className="font-medium text-gray-700 mb-3">Order Items</h3>
+                          <ul className="space-y-2 mb-4">
+                            {order.items.map((item, index) => (
+                              <li key={index} className="bg-gray-50 rounded-lg p-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-2">
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-gray-800 break-words line-clamp-2 w-full sm:w-auto">{item.name}</span>
+                                    {item.type !== 'Fixed' && item.type !== 'FIXED' && (
+                                      <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
+                                        {item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] xxs:text-xs sm:text-sm text-gray-600 mt-1 overflow-hidden text-ellipsis">
+                                    <span className="whitespace-nowrap">₹{item.price.toFixed(2)} × {item.quantity} = ₹{(item.price * item.quantity).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                                  <button
+                                    onClick={() => handleQuantityChange(order.orderId, index, -1)}
+                                    disabled={item.quantity === 1}
+                                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                                      item.quantity === 1
+                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                        : 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-200'
+                                    }`}
+                                    aria-label={`Decrease quantity of ${item.name}`}
+                                  >
+                                    -
+                                  </button>
+                                  
+                                  <div className="inline-flex justify-center items-center bg-white border border-gray-200 rounded-md px-2 min-w-[1.75rem] sm:min-w-[2rem] h-7 sm:h-8 text-center">
+                                    {item.quantity}
+                                  </div>
+                                  
+                                  <button
+                                    onClick={() => handleQuantityChange(order.orderId, index, 1)}
+                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
+                                    aria-label={`Increase quantity of ${item.name}`}
+                                  >
+                                    +
+                                  </button>
+                                  
+                                  <button
+                                    onClick={() => handleRemoveItemOrOrder(order, item, index)}
+                                    className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
+                                    aria-label={`Remove ${item.name}`}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-3 border-t border-gray-200 pt-4">
+                            <button
+                              onClick={() => { 
+                                setShowMenu(true); 
+                                setCurrentOrderId(order.orderId); 
+                              }}
+                              className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                              <span>Add Items</span>
+                            </button>
+                            
+                          <button
+                            onClick={() => {
+                              setPaymentOptionOrderId(order.orderId); // Open payment options dialog
+                              setCurrentOrderForQr(order); // Ensure current order is set for dialogs
+                            }}
+                            className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2 ${
+                          paymentConfirmedOrderId === order.orderId
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : paymentOptionOrderId === order.orderId
+                                ? 'bg-gray-700 text-white'
+                                : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                        }`}
+                        disabled={paymentConfirmedOrderId === order.orderId}
+                      >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Confirm</span>
+                          </button>
+                          </div>
+
+                          {/* Payment Options Dialog */}
+                          {paymentOptionOrderId && (
+                            <ConfirmationDialog
+                              isOpen={!!paymentOptionOrderId}
+                              onClose={() => setPaymentOptionOrderId(null)}
+                              title="Select Payment Method"
+                              message="How would the customer like to pay?"
+                              customContent={
+                                <div className="flex flex-wrap justify-center gap-3 w-full">
+                                  <button
+                                    onClick={() => handlePaymentMethodSelect("Cash", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
+                                    className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                    </svg>
+                                    Cash
+                                  </button>
+                                  <button
+                                    onClick={() => handlePaymentMethodSelect("Online", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
+                                    className="flex-1 min-w-[calc(50%-0.75rem)] py-3 px-3 rounded-lg font-medium bg-yellow-500 hover:bg-yellow-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    Online
+                                  </button>
+                                  <button
+                                    onClick={() => handlePaymentMethodSelect("Custom", pendingOrders.find(o => o.orderId === paymentOptionOrderId))}
+                                    className="w-full py-3 px-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    Custom
+                                  </button>
+                                </div>
+                              }
+                              confirmText={null}
+                              cancelText="Cancel"
+                              type="info"
+                              isLoading={false}
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </div>
+      </div>
       
       {showMenu && (
         <MenuModal 
@@ -882,65 +884,71 @@ export default function PendingOrders() {
         />
       )}
 
-      {/* QR Code Payment Dialog */}
-      <ConfirmationDialog
-        isOpen={showQrCode}
-        onClose={() => setShowQrCode(false)}
-        title="Scan QR Code to Pay"
-        message={`Total Amount: ₹${currentOrderForQr ? (currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount).toFixed(2) : '0.00'}`}
-        customContent={
-          <div className="flex flex-col items-center gap-4 w-full">
-            <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">
-              {qrCodeUrl ? (
-                <img
-                  src={qrCodeUrl}
-                  alt="Payment QR Code"
-                  className="w-64 h-64 object-contain"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "/images/qr-code.png";
-                    setNotification({
-                      message: "QR code generation failed. Please try again.",
-                      type: "error"
-                    });
-                  }}
-                />
-              ) : (
-                <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg">
-                  <div className="animate-spin h-12 w-12 border-4 border-orange-500 rounded-full border-t-transparent"></div>
+      {showQrCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-white bg-opacity-80 backdrop-blur-sm"></div>
+          <div className="relative z-10">
+            <ConfirmationDialog
+              isOpen={showQrCode}
+              onClose={() => setShowQrCode(false)}
+              title="Scan QR Code to Pay"
+              message={`Total Amount: ₹${currentOrderForQr ? (currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount).toFixed(2) : '0.00'}`}
+              customContent={
+                <div className="flex flex-col items-center gap-4 w-full">
+                  <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">
+                    {qrCodeUrl ? (
+                      <img
+                        src={qrCodeUrl}
+                        alt="Payment QR Code"
+                        className="w-64 h-64 object-contain"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = "/images/qr-code.png";
+                          setNotification({
+                            message: "QR code generation failed. Please try again.",
+                            type: "error"
+                          });
+                        }}
+                      />
+                    ) : (
+                      <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+                        <div className="animate-spin h-12 w-12 border-4 border-orange-500 rounded-full border-t-transparent"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 w-full text-center">
+                    <p className="font-medium text-gray-700">Paying to:</p>
+                    <p className="font-medium text-blue-600 text-lg">{defaultUpiAddress?.upiId}</p>
+                    <p className="text-sm text-gray-600 mt-1">{defaultUpiAddress?.name}</p>
+                  </div>
+                  {activeDiscount && currentOrderForQr && currentOrderForQr.subtotal >= activeDiscount.minOrderAmount && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2 w-full text-center">
+                      <p className="text-sm text-green-600 flex items-center justify-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <span>{activeDiscount.percentage}% discount applied</span>
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleQrConfirmPayment}
+                    className="w-full py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Confirm Payment
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 w-full text-center">
-              <p className="font-medium text-gray-700">Paying to:</p>
-              <p className="font-medium text-blue-600 text-lg">{defaultUpiAddress?.upiId}</p>
-              <p className="text-sm text-gray-600 mt-1">{defaultUpiAddress?.name}</p>
-            </div>
-            {activeDiscount && currentOrderForQr && currentOrderForQr.subtotal >= activeDiscount.minOrderAmount && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-2 w-full text-center">
-                <p className="text-sm text-green-600 flex items-center justify-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  <span>{activeDiscount.percentage}% discount applied</span>
-                </p>
-              </div>
-            )}
-            <button
-              onClick={handleQrConfirmPayment}
-              className="w-full py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Confirm Payment
-            </button>
+              }
+              confirmText={null}
+              cancelText="Cancel"
+              type="info"
+            />
           </div>
-        }
-        confirmText={null}
-        cancelText="Cancel"
-        type="info"
-      />
+        </div>
+      )}
 
       {cashConfirmDialog.isOpen && (
         <ConfirmationDialog

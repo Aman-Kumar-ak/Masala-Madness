@@ -325,16 +325,26 @@ export default function WorkerPendingOrders() {
       const updatedItems = [...order.items];
       updatedItems[itemIndex] = {
         ...updatedItems[itemIndex],
-        quantity: updatedItems[itemIndex].quantity + delta
+        quantity: updatedItems[itemIndex].quantity + delta,
+        totalPrice: updatedItems[itemIndex].price * (updatedItems[itemIndex].quantity + delta),
       };
       // Remove item if quantity is 0
       if (updatedItems[itemIndex].quantity <= 0) {
         updatedItems.splice(itemIndex, 1);
       }
+      // Recalculate totals
+      const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const discountPercentage = order.discountPercentage || 0;
+      const discountAmount = Math.round(subtotal * discountPercentage / 100);
+      const totalAmount = subtotal - discountAmount;
       const data = await api.post('/orders/confirm', {
         orderId,
         items: updatedItems,
-        isPaid: false
+        isPaid: false,
+        subtotal,
+        discountAmount,
+        discountPercentage,
+        totalAmount,
       });
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
@@ -621,7 +631,7 @@ export default function WorkerPendingOrders() {
                       <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-4 border-b border-gray-200 flex justify-between items-start">
                         <div>
                           <h2 className="font-bold text-xl text-gray-800 flex items-center gap-2">
-                            <span>Order #{pendingOrders.length - pendingOrders.indexOf(order)}</span>
+                            <span>Order #{order.orderNumber ?? (pendingOrders.length - pendingOrders.indexOf(order))}</span>
                           </h2>
                           <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -797,7 +807,7 @@ export default function WorkerPendingOrders() {
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span>{paymentOptionOrderId === order.orderId ? 'Cancel' : 'Confirm Payment'}</span>
+                          <span>{paymentOptionOrderId === order.orderId ? 'Cancel' : 'Confirm'}</span>
                         </button>
                         </div>
 
@@ -883,65 +893,71 @@ export default function WorkerPendingOrders() {
         />
       )}
 
-      {/* QR Code Payment Dialog */}
-      <ConfirmationDialog
-        isOpen={showQrCode}
-        onClose={() => setShowQrCode(false)}
-        title="Scan QR Code to Pay"
-        message={`Total Amount: ₹${currentOrderForQr ? (currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount).toFixed(2) : '0.00'}`}
-        customContent={
-          <div className="flex flex-col items-center gap-4 w-full">
-            <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">
-              {qrCodeUrl ? (
-                <img
-                  src={qrCodeUrl}
-                  alt="Payment QR Code"
-                  className="w-64 h-64 object-contain"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "/images/qr-code.png";
-                    setNotification({
-                      message: "QR code generation failed. Please try again.",
-                      type: "error"
-                    });
-                  }}
-                />
-              ) : (
-                <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg">
-                  <div className="animate-spin h-12 w-12 border-4 border-orange-500 rounded-full border-t-transparent"></div>
+      {showQrCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-white bg-opacity-80 backdrop-blur-sm"></div>
+          <div className="relative z-10">
+            <ConfirmationDialog
+              isOpen={showQrCode}
+              onClose={() => setShowQrCode(false)}
+              title="Scan QR Code to Pay"
+              message={`Total Amount: ₹${currentOrderForQr ? (currentOrderForQr.subtotal - calculateOrderDiscount(currentOrderForQr).totalDiscount).toFixed(2) : '0.00'}`}
+              customContent={
+                <div className="flex flex-col items-center gap-4 w-full">
+                  <div className="bg-white p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center">
+                    {qrCodeUrl ? (
+                      <img
+                        src={qrCodeUrl}
+                        alt="Payment QR Code"
+                        className="w-64 h-64 object-contain"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = "/images/qr-code.png";
+                          setNotification({
+                            message: "QR code generation failed. Please try again.",
+                            type: "error"
+                          });
+                        }}
+                      />
+                    ) : (
+                      <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+                        <div className="animate-spin h-12 w-12 border-4 border-orange-500 rounded-full border-t-transparent"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 w-full text-center">
+                    <p className="font-medium text-gray-700">Paying to:</p>
+                    <p className="font-medium text-blue-600 text-lg">{defaultUpiAddress?.upiId}</p>
+                    <p className="text-sm text-gray-600 mt-1">{defaultUpiAddress?.name}</p>
+                  </div>
+                  {activeDiscount && currentOrderForQr && currentOrderForQr.subtotal >= activeDiscount.minOrderAmount && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2 w-full text-center">
+                      <p className="text-sm text-green-600 flex items-center justify-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <span>{activeDiscount.percentage}% discount applied</span>
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleQrConfirmPayment}
+                    className="w-full py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Confirm Payment
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 w-full text-center">
-              <p className="font-medium text-gray-700">Paying to:</p>
-              <p className="font-medium text-blue-600 text-lg">{defaultUpiAddress?.upiId}</p>
-              <p className="text-sm text-gray-600 mt-1">{defaultUpiAddress?.name}</p>
-            </div>
-            {activeDiscount && currentOrderForQr && currentOrderForQr.subtotal >= activeDiscount.minOrderAmount && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-2 w-full text-center">
-                <p className="text-sm text-green-600 flex items-center justify-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  <span>{activeDiscount.percentage}% discount applied</span>
-                </p>
-              </div>
-            )}
-            <button
-              onClick={handleQrConfirmPayment}
-              className="w-full py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Confirm Payment Received
-            </button>
+              }
+              confirmText={null}
+              cancelText="Cancel"
+              type="info"
+            />
           </div>
-        }
-        confirmText={null}
-        cancelText="Cancel"
-        type="info"
-      />
+        </div>
+      )}
 
       {/* Cash Payment Confirmation Dialog for Pending Orders */}
       {showCashPaymentConfirm && currentOrderForCashConfirm && (

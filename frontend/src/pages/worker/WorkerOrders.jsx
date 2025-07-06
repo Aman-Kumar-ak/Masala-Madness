@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import BackButton from "../../components/BackButton";
 import { useRefresh } from "../../contexts/RefreshContext";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,106 @@ import Notification from "../../components/Notification";
 import { AnimatePresence, motion } from 'framer-motion';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// WorkerOrderCard component for per-order animation
+function WorkerOrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST }) {
+  // Animate totalAmount with Framer Motion
+  const amountRef = useRef(null);
+  const [displayAmount, setDisplayAmount] = useState(order.totalAmount);
+  useEffect(() => {
+    if (isUpdated) {
+      // Animate number flip
+      const start = displayAmount;
+      const end = order.totalAmount;
+      if (start !== end) {
+        let frame;
+        let startTime;
+        const duration = 400;
+        const animate = (timestamp) => {
+          if (!startTime) startTime = timestamp;
+          const progress = Math.min((timestamp - startTime) / duration, 1);
+          const value = start + (end - start) * progress;
+          setDisplayAmount(value);
+          if (progress < 1) {
+            frame = requestAnimationFrame(animate);
+          } else {
+            setDisplayAmount(end);
+          }
+        };
+        frame = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(frame);
+      }
+    } else {
+      setDisplayAmount(order.totalAmount);
+    }
+  }, [order.totalAmount, isUpdated]);
+
+  return (
+    <div
+      className={order.isPaid ? "bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative" : "bg-red-50 p-5 rounded-lg shadow-sm border border-red-200 hover:shadow-md transition-all duration-300 relative"}
+    >
+      <div className="flex justify-between items-start mb-3 relative">
+        <div className="relative">
+          {!order.isPaid && (
+            <span className="absolute -top-4 left-0 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm z-10 select-none" style={{lineHeight: '1.2', letterSpacing: '0.02em'}}>
+              Pending
+            </span>
+          )}
+          <div className="flex items-center">
+            <h3 className="text-lg font-semibold mr-2 whitespace-nowrap">Order #{order.orderNumber}</h3>
+            {/* Delete button removed as per worker requirements */}
+          </div>
+          <p className="text-gray-500 text-sm mt-1">
+            {formatDateIST(order.createdAt)}
+          </p>
+        </div>
+        <div className="text-right">
+          {order.isPaid ? (
+            <span className="text-gray-500 text-sm">
+              Paid
+              {order.paymentMethod.startsWith('Custom') ? (
+                <span className="font-medium"> Custom</span>
+              ) : (
+                <span className="font-medium"> {order.paymentMethod}</span>
+              )}
+            </span>
+          ) : null}
+          <span
+            ref={amountRef}
+            className="text-xl font-bold text-gray-800 mt-1 inline-block"
+          >
+            ₹{displayAmount.toFixed(2)}
+          </span>
+          {order.discountAmount > 0 && (
+            <p className="text-sm text-gray-500 line-through">
+              ₹{order.subtotal.toFixed(2)}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="mt-3 bg-gray-50 p-3 rounded-lg">
+        <h4 className="font-medium mb-2">Items:</h4>
+        <ul className="space-y-1.5">
+          {order.items.map((item, index) => (
+            <li
+              key={index}
+              className="text-sm flex flex-col"
+            >
+              <span className="font-medium text-gray-800 mb-0.5">{item.name} ({item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type})</span>
+              <span className="text-gray-600 italic text-xs">{item.quantity} x ₹{item.price.toFixed(2)} = <span className="font-bold">₹{item.totalPrice.toFixed(2)}</span></span>
+            </li>
+          ))}
+        </ul>
+        {order.discountAmount > 0 && (
+          <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-green-600 flex justify-between">
+            <span>Discount Applied: {order.discountPercentage}%</span>
+            <span>-₹{order.discountAmount.toFixed(2)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function WorkerOrders() {
   const [orders, setOrders] = useState([]);
@@ -31,6 +131,9 @@ export default function WorkerOrders() {
   const navigate = useNavigate();
 
   const { refreshKey, socket } = useRefresh();
+
+  const [lastUpdatedOrderId, setLastUpdatedOrderId] = useState(null);
+  const [orderFilter, setOrderFilter] = useState('all'); // 'all', 'confirmed', 'pending'
 
   // Helper to parse custom payment amounts from the paymentMethod string
   const parseCustomPaymentAmounts = (paymentMethodString) => {
@@ -80,7 +183,27 @@ export default function WorkerOrders() {
   useEffect(() => {
     if (!socket) return;
     const handleOrderUpdate = (data) => {
-      loadOrders();
+      if (data?.order?.orderId) {
+        setLastUpdatedOrderId(data.order.orderId);
+        setOrders(prevOrders => {
+          const filtered = prevOrders.filter(order => order.orderId !== data.order.orderId);
+          const newOrders = [data.order, ...filtered];
+          // Update stats live
+          const paidOrders = newOrders.filter(o => o.isPaid);
+          const totalPaidOrders = paidOrders.length;
+          const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+          const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0;
+          setStats({
+            totalOrders: newOrders.length,
+            totalPaidOrders,
+            totalRevenue,
+            avgOrderValue
+          });
+          // Update pending orders count live
+          setPendingOrdersCount(newOrders.filter(o => !o.isPaid).length);
+          return newOrders;
+        });
+      }
     };
     socket.on('order-update', handleOrderUpdate);
     return () => {
@@ -193,6 +316,17 @@ export default function WorkerOrders() {
     );
   }
 
+  // Before rendering orders, sort by orderNumber descending (like admin Orders.jsx)
+  const sortedOrders = [...orders].sort((a, b) => b.orderNumber - a.orderNumber);
+
+  // Filter orders based on filter bar
+  const filteredOrders = sortedOrders.filter(order => {
+    if (orderFilter === 'all') return true;
+    if (orderFilter === 'confirmed') return order.isPaid;
+    if (orderFilter === 'pending') return !order.isPaid;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-orange-100">
       <BackButton />
@@ -207,7 +341,7 @@ export default function WorkerOrders() {
 
           {/* Enhanced Stats Display (Total Orders & Pending Orders) */}
           {orders.length > 0 && ( // Only show stats if there are orders
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg shadow-sm border border-orange-200 transition-all duration-300 hover:shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700">Total Orders</h3>
                 <p className="text-3xl font-bold text-orange-600 mt-2">
@@ -216,110 +350,56 @@ export default function WorkerOrders() {
               </div>
 
               <div
-                role="button"
-                tabIndex={0}
-                className="bg-gradient-to-br from-orange-50 to-yellow-100 p-4 rounded-lg shadow-sm border border-yellow-200 transition-all duration-300 hover:shadow-md cursor-pointer"
+                className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg shadow-sm border border-yellow-200 transition-all duration-300 hover:shadow-md cursor-pointer"
                 onClick={() => navigate("/worker-pending-orders")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    navigate("/worker-pending-orders");
-                  }
-                }}
-                aria-label={`Pending Orders: ${pendingOrdersCount}`}
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigate('/worker-pending-orders'); }}
+                aria-label="View Pending Orders"
               >
                 <h3 className="text-lg font-semibold text-gray-700 select-none">Pending Orders</h3>
                 <p className="text-3xl font-bold text-yellow-600 mt-2 select-none">{pendingOrdersCount}</p>
-                <p className="text-sm text-gray-500 mt-1 select-none">Orders awaiting confirmation</p>
               </div>
             </div>
           )}
 
+          {/* Divider above Filter Bar */}
+          <div className="w-full border-t border-gray-200 mb-3"></div>
+          {/* Filter Bar */}
+          <div className="flex gap-1 mb-6 overflow-x-auto hide-scrollbar pb-2">
+            <button
+              className={`px-3 py-2 rounded-full font-medium whitespace-nowrap transition-colors duration-200 focus:outline-none ${orderFilter === 'all' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'bg-transparent text-gray-700 hover:bg-orange-50'}`}
+              onClick={() => setOrderFilter('all')}
+            >
+              All
+            </button>
+            <button
+              className={`px-5 py-2 rounded-full font-medium whitespace-nowrap transition-colors duration-200 focus:outline-none ${orderFilter === 'confirmed' ? 'bg-green-100 text-green-700 shadow-sm' : 'bg-transparent text-gray-700 hover:bg-green-50'}`}
+              onClick={() => setOrderFilter('confirmed')}
+            >
+              Confirmed
+            </button>
+            <button
+              className={`px-5 py-2 rounded-full font-medium whitespace-nowrap transition-colors duration-200 focus:outline-none ${orderFilter === 'pending' ? 'bg-yellow-100 text-yellow-700 shadow-sm' : 'bg-transparent text-gray-700 hover:bg-yellow-50'}`}
+              onClick={() => setOrderFilter('pending')}
+            >
+              Pending
+            </button>
+          </div>
+
           {/* Orders List */}
           <div className="space-y-4">
-            {orders.length === 0 ? (
-              <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders available for today.</p>
+            {filteredOrders.length === 0 ? (
+              <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
             ) : (
-              <AnimatePresence>
-                {orders.map((order) => (
-                  <motion.div
-                    key={order.orderId}
-                    layout
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="flex items-center">
-                          <h3 className="text-lg font-semibold mr-2">Order #{order.orderNumber}</h3>
-                          {/* Delete button removed as per worker requirements */}
-                        </div>
-                        <p className="text-gray-500 text-sm mt-1">
-                          {formatDateIST(order.createdAt)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-gray-500 text-sm">
-                          {order.isPaid ? 'Paid' : 'Pending'} -
-                          {order.paymentMethod.startsWith('Custom') ? (() => {
-                            const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
-                            return (
-                              <span className="font-medium">
-                                {' '}
-                                Custom
-                              </span>
-                            );
-                          })() : (
-                            <span className="font-medium"> {order.paymentMethod}</span>
-                          )}
-                        </span>
-
-                        <p className="text-xl font-bold text-gray-800 mt-1">₹{order.totalAmount.toFixed(2)}</p>
-                        {order.discountAmount > 0 && (
-                          <p className="text-sm text-gray-500 line-through">
-                            ₹{order.subtotal.toFixed(2)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-3 bg-gray-50 p-3 rounded-lg">
-                      <h4 className="font-medium mb-2">Items:</h4>
-                      <ul className="space-y-1.5">
-                        {order.items.map((item, index) => (
-                          <li key={index} className="text-sm flex flex-col">
-                            <span className="font-medium text-gray-800 mb-0.5">{item.name} ({item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type})</span>
-                            <span className="text-gray-600 italic text-xs">{item.quantity} x ₹{item.price.toFixed(2)} = <span className="font-bold">₹{item.totalPrice.toFixed(2)}</span></span>
-                          </li>
-                        ))}
-                      </ul>
-                      {order.discountAmount > 0 && (
-                        <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-green-600 flex justify-between">
-                          <span>Discount Applied: {order.discountPercentage}%</span>
-                          <span>-₹{order.discountAmount.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {order.paymentMethod.startsWith('Custom') && (() => {
-                        const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
-                        return (
-                          <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-gray-700">
-                            <span className="block mb-1">Custom Payment Details:</span>
-                            <div className="flex flex-wrap gap-2 text-gray-800">
-                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
-                                Cash: ₹{cash.toFixed(2)}
-                              </span>
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
-                                Online: ₹{online.toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+              filteredOrders.map((order) => (
+                <WorkerOrderCard
+                  key={order.orderId}
+                  order={order}
+                  isUpdated={order.orderId === lastUpdatedOrderId}
+                  parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                  formatDateIST={formatDateIST}
+                />
+              ))
             )}
           </div>
         </div>
