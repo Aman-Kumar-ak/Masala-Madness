@@ -241,7 +241,7 @@ export default function WorkerCart() {
         // Add to pending logic (now unified)
         setShowPendingConfirm(false);
         setShowSplashScreen(true);
-        const res = await api.post('/orders', payload); // Use /orders for pending
+        const res = await api.post('/orders/confirm', payload); // Use /orders/confirm for pending
         const data = res;
         if (data && data.message) {
           showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);

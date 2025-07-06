@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from '../../utils/api';
 // import DeleteOrderConfirmation from "../../components/DeleteOrderConfirmation"; // Removed
 import Notification from "../../components/Notification";
+import { AnimatePresence, motion } from 'framer-motion';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -29,7 +30,7 @@ export default function WorkerOrders() {
   });
   const navigate = useNavigate();
 
-  const { refreshKey } = useRefresh();
+  const { refreshKey, socket } = useRefresh();
 
   // Helper to parse custom payment amounts from the paymentMethod string
   const parseCustomPaymentAmounts = (paymentMethodString) => {
@@ -75,6 +76,17 @@ export default function WorkerOrders() {
       setSelectedDate(getCurrentDate());
     }
   }, [selectedDate, refreshKey]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleOrderUpdate = (data) => {
+      loadOrders();
+    };
+    socket.on('order-update', handleOrderUpdate);
+    return () => {
+      socket.off('order-update', handleOrderUpdate);
+    };
+  }, [socket, selectedDate, refreshKey]);
 
   const getCurrentDate = () => {
     const now = new Date();
@@ -227,77 +239,87 @@ export default function WorkerOrders() {
             {orders.length === 0 ? (
               <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders available for today.</p>
             ) : (
-              orders.map((order) => (
-                <div key={order.orderId} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="flex items-center">
-                        <h3 className="text-lg font-semibold mr-2">Order #{order.orderNumber}</h3>
-                        {/* Delete button removed as per worker requirements */}
-                      </div>
-                      <p className="text-gray-500 text-sm mt-1">
-                        {formatDateIST(order.createdAt)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-gray-500 text-sm">
-                        {order.isPaid ? 'Paid' : 'Pending'} -
-                        {order.paymentMethod.startsWith('Custom') ? (() => {
-                          const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
-                          return (
-                            <span className="font-medium">
-                              {' '}
-                              Custom
-                            </span>
-                          );
-                        })() : (
-                          <span className="font-medium"> {order.paymentMethod}</span>
-                        )}
-                      </span>
-
-                      <p className="text-xl font-bold text-gray-800 mt-1">₹{order.totalAmount.toFixed(2)}</p>
-                      {order.discountAmount > 0 && (
-                        <p className="text-sm text-gray-500 line-through">
-                          ₹{order.subtotal.toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-3 bg-gray-50 p-3 rounded-lg">
-                    <h4 className="font-medium mb-2">Items:</h4>
-                    <ul className="space-y-1.5">
-                      {order.items.map((item, index) => (
-                        <li key={index} className="text-sm flex flex-col">
-                          <span className="font-medium text-gray-800 mb-0.5">{item.name} ({item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type})</span>
-                          <span className="text-gray-600 italic text-xs">{item.quantity} x ₹{item.price.toFixed(2)} = <span className="font-bold">₹{item.totalPrice.toFixed(2)}</span></span>
-                        </li>
-                      ))}
-                    </ul>
-                    {order.discountAmount > 0 && (
-                      <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-green-600 flex justify-between">
-                        <span>Discount Applied: {order.discountPercentage}%</span>
-                        <span>-₹{order.discountAmount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {order.paymentMethod.startsWith('Custom') && (() => {
-                      const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
-                      return (
-                        <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-gray-700">
-                          <span className="block mb-1">Custom Payment Details:</span>
-                          <div className="flex flex-wrap gap-2 text-gray-800">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
-                              Cash: ₹{cash.toFixed(2)}
-                            </span>
-                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
-                              Online: ₹{online.toFixed(2)}
-                            </span>
-                          </div>
+              <AnimatePresence>
+                {orders.map((order) => (
+                  <motion.div
+                    key={order.orderId}
+                    layout
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="flex items-center">
+                          <h3 className="text-lg font-semibold mr-2">Order #{order.orderNumber}</h3>
+                          {/* Delete button removed as per worker requirements */}
                         </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              ))
+                        <p className="text-gray-500 text-sm mt-1">
+                          {formatDateIST(order.createdAt)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-gray-500 text-sm">
+                          {order.isPaid ? 'Paid' : 'Pending'} -
+                          {order.paymentMethod.startsWith('Custom') ? (() => {
+                            const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
+                            return (
+                              <span className="font-medium">
+                                {' '}
+                                Custom
+                              </span>
+                            );
+                          })() : (
+                            <span className="font-medium"> {order.paymentMethod}</span>
+                          )}
+                        </span>
+
+                        <p className="text-xl font-bold text-gray-800 mt-1">₹{order.totalAmount.toFixed(2)}</p>
+                        {order.discountAmount > 0 && (
+                          <p className="text-sm text-gray-500 line-through">
+                            ₹{order.subtotal.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 bg-gray-50 p-3 rounded-lg">
+                      <h4 className="font-medium mb-2">Items:</h4>
+                      <ul className="space-y-1.5">
+                        {order.items.map((item, index) => (
+                          <li key={index} className="text-sm flex flex-col">
+                            <span className="font-medium text-gray-800 mb-0.5">{item.name} ({item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type})</span>
+                            <span className="text-gray-600 italic text-xs">{item.quantity} x ₹{item.price.toFixed(2)} = <span className="font-bold">₹{item.totalPrice.toFixed(2)}</span></span>
+                          </li>
+                        ))}
+                      </ul>
+                      {order.discountAmount > 0 && (
+                        <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-green-600 flex justify-between">
+                          <span>Discount Applied: {order.discountPercentage}%</span>
+                          <span>-₹{order.discountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {order.paymentMethod.startsWith('Custom') && (() => {
+                        const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
+                        return (
+                          <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-gray-700">
+                            <span className="block mb-1">Custom Payment Details:</span>
+                            <div className="flex flex-wrap gap-2 text-gray-800">
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
+                                Cash: ₹{cash.toFixed(2)}
+                              </span>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
+                                Online: ₹{online.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             )}
           </div>
         </div>

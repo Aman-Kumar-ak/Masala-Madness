@@ -309,10 +309,19 @@ export default function PendingOrders() {
         quantity: updatedItems[itemIndex].quantity + delta,
         totalPrice: updatedItems[itemIndex].price * (updatedItems[itemIndex].quantity + delta),
       };
+      // Recalculate totals
+      const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const discountPercentage = order.discountPercentage || 0;
+      const discountAmount = Math.round(subtotal * discountPercentage / 100);
+      const totalAmount = subtotal - discountAmount;
       const updatePayload = {
         orderId,
         items: updatedItems,
         isPaid: false,
+        subtotal,
+        discountAmount,
+        discountPercentage,
+        totalAmount,
       };
       const data = await api.post('/orders/confirm', updatePayload);
       setPendingOrders(prevOrders =>

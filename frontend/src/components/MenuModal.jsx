@@ -4,7 +4,7 @@ import { api } from '../utils/api';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
+const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPercentage: propsDiscountPercentage, discountAmount: propsDiscountAmount }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [notification, setNotification] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -102,9 +102,10 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
       return;
     }
 
-    // Prepare the request body with only new items
-    const requestBody = {
-      items: newItems.map(item => ({
+    // Build the full updated items array
+    const updatedItems = [
+      ...existingItems,
+      ...newItems.map(item => ({
         name: item.name,
         type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion === 'fixed' ? 'Fixed' : item.portion,
         price: item.price,
@@ -112,16 +113,26 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
         totalPrice: item.price * (item.quantity || 1),
         id: item.id || item._id,
         index: item.index
-      })),
-      append: true // let backend know to append, not replace
-    };
+      }))
+    ];
+
+    // Recalculate totals
+    const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // Use discountPercentage and discountAmount from props if available
+    const discountPercentage = typeof propsDiscountPercentage === 'number' ? propsDiscountPercentage : 0;
+    const discountAmount = Math.round(subtotal * discountPercentage / 100);
+    const totalAmount = subtotal - discountAmount;
 
     try {
       const data = await api.post(`/orders/confirm`, {
         orderId,
-        items: requestBody.items,
-        append: true,
-        isPaid: false
+        items: updatedItems,
+        append: false, // We are sending the full array now
+        isPaid: false,
+        subtotal,
+        totalAmount,
+        discountAmount,
+        discountPercentage
       });
       onSave(data.order);  // Pass updated order object
       setNotification({ message: 'Items added successfully!', type: 'success' });

@@ -85,6 +85,14 @@ router.post("/confirm", async (req, res) => {
     // Clear relevant cache entries
     const todayKey = now.toISOString().split('T')[0];
     ordersCache.delete(todayKey);
+
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      console.log('Emitting order-update', order.orderId);
+      io.emit('order-update', { type: 'order-updated', order });
+    }
+
     return res.status(201).json({ 
       message: "Order saved successfully", 
       order

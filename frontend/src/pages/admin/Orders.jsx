@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import BackButton from "../../components/BackButton";
 import { useRefresh } from "../../contexts/RefreshContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { api } from '../../utils/api';
 import DeleteOrderConfirmation from "../../components/DeleteOrderConfirmation";
 import Notification from "../../components/Notification";
+import { AnimatePresence, motion } from 'framer-motion';
+import { useSpring, animated } from '@react-spring/web';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -28,7 +30,13 @@ const Orders = () => {
   });
   const navigate = useNavigate();
 
-  const { refreshKey } = useRefresh();
+  const { refreshKey, socket } = useRefresh();
+
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+  const isMounted = useRef(false);
+
+  // Track the last updated orderId for per-order animation
+  const [lastUpdatedOrderId, setLastUpdatedOrderId] = useState(null);
 
   // Helper to parse custom payment amounts from the paymentMethod string
   const parseCustomPaymentAmounts = (paymentMethodString) => {
@@ -65,13 +73,30 @@ const Orders = () => {
   };
 
   useEffect(() => {
-    // Only load orders if we have a valid selectedDate
-    if (selectedDate) {
+    isMounted.current = true;
+    setShouldAnimate(false); // Disable animation on initial mount or navigation
+    return () => {
+      isMounted.current = false;
+    };
+  }, [selectedDate, refreshKey]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleOrderUpdate = (data) => {
+      if (isMounted.current && data?.order?.orderId) {
+        setLastUpdatedOrderId(data.order.orderId); // Track which order was updated
+      }
       loadOrders();
-    } else {
-      // If somehow selectedDate becomes invalid, reset it to current date
-      setSelectedDate(getCurrentDate());
-    }
+    };
+    socket.on('order-update', handleOrderUpdate);
+    return () => {
+      socket.off('order-update', handleOrderUpdate);
+    };
+  }, [socket, selectedDate, refreshKey]);
+
+  useEffect(() => {
+    loadOrders();
+    // eslint-disable-next-line
   }, [selectedDate, refreshKey]);
 
   const handleDateChange = (e) => {
@@ -138,6 +163,7 @@ const Orders = () => {
         duration: 2000
       });
       loadOrders();
+      setSelectedDate(getCurrentDate());
     } catch (error) {
       console.error('Error deleting order:', error);
       setNotification({
@@ -182,6 +208,9 @@ const Orders = () => {
       });
     }
   };
+
+  // Before rendering orders, sort by orderNumber descending
+  const sortedOrders = [...orders].sort((a, b) => b.orderNumber - a.orderNumber);
 
   if (loading) {
     return (
@@ -302,106 +331,123 @@ const Orders = () => {
 
           {/* Orders List */}
           <div className="space-y-4">
-            {orders.length === 0 ? (
+            {sortedOrders.length === 0 ? (
               <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this date</p>
             ) : (
-              orders.map((order) => (
-                <div key={order.orderId} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative">
-                  {/* Pending badge in top right */}
-                  {!order.isPaid && (
-                    <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-red-500 text-white text-xs font-bold shadow-sm z-10" title="Payment Pending">
-                      Pending
-                    </span>
-                  )}
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="flex items-center">
-                        <h3 className="text-lg font-semibold mr-2">Order #{order.orderNumber}</h3>
-                        <button 
-                          onClick={() => handleDeleteClick(order)} 
-                          disabled={deleteLoading}
-                          className="group p-1.5 rounded-full hover:bg-red-100 focus:bg-red-100 focus:outline-none transition-colors duration-200"
-                          aria-label="Delete order"
-                          title="Delete order"
-                        >
-                          <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            className="h-5 w-5 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor"
+              <AnimatePresence initial={false}>
+                {sortedOrders.map((order) => {
+                  // Animation for total amount (number flip)
+                  const isUpdated = order.orderId === lastUpdatedOrderId;
+                  const amountSpring = useSpring({
+                    number: order.totalAmount,
+                    config: { tension: 170, friction: 26 },
+                    reset: isUpdated,
+                  });
+                  return (
+                    <motion.div
+                      key={order.orderId}
+                      layout
+                      initial={false}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={false}
+                      className={order.isPaid ? "bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative" : "bg-red-50 p-5 rounded-lg shadow-sm border border-red-200 hover:shadow-md transition-all duration-300 relative cursor-pointer"}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="flex items-center">
+                            <h3 className="text-lg font-semibold mr-2">Order #{order.orderNumber}</h3>
+                            <button 
+                              onClick={() => handleDeleteClick(order)} 
+                              disabled={deleteLoading}
+                              className="group p-1.5 rounded-full hover:bg-red-100 focus:bg-red-100 focus:outline-none transition-colors duration-200"
+                              aria-label="Delete order"
+                              title="Delete order"
+                            >
+                              <svg 
+                                xmlns="http://www.w3.org/2000/svg" 
+                                className="h-5 w-5 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
+                                fill="none" 
+                                viewBox="0 0 24 24" 
+                                stroke="currentColor"
+                              >
+                                <path 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round" 
+                                  strokeWidth={2} 
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                          <p className="text-gray-500 text-sm mt-1">
+                            {formatDateIST(order.createdAt)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-gray-500 text-sm">
+                            {order.isPaid ? 'Paid' : ''}
+                            {order.isPaid ? (
+                              order.paymentMethod.startsWith('Custom') ? (
+                                <span className="font-medium"> Custom</span>
+                              ) : (
+                                <span className="font-medium"> {order.paymentMethod}</span>
+                              )
+                            ) : null}
+                          </span>
+                          <animated.p
+                            className={`text-xl font-bold text-gray-800 mt-1 ${isUpdated ? 'order-amount-flip' : ''}`}
+                            style={isUpdated ? { display: 'inline-block' } : {}}
                           >
-                            <path 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round" 
-                              strokeWidth={2} 
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
-                            />
-                          </svg>
-                        </button>
+                            ₹{amountSpring.number.to((n) => n.toFixed(2))}
+                          </animated.p>
+                          {order.discountAmount > 0 && (
+                            <p className="text-sm text-gray-500 line-through">
+                              ₹{order.subtotal.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-gray-500 text-sm mt-1">
-                        {formatDateIST(order.createdAt)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-gray-500 text-sm">
-                        {order.isPaid ? 'Paid' : 'Pending'} -
-                        {order.paymentMethod.startsWith('Custom') ? (() => {
+                      <div className="mt-3 bg-gray-50 p-3 rounded-lg">
+                        <h4 className="font-medium mb-2">Items:</h4>
+                        <ul className="space-y-1.5">
+                          {order.items.map((item, index) => (
+                            <li
+                              key={index}
+                              className={`text-sm flex flex-col ${isUpdated ? 'order-item-highlight' : ''}`}
+                              style={isUpdated ? { transition: 'background 0.5s', background: '#fffbe6' } : {}}
+                            >
+                              <span className="font-medium text-gray-800 mb-0.5">{item.name} ({item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type})</span>
+                              <span className="text-gray-600 italic text-xs">{item.quantity} x ₹{item.price.toFixed(2)} = <span className="font-bold">₹{item.totalPrice.toFixed(2)}</span></span>
+                            </li>
+                          ))}
+                        </ul>
+                        {order.discountAmount > 0 && (
+                          <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-green-600 flex justify-between">
+                            <span>Discount Applied: {order.discountPercentage}%</span>
+                            <span>-₹{order.discountAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {order.paymentMethod.startsWith('Custom') && (() => {
                           const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
                           return (
-                            <span className="font-medium">
-                              {' '}
-                              Custom
-                            </span>
+                            <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-gray-700">
+                              <span className="block mb-1">Custom Payment Details:</span>
+                              <div className="flex flex-wrap gap-2 text-gray-800">
+                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
+                                  Cash: ₹{cash.toFixed(2)}
+                                </span>
+                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
+                                  Online: ₹{online.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
                           );
-                        })() : (
-                          <span className="font-medium"> {order.paymentMethod}</span>
-                        )}
-                      </span>
-                      <p className="text-xl font-bold text-gray-800 mt-1">₹{order.totalAmount.toFixed(2)}</p>
-                      {order.discountAmount > 0 && (
-                        <p className="text-sm text-gray-500 line-through">
-                          ₹{order.subtotal.toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-3 bg-gray-50 p-3 rounded-lg">
-                    <h4 className="font-medium mb-2">Items:</h4>
-                    <ul className="space-y-1.5">
-                      {order.items.map((item, index) => (
-                        <li key={index} className="text-sm flex flex-col">
-                          <span className="font-medium text-gray-800 mb-0.5">{item.name} ({item.type === 'H' ? 'Half' : item.type === 'F' ? 'Full' : item.type})</span>
-                          <span className="text-gray-600 italic text-xs">{item.quantity} x ₹{item.price.toFixed(2)} = <span className="font-bold">₹{item.totalPrice.toFixed(2)}</span></span>
-                        </li>
-                      ))}
-                    </ul>
-                    {order.discountAmount > 0 && (
-                      <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-green-600 flex justify-between">
-                        <span>Discount Applied: {order.discountPercentage}%</span>
-                        <span>-₹{order.discountAmount.toFixed(2)}</span>
+                        })()}
                       </div>
-                    )}
-                    {order.paymentMethod.startsWith('Custom') && (() => {
-                      const { cash, online } = parseCustomPaymentAmounts(order.paymentMethod);
-                      return (
-                        <div className="mt-3 pt-2 border-t border-gray-200 text-sm font-medium text-gray-700">
-                          <span className="block mb-1">Custom Payment Details:</span>
-                          <div className="flex flex-wrap gap-2 text-gray-800">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
-                              Cash: ₹{cash.toFixed(2)}
-                            </span>
-                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md flex-grow flex-shrink-0 text-center whitespace-nowrap text-xs">
-                              Online: ₹{online.toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              ))
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             )}
           </div>
         </div>
