@@ -330,24 +330,20 @@ const Orders = () => {
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
+    // Optimistically remove the order from the UI
+    setOrders(prevOrders => prevOrders.filter(order => order.orderId !== orderToDelete.orderId));
+    setDeleteLoading(true);
     try {
-      setDeleteLoading(true);
       await api.delete(`/orders/${orderToDelete.orderId}`);
-      // Update local orders state immediately (mimic websocket handler)
-      setOrders(prevOrders => {
-        const newOrders = prevOrders.filter(order => order.orderId !== orderToDelete.orderId);
-        // Recalculate stats
-        const paidOrders = newOrders.filter(o => o.isPaid);
-        const totalPaidOrders = paidOrders.length;
-        const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-        const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0;
-        setStats({
-          totalOrders: newOrders.length,
-          totalPaidOrders,
-          totalRevenue,
-          avgOrderValue
-        });
-        return newOrders;
+      // Fetch updated orders to update order numbers instantly
+      const dateToQuery = selectedDate || getCurrentDate();
+      const ordersData = await api.get(`/orders/date/${dateToQuery}`);
+      setOrders(ordersData.orders || []);
+      setStats(ordersData.stats || {
+        totalOrders: 0,
+        totalPaidOrders: 0,
+        totalRevenue: 0,
+        avgOrderValue: 0
       });
       setNotification({
         message: `Order #${orderToDelete.orderNumber} has been deleted successfully`,
@@ -361,6 +357,8 @@ const Orders = () => {
         type: 'error',
         duration: 2000
       });
+      // If deletion fails, reload orders to restore UI
+      await loadOrders();
     } finally {
       setDeleteLoading(false);
       setShowDeleteConfirmation(false);
