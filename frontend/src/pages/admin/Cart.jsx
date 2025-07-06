@@ -223,7 +223,7 @@ export default function Cart() {
       discountAmount,
       discountPercentage: activeDiscount?.percentage || 0,
       manualDiscount,
-      paymentMethod: isPaid ? finalPaymentMethod : "",
+      paymentMethod: isPaid ? finalPaymentMethod : "Pending",
       isPaid,
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
       customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
@@ -277,14 +277,16 @@ export default function Cart() {
           throw new Error((data && data.message) || "Failed to process order");
         }
       } else {
-        // Add to pending logic
-        const res = await api.post('/pending-orders', payload);
+        // Add to pending logic (now unified)
+        setShowPendingConfirm(false);
+        setShowSplashScreen(true);
+        const res = await api.post('/orders', payload); // Use /orders for pending
         const data = res;
         if (data && data.message) {
-          showInfo(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
+          showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
           clearCart();
           setTimeout(() => {
-            navigate("/");
+            navigate("/home");
           }, 1500);
         } else {
           throw new Error((data && data.message) || "Failed to add order to pending");

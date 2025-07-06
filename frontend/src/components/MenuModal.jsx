@@ -117,8 +117,12 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [] }) => {
     };
 
     try {
-      // Use POST instead of PUT for append-items endpoint
-      const data = await api.post(`/pending-orders/${orderId}/append-items`, requestBody);
+      const data = await api.post(`/orders/confirm`, {
+        orderId,
+        items: requestBody.items,
+        append: true,
+        isPaid: false
+      });
       onSave(data.order);  // Pass updated order object
       setNotification({ message: 'Items added successfully!', type: 'success' });
     } catch (error) {

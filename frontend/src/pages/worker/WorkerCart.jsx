@@ -211,7 +211,7 @@ export default function WorkerCart() {
       discountAmount,
       discountPercentage: activeDiscount?.percentage || 0,
       manualDiscount,
-      paymentMethod: isPaid ? finalPaymentMethod : "",
+      paymentMethod: isPaid ? finalPaymentMethod : "Pending",
       isPaid,
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
       customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
