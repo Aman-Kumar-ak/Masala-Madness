@@ -24,6 +24,7 @@ export default function WorkerHome() {
   const [showHeader, setShowHeader] = useState(true);
   const headerRef = useRef(null);
   const menuSectionRef = useRef(null);
+  const [showPrinterDialog, setShowPrinterDialog] = useState(false);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -215,16 +216,18 @@ export default function WorkerHome() {
       <div className="bg-white shadow-sm rounded-xl mx-4 mt-4 overflow-hidden">
         <div className="container mx-auto">
           <div className="flex items-center justify-between gap-2 px-3 py-2 bg-blue-50">
-            {/* Date and Refresh Button */}
-            <div className="flex items-center gap-2">
-            <button
+            {/* Left group: Refresh + Date */}
+            <div className="flex items-center gap-2 min-[380px]:gap-3">
+              {/* Refresh Button */}
+              <button
                 onClick={fetchStats}
                 disabled={loading}
-                className={`w-10 h-10 rounded-full ${loading ? 'bg-gray-300' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-colors duration-200 flex items-center justify-center shadow-sm`}
+                className={`w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-colors duration-200 ${loading ? 'bg-gray-300' : ''}`}
                 title="Refresh Stats"
+                style={{ minWidth: 40, minHeight: 40 }}
               >
                 <svg
-                  className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
+                  className={`w-8 h-8 min-[380px]:w-9 min-[380px]:h-9 ${loading ? 'animate-spin' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -237,34 +240,50 @@ export default function WorkerHome() {
                   />
                 </svg>
               </button>
-              <div>
-                <p className="text-lg font-semibold text-gray-800 whitespace-nowrap">
-                  {getCurrentDate()}
-                </p>
-              </div>
+              {/* Date */}
+              <span className="text-base min-[380px]:text-lg font-semibold text-gray-800 whitespace-nowrap mx-1 min-[380px]:mx-2">
+                {getCurrentDate()}
+              </span>
             </div>
-
-            {/* Settings and Orders Links */}
-            <div className="flex items-center gap-2">
+            {/* Right group: Printer, Settings, Orders */}
+            <div className="flex items-center gap-2 min-[380px]:gap-3">
+              {/* Printer Button */}
+              <button
+                onClick={() => {
+                  if (window.AndroidBridge && window.AndroidBridge.openPrinterSettings) {
+                    window.AndroidBridge.openPrinterSettings();
+                  } else {
+                    setShowPrinterDialog(true);
+                  }
+                }}
+                className="w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full bg-green-100 flex items-center justify-center shadow-sm transition-all duration-200 hover:bg-green-200"
+                title="Printer Settings"
+                style={{ minWidth: 40, minHeight: 40 }}
+              >
+                <img src="/images/printer.png" alt="Printer Settings" className="w-8 h-8 min-[380px]:w-9 min-[380px]:h-9 object-contain" width={36} height={36} />
+              </button>
+              {/* Settings Icon - larger */}
               <Link
                 to="/worker-settings"
-                className="w-10 h-10 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors duration-200 flex items-center justify-center shadow-sm"
+                className="w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full bg-blue-900 flex items-center justify-center shadow-sm hover:bg-blue-800 transition-colors duration-200"
                 title="Settings"
+                style={{ minWidth: 40, minHeight: 40 }}
               >
                 <OptimizedImage
                   src="/images/login.png"
                   alt="Settings"
-                  className="w-10 h-10 object-contain"
-                  width={40}
-                  height={40}
+                  className="w-10 h-10 min-[380px]:w-9 min-[380px]:h-9 object-contain"
+                  width={36}
+                  height={36}
                 />
               </Link>
+              {/* Orders Button */}
               <Link
                 to="/worker-orders"
-                className="rounded-full bg-green-50 hover:bg-green-100 transition-colors duration-200 flex items-center justify-center shadow-sm px-3 py-1.5"
+                className="rounded-full bg-green-50 hover:bg-green-100 transition-colors duration-200 flex items-center justify-center shadow-sm px-3 min-[380px]:px-4 py-2 min-[380px]:py-2.5"
                 title="Orders"
               >
-                <span className="text-lg font-bold text-green-700">Orders</span>
+                <span className="text-base min-[380px]:text-lg font-bold text-green-700">Orders</span>
               </Link>
             </div>
           </div>
@@ -340,6 +359,18 @@ export default function WorkerHome() {
         confirmText="Yes, Clear Cart"
         cancelText="Cancel"
         type="danger"
+      />
+
+      {/* Printer Settings Dialog */}
+      <ConfirmationDialog
+        isOpen={showPrinterDialog}
+        onClose={() => setShowPrinterDialog(false)}
+        onConfirm={() => setShowPrinterDialog(false)}
+        title="Printer settings"
+        message="Printer settings not available on this platform."
+        confirmText="Close"
+        cancelText={null}
+        type="info"
       />
     </div>
   );
