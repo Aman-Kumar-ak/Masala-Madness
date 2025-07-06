@@ -167,7 +167,8 @@ router.get("/date/:date", async (req, res) => {
     const [stats, orders] = await Promise.all([
       Order.calculateStats(startOfDay, endOfDay),
       Order.find({
-        createdAt: { $gte: startOfDay, $lte: endOfDay }
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        isDeleted: false
       })
       .select('-__v')
       .sort({ updatedAt: -1 })
