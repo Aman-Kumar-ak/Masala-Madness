@@ -183,7 +183,14 @@ export default function WorkerOrders() {
   useEffect(() => {
     if (!socket) return;
     const handleOrderUpdate = (data) => {
-      if (data?.order?.orderId) {
+      if (data?.type === 'order-deleted' && data?.orderId) {
+        setOrders(prevOrders => prevOrders.filter(order => order.orderId !== data.orderId));
+        setStats(prevStats => ({
+          ...prevStats,
+          totalOrders: prevStats.totalOrders - 1
+        }));
+        setPendingOrdersCount(prevCount => prevCount - 1);
+      } else if (data?.order?.orderId) {
         setLastUpdatedOrderId(data.order.orderId);
         setOrders(prevOrders => {
           const filtered = prevOrders.filter(order => order.orderId !== data.order.orderId);
@@ -391,15 +398,24 @@ export default function WorkerOrders() {
             {filteredOrders.length === 0 ? (
               <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
             ) : (
-              filteredOrders.map((order) => (
-                <WorkerOrderCard
-                  key={order.orderId}
-                  order={order}
-                  isUpdated={order.orderId === lastUpdatedOrderId}
-                  parseCustomPaymentAmounts={parseCustomPaymentAmounts}
-                  formatDateIST={formatDateIST}
-                />
-              ))
+              <AnimatePresence>
+                {filteredOrders.map(order => (
+                  <motion.div
+                    key={order.orderId}
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -40 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <WorkerOrderCard
+                      order={order}
+                      isUpdated={order.orderId === lastUpdatedOrderId}
+                      parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                      formatDateIST={formatDateIST}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             )}
           </div>
         </div>

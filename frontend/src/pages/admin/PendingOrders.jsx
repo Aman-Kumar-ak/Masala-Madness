@@ -48,6 +48,8 @@ export default function PendingOrders() {
   // Add manual discount state for each order
   const [manualDiscounts, setManualDiscounts] = useState({});
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Save the scroll position before updates
   const saveScrollPosition = () => {
     if (ordersContainerRef.current) {
@@ -403,10 +405,18 @@ export default function PendingOrders() {
             );
           } else {
             const updatedItems = order.items.filter((_, idx) => idx !== index);
+            const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const discountPercentage = order.discountPercentage || 0;
+            const discountAmount = Math.round(subtotal * discountPercentage / 100);
+            const totalAmount = subtotal - discountAmount;
             const updatePayload = {
               orderId: order.orderId,
               items: updatedItems,
               isPaid: false,
+              subtotal,
+              discountAmount,
+              discountPercentage,
+              totalAmount,
             };
             const data = await api.post('/orders/confirm', updatePayload);
             setPendingOrders(prevOrders =>
@@ -428,8 +438,9 @@ export default function PendingOrders() {
     setConfirmDialog({
       isOpen: true,
       title: 'Confirm Order Deletion',
-      message: `Are you sure you want to delete the entire order #${pendingOrders.length - pendingOrders.indexOf(order)}?`,
+      message: `Are you sure you want to delete the entire order #${order.orderNumber ?? (pendingOrders.length - pendingOrders.indexOf(order))}?`,
       onConfirm: async () => {
+        setIsDeleting(true);
         try {
           await api.delete(`/orders/${order.orderId}`);
           setPendingOrders(prevOrders =>
@@ -440,12 +451,12 @@ export default function PendingOrders() {
             type: "success" 
           });
         } catch (error) {
-          console.error('Error removing order:', error);
           setNotification({ 
             message: "Failed to delete order", 
             type: "error" 
           });
         } finally {
+          setIsDeleting(false);
           setConfirmDialog(null);
         }
       },
@@ -881,6 +892,7 @@ export default function PendingOrders() {
           message={confirmDialog.message}
           onConfirm={confirmDialog.onConfirm}
           onCancel={confirmDialog.onCancel}
+          isLoading={isDeleting}
         />
       )}
 

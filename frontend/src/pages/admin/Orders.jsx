@@ -84,27 +84,30 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
           </p>
         </div>
         <div className="text-right">
-          <span className="text-gray-500 text-sm">
-            {order.isPaid ? 'Paid' : ''}
-            {order.isPaid ? (
-              order.paymentMethod.startsWith('Custom') ? (
-                <span className="font-medium"> Custom</span>
-              ) : (
-                <span className="font-medium"> {order.paymentMethod}</span>
-              )
-            ) : null}
-          </span>
-          <span
-            ref={amountRef}
-            className="text-xl font-bold text-gray-800 mt-1 inline-block"
-          >
-            ₹{displayAmount.toFixed(2)}
-          </span>
-          {order.discountAmount > 0 && (
-            <p className="text-sm text-gray-500 line-through">
-              ₹{order.subtotal.toFixed(2)}
-            </p>
-          )}
+          <div className="flex flex-col items-end sm:items-end md:items-end lg:items-end">
+            <span className="text-gray-500 text-sm">
+              {order.isPaid ? 'Paid' : ''}
+              {order.isPaid ? (
+                order.paymentMethod.startsWith('Custom') ? (
+                  <span className="font-medium"> Custom</span>
+                ) : (
+                  <span className="font-medium"> {order.paymentMethod}</span>
+                )
+              ) : null}
+            </span>
+            <span
+              ref={amountRef}
+              className="text-xl font-bold text-gray-800 mt-1 block"
+              style={{ marginTop: 4 }}
+            >
+              ₹{displayAmount.toFixed(2)}
+            </span>
+            {order.discountAmount > 0 && (
+              <p className="text-sm text-gray-500 line-through">
+                ₹{order.subtotal.toFixed(2)}
+              </p>
+            )}
+          </div>
         </div>
       </div>
       <div className="mt-3 bg-gray-50 p-3 rounded-lg">
@@ -222,7 +225,14 @@ const Orders = () => {
   useEffect(() => {
     if (!socket) return;
     const handleOrderUpdate = (data) => {
-      if (isMounted.current && data?.order?.orderId) {
+      if (!isMounted.current) return;
+      if (data?.type === 'order-deleted' && data?.orderId) {
+        setOrders(prevOrders => prevOrders.filter(order => order.orderId !== data.orderId));
+        setStats(prevStats => ({
+          ...prevStats,
+          totalOrders: prevStats.totalOrders - 1
+        }));
+      } else if (data?.order?.orderId) {
         setLastUpdatedOrderId(data.order.orderId);
         setOrders(prevOrders => {
           const filtered = prevOrders.filter(order => order.orderId !== data.order.orderId);
@@ -534,17 +544,26 @@ const Orders = () => {
             {filteredOrders.length === 0 ? (
               <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
             ) : (
-              filteredOrders.map((order) => (
-                <OrderCard
-                  key={order.orderId}
-                  order={order}
-                  isUpdated={order.orderId === lastUpdatedOrderId}
-                  parseCustomPaymentAmounts={parseCustomPaymentAmounts}
-                  formatDateIST={formatDateIST}
-                  handleDeleteClick={handleDeleteClick}
-                  deleteLoading={deleteLoading}
-                />
-              ))
+              <AnimatePresence>
+                {filteredOrders.map(order => (
+                  <motion.div
+                    key={order.orderId}
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -40 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <OrderCard
+                      order={order}
+                      isUpdated={order.orderId === lastUpdatedOrderId}
+                      parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                      formatDateIST={formatDateIST}
+                      handleDeleteClick={handleDeleteClick}
+                      deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             )}
           </div>
         </div>

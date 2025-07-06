@@ -50,6 +50,8 @@ export default function WorkerPendingOrders() {
   // Add manual discount state for each order
   const [manualDiscounts, setManualDiscounts] = useState({});
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Save the scroll position before updates
   const saveScrollPosition = () => {
     if (ordersContainerRef.current) {
@@ -422,10 +424,18 @@ export default function WorkerPendingOrders() {
           } else {
             const updatedItems = [...order.items];
             updatedItems.splice(index, 1);
+            const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const discountPercentage = order.discountPercentage || 0;
+            const discountAmount = Math.round(subtotal * discountPercentage / 100);
+            const totalAmount = subtotal - discountAmount;
             const data = await api.post('/orders/confirm', {
               orderId: order.orderId,
               items: updatedItems,
-              isPaid: false
+              isPaid: false,
+              subtotal,
+              discountAmount,
+              discountPercentage,
+              totalAmount,
             });
             setPendingOrders(prevOrders =>
               prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
@@ -445,10 +455,11 @@ export default function WorkerPendingOrders() {
     setConfirmDialog({
       isOpen: true,
       title: 'Confirm Order Deletion',
-      message: `Are you sure you want to delete the entire order #${pendingOrders.length - pendingOrders.indexOf(order)}?`,
+      message: `Are you sure you want to delete the entire order #${order.orderNumber ?? (pendingOrders.length - pendingOrders.indexOf(order))}?`,
       onConfirm: async () => {
+        setIsDeleting(true);
         try {
-          const response = await api.delete(`/orders/${order.orderId}`);
+          await api.delete(`/orders/${order.orderId}`);
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)
           );
@@ -462,6 +473,7 @@ export default function WorkerPendingOrders() {
             type: "error" 
           });
         } finally {
+          setIsDeleting(false);
           setConfirmDialog(null);
         }
       },
@@ -890,6 +902,7 @@ export default function WorkerPendingOrders() {
           message={confirmDialog.message}
           onConfirm={confirmDialog.onConfirm}
           onCancel={confirmDialog.onCancel}
+          isLoading={isDeleting}
         />
       )}
 

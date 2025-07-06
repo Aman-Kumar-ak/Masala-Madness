@@ -404,6 +404,16 @@ router.delete("/:orderId", async (req, res) => {
     const revenueCacheKey = `revenue_${dateCacheKey}`;
     ordersCache.delete(revenueCacheKey);
     
+    // Emit socket event for live deletion
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', {
+        type: 'order-deleted',
+        orderId: order.orderId,
+        orderNumber: order.orderNumber
+      });
+    }
+
     res.status(200).json({ 
       message: "Order deleted successfully",
       deletedOrder: {
