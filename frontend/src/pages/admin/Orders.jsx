@@ -333,12 +333,27 @@ const Orders = () => {
     try {
       setDeleteLoading(true);
       await api.delete(`/orders/${orderToDelete.orderId}`);
+      // Update local orders state immediately (mimic websocket handler)
+      setOrders(prevOrders => {
+        const newOrders = prevOrders.filter(order => order.orderId !== orderToDelete.orderId);
+        // Recalculate stats
+        const paidOrders = newOrders.filter(o => o.isPaid);
+        const totalPaidOrders = paidOrders.length;
+        const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+        const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0;
+        setStats({
+          totalOrders: newOrders.length,
+          totalPaidOrders,
+          totalRevenue,
+          avgOrderValue
+        });
+        return newOrders;
+      });
       setNotification({
         message: `Order #${orderToDelete.orderNumber} has been deleted successfully`,
         type: 'delete',
         duration: 2000
       });
-      // No need to call loadOrders() or setSelectedDate here; socket will update the list
     } catch (error) {
       console.error('Error deleting order:', error);
       setNotification({

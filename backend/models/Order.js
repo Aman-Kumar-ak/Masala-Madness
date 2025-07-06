@@ -41,6 +41,9 @@ const OrderSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  isDeleted: { type: Boolean, default: false },
+  deletedBy: { type: String, default: null },
+  deletedAt: { type: Date, default: null },
 });
 
 // Add compound indexes for better query performance

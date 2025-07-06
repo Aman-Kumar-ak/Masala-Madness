@@ -2,6 +2,7 @@ const express = require("express");
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
+const DeletedOrder = require('../models/DeletedOrder');
 
 const router = express.Router();
 
@@ -357,70 +358,64 @@ router.get("/excel/:date", async (req, res) => {
 });
 
 // @route   DELETE /api/orders/:orderId
-// Delete a specific order by ID
+// Soft delete a specific order by ID
 router.delete("/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
-    
+    const deletedBy = req.body.deletedBy || (req.user ? req.user.name : 'Unknown');
     // Find the order to get its details before deletion
-    const order = await Order.findOne({ orderId }).lean();
-    
+    const order = await Order.findOne({ orderId });
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-    
+    // Soft delete: set isDeleted, deletedBy, deletedAt
+    order.isDeleted = true;
+    order.deletedBy = deletedBy;
+    order.deletedAt = new Date();
+    await order.save();
     // Get the date of the order
     const orderDate = new Date(order.createdAt);
     const startOfDay = new Date(orderDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(orderDate);
     endOfDay.setHours(23, 59, 59, 999);
-    
-    // Delete the order
-    await Order.deleteOne({ orderId });
-    
-    // Get all remaining orders for that day to renumber them
-    const remainingOrders = await Order.find({
+    // Resequence orderNumbers for non-deleted orders
+    const nonDeletedOrders = await Order.find({
       createdAt: { $gte: startOfDay, $lte: endOfDay },
-      orderNumber: { $gt: order.orderNumber }
+      isDeleted: false
     }).sort({ orderNumber: 1 });
-    
-    // Update order numbers for all subsequent orders
-    const updatePromises = remainingOrders.map((remainingOrder, index) => {
-      return Order.updateOne(
-        { _id: remainingOrder._id },
-        { $set: { orderNumber: order.orderNumber + index } }
-      );
-    });
-    
-    // Execute all updates
+    // Update order numbers for all non-deleted orders
+    const updatePromises = nonDeletedOrders.map((o, idx) => {
+      if (o.orderNumber !== idx + 1) {
+        return Order.updateOne({ _id: o._id }, { $set: { orderNumber: idx + 1 } });
+      }
+      return null;
+    }).filter(Boolean);
     if (updatePromises.length > 0) {
       await Promise.all(updatePromises);
     }
-    
     // Invalidate cache for the order's date
     const dateCacheKey = orderDate.toISOString().split('T')[0];
     ordersCache.delete(dateCacheKey);
-    
     // Also invalidate revenue cache if exists
     const revenueCacheKey = `revenue_${dateCacheKey}`;
     ordersCache.delete(revenueCacheKey);
-    
     // Emit socket event for live deletion
     const io = req.app.get('io');
     if (io) {
       io.emit('order-update', {
         type: 'order-deleted',
         orderId: order.orderId,
-        orderNumber: order.orderNumber
+        orderNumber: order.orderNumber,
+        deletedBy,
       });
     }
-
     res.status(200).json({ 
       message: "Order deleted successfully",
       deletedOrder: {
         orderId: order.orderId,
-        orderNumber: order.orderNumber
+        orderNumber: order.orderNumber,
+        deletedBy,
       },
       ordersResequenced: updatePromises.length
     });
@@ -454,6 +449,22 @@ router.post('/:orderId/mark-kot', async (req, res) => {
   } catch (error) {
     console.error('Mark KOT error:', error);
     res.status(500).json({ message: 'Failed to mark KOT', error: error.message });
+  }
+});
+
+// @route   GET /api/orders/deleted/:date
+// Get all deleted orders for a specific date (YYYY-MM-DD)
+router.get('/deleted/:date', async (req, res) => {
+  try {
+    const { startOfDay, endOfDay } = getDateRange(req.params.date);
+    const deletedOrders = await Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      isDeleted: true
+    }).sort({ orderNumber: 1 });
+    res.status(200).json({ deletedOrders });
+  } catch (error) {
+    console.error('Fetch deleted orders error:', error);
+    res.status(500).json({ message: 'Failed to fetch deleted orders', error: error.message });
   }
 });
 
