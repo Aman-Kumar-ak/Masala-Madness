@@ -16,7 +16,6 @@ const Orders = () => {
     totalRevenue: 0,
     avgOrderValue: 0,
   });
-  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -47,9 +46,8 @@ const Orders = () => {
       setLoading(true);
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
-      const [ordersData, pendingOrdersData] = await Promise.all([
+      const [ordersData] = await Promise.all([
         api.get(`/orders/date/${dateToQuery}`),
-        api.get('/pending-orders'),
       ]);
       setOrders(ordersData.orders || []);
       setStats(ordersData.stats || {
@@ -58,7 +56,6 @@ const Orders = () => {
         totalRevenue: 0,
         avgOrderValue: 0
       });
-      setPendingOrdersCount(pendingOrdersData.length || 0);
     } catch (error) {
       console.error('Error loading orders:', error);
       setError('Failed to load orders. Please try again.');
@@ -285,23 +282,6 @@ const Orders = () => {
                 </p>
               </div>
 
-              <div
-                role="button"
-                tabIndex={0}
-                className="bg-gradient-to-br from-orange-50 to-yellow-100 p-4 rounded-lg shadow-sm border border-yellow-200 transition-all duration-300 hover:shadow-md cursor-pointer"
-                onClick={() => navigate("/pending-orders")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    navigate("/pending-orders");
-                  }
-                }}
-                aria-label={`Pending Orders: ${pendingOrdersCount}`}
-              >
-                <h3 className="text-lg font-semibold text-gray-700 select-none">Pending Orders</h3>
-                <p className="text-3xl font-bold text-yellow-600 mt-2 select-none">{pendingOrdersCount}</p>
-                <p className="text-sm text-gray-500 mt-1 select-none">Orders awaiting confirmation</p>
-              </div>
-              
               <div className="bg-gradient-to-br from-orange-50 to-green-100 p-4 rounded-lg shadow-sm border border-green-200 transition-all duration-300 hover:shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700">Revenue</h3>
                 <p className="text-3xl font-bold text-green-600 mt-2">
@@ -326,7 +306,13 @@ const Orders = () => {
               <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this date</p>
             ) : (
               orders.map((order) => (
-                <div key={order.orderId} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300">
+                <div key={order.orderId} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative">
+                  {/* Pending badge in top right */}
+                  {!order.isPaid && (
+                    <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-red-500 text-white text-xs font-bold shadow-sm z-10" title="Payment Pending">
+                      Pending
+                    </span>
+                  )}
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className="flex items-center">
@@ -338,20 +324,20 @@ const Orders = () => {
                           aria-label="Delete order"
                           title="Delete order"
                         >
-                            <svg 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              className="h-5 w-5 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
-                              fill="none" 
-                              viewBox="0 0 24 24" 
-                              stroke="currentColor"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2} 
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
-                              />
-                            </svg>
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-5 w-5 text-red-500 group-hover:text-red-600 group-active:text-red-600 transition-colors duration-200" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={2} 
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                            />
+                          </svg>
                         </button>
                       </div>
                       <p className="text-gray-500 text-sm mt-1">
@@ -373,7 +359,6 @@ const Orders = () => {
                           <span className="font-medium"> {order.paymentMethod}</span>
                         )}
                       </span>
-
                       <p className="text-xl font-bold text-gray-800 mt-1">₹{order.totalAmount.toFixed(2)}</p>
                       {order.discountAmount > 0 && (
                         <p className="text-sm text-gray-500 line-through">

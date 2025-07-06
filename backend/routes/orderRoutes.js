@@ -2,7 +2,6 @@ const express = require("express");
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
-const PendingOrder = require("../models/PendingOrder");
 
 const router = express.Router();
 
@@ -25,71 +24,71 @@ const getDateRange = (dateStr) => {
 // Confirm and create a new order or add to pending
 router.post("/confirm", async (req, res) => {
   try {
-    const { items, totalAmount, subtotal, discountAmount, discountPercentage, manualDiscount, paymentMethod, isPaid, customCashAmount, customOnlineAmount } = req.body;
-
-    if (isPaid) {
-      // Logic for confirming payment and creating an order
-      // Get current time in UTC
-      const now = new Date();
-
+    const { orderId, items, totalAmount, subtotal, discountAmount, discountPercentage, manualDiscount, paymentMethod, isPaid, customCashAmount, customOnlineAmount } = req.body;
+    const now = new Date();
+    // If orderId is provided, update existing order (for confirming a pending order)
+    let order;
+    if (orderId) {
+      order = await Order.findOne({ orderId });
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      // Update fields
+      order.items = items || order.items;
+      order.subtotal = subtotal !== undefined ? subtotal : order.subtotal;
+      order.totalAmount = totalAmount !== undefined ? totalAmount : order.totalAmount;
+      order.discountAmount = discountAmount !== undefined ? discountAmount : order.discountAmount;
+      order.discountPercentage = discountPercentage !== undefined ? discountPercentage : order.discountPercentage;
+      order.manualDiscount = manualDiscount !== undefined ? manualDiscount : order.manualDiscount;
+      order.paymentMethod = paymentMethod || order.paymentMethod;
+      order.isPaid = isPaid !== undefined ? isPaid : order.isPaid;
+      order.customCashAmount = customCashAmount !== undefined ? customCashAmount : order.customCashAmount;
+      order.customOnlineAmount = customOnlineAmount !== undefined ? customOnlineAmount : order.customOnlineAmount;
+      order.updatedAt = now;
+      await order.save();
+    } else {
+      // New order (pending or confirmed)
       // Get the latest order for today in UTC
       const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       const tomorrowUTC = new Date(todayUTC);
       tomorrowUTC.setDate(todayUTC.getDate() + 1);
-
-      // Get latest order number efficiently using index
       const latestOrder = await Order.findOne({
         createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
       })
       .select('orderNumber')
       .sort({ orderNumber: -1 })
       .lean();
-
       const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
-
-      const processedItems = items.map(item => ({
+      const processedItems = (items || []).map(item => ({
         ...item,
         type: item.type || 'H',
         totalPrice: item.totalPrice || (item.price * item.quantity)
       }));
-
-      const newOrder = new Order({
+      order = new Order({
         orderId: uuidv4(),
         orderNumber,
         items: processedItems,
-        subtotal: subtotal || totalAmount, // Use subtotal if provided, otherwise use totalAmount
+        subtotal: subtotal || totalAmount,
         totalAmount,
         discountAmount: discountAmount || 0,
         discountPercentage: discountPercentage || 0,
         manualDiscount: manualDiscount || 0,
         paymentMethod,
-        isPaid,
+        isPaid: isPaid || false,
         customCashAmount: customCashAmount || 0,
         customOnlineAmount: customOnlineAmount || 0,
         createdAt: now,
         updatedAt: now
       });
-
-      await newOrder.save();
-
-      // Clear relevant cache entries
-      const todayKey = todayUTC.toISOString().split('T')[0];
-      ordersCache.delete(todayKey);
-
-      return res.status(201).json({ 
-        message: "Order saved successfully", 
-        order: newOrder
-      });
-    } else {
-      // Logic for adding to pending orders
-      const newPendingOrder = new PendingOrder({
-        orderId: uuidv4(), // Generate a unique ID
-        items,
-        subtotal,
-      });
-      await newPendingOrder.save();
-      return res.status(201).json({ message: "Order added to pending successfully", orderId: newPendingOrder.orderId });
+      await order.save();
     }
+    // Clear relevant cache entries
+    const todayKey = now.toISOString().split('T')[0];
+    ordersCache.delete(todayKey);
+    return res.status(201).json({ 
+      message: "Order saved successfully", 
+      order
+    });
   } catch (error) {
     console.error('Order save error:', error);
     res.status(500).json({ message: "Failed to save order", error: error.message });

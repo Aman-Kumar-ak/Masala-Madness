@@ -47,10 +47,7 @@ export default function WorkerOrders() {
       setLoading(true);
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
-      const [ordersData, pendingOrdersData] = await Promise.all([
-        api.get(`/orders/date/${dateToQuery}`),
-        api.get('/pending-orders'),
-      ]);
+      const ordersData = await api.get(`/orders/date/${dateToQuery}`);
       setOrders(ordersData.orders || []);
       setStats(ordersData.stats || {
         totalOrders: 0,
@@ -58,7 +55,9 @@ export default function WorkerOrders() {
         totalRevenue: 0,
         avgOrderValue: 0
       });
-      setPendingOrdersCount(pendingOrdersData.length || 0);
+      // For pending orders count, count isPaid: false in ordersData.orders
+      const pendingCount = (ordersData.orders || []).filter(order => order.isPaid === false).length;
+      setPendingOrdersCount(pendingCount);
     } catch (error) {
       console.error('Error loading orders:', error);
       setError('Failed to load orders. Please try again.');

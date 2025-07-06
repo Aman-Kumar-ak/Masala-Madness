@@ -68,8 +68,9 @@ export default function WorkerPendingOrders() {
   const fetchPendingOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.get('/pending-orders');
-      setPendingOrders(data);
+      const allOrders = await api.get('/orders');
+      const pending = (allOrders || []).filter(order => order.isPaid === false);
+      setPendingOrders(pending);
     } catch (error) {
       console.error('Error fetching pending orders:', error);
       setNotification({ 
@@ -273,7 +274,8 @@ export default function WorkerPendingOrders() {
     
     console.log('Confirming payment for order', orderId, 'with method', paymentMethod);
     try {
-      const data = await api.post(`/pending-orders/confirm/${orderId}`, {
+      const data = await api.post(`/orders/confirm`, {
+        orderId,
         paymentMethod: finalPaymentMethod,
         isPaid: true,
         discountAmount: totalDiscount,
@@ -318,7 +320,22 @@ export default function WorkerPendingOrders() {
   const handleQuantityChange = async (orderId, itemIndex, delta) => {
     saveScrollPosition();
     try {
-      const data = await api.patch(`/pending-orders/${orderId}/item-quantity`, { itemIndex, delta });
+      // Find the order and update the item quantity
+      const order = pendingOrders.find(order => order.orderId === orderId);
+      const updatedItems = [...order.items];
+      updatedItems[itemIndex] = {
+        ...updatedItems[itemIndex],
+        quantity: updatedItems[itemIndex].quantity + delta
+      };
+      // Remove item if quantity is 0
+      if (updatedItems[itemIndex].quantity <= 0) {
+        updatedItems.splice(itemIndex, 1);
+      }
+      const data = await api.post('/orders/confirm', {
+        orderId,
+        items: updatedItems,
+        isPaid: false
+      });
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
@@ -381,7 +398,6 @@ export default function WorkerPendingOrders() {
     const confirmMsg = isLastItem
       ? `Removing last item will delete entire order. Continue?`
       : `Remove ${item.name} from order?`;
-
     setConfirmDialog({
       isOpen: true,
       title: 'Confirm Removal',
@@ -389,19 +405,24 @@ export default function WorkerPendingOrders() {
       onConfirm: async () => {
         try {
           if (isLastItem) {
-            await api.delete(`/pending-orders/${order.orderId}`);
+            await api.delete(`/orders/${order.orderId}`);
             setPendingOrders(prevOrders =>
               prevOrders.filter(o => o.orderId !== order.orderId)
             );
           } else {
-            const data = await api.delete(`/pending-orders/${order.orderId}/item/${index}`);
+            const updatedItems = [...order.items];
+            updatedItems.splice(index, 1);
+            const data = await api.post('/orders/confirm', {
+              orderId: order.orderId,
+              items: updatedItems,
+              isPaid: false
+            });
             setPendingOrders(prevOrders =>
               prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
             );
           }
         } catch (error) {
-          console.error('Error removing item/order:', error);
-          alert('Failed to remove item/order');
+          setNotification({ message: 'Failed to remove item/order', type: 'error' });
         } finally {
           setConfirmDialog(null);
         }
@@ -417,10 +438,7 @@ export default function WorkerPendingOrders() {
       message: `Are you sure you want to delete the entire order #${pendingOrders.length - pendingOrders.indexOf(order)}?`,
       onConfirm: async () => {
         try {
-          const response = await fetch(`${API_URL}/api/pending-orders/${order.orderId}`, {
-            method: 'DELETE',
-          });
-          if (!response.ok) throw new Error('Failed to delete order');
+          const response = await api.delete(`/orders/${order.orderId}`);
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)
           );
@@ -429,7 +447,6 @@ export default function WorkerPendingOrders() {
             type: "success" 
           });
         } catch (error) {
-          console.error('Error removing order:', error);
           setNotification({ 
             message: "Failed to delete order", 
             type: "error" 

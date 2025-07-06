@@ -66,29 +66,9 @@ export default function PendingOrders() {
   const fetchPendingOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.get('/pending-orders');
-      setPendingOrders(data);
-      if (window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
-        const kotData = {
-          orderNumber: data.order.orderNumber,
-          createdAt: data.order.createdAt,
-          items: (data.order.items || []).map(item => ({
-            name: item.name,
-            type: item.type,
-            quantity: item.quantity
-          }))
-        };
-        if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
-          try {
-            console.log('[KOT] Sending to app:', kotData);
-            window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
-          } catch (err) {
-            console.error('Failed to send KOT to app:', err);
-          }
-        } else {
-          console.warn('KOT data missing required fields, not sending to app:', kotData);
-        }
-      }
+      const allOrders = await api.get('/orders');
+      const pending = (allOrders || []).filter(order => order.isPaid === false);
+      setPendingOrders(pending);
     } catch (error) {
       console.error('Error fetching pending orders:', error);
       setNotification({ 
@@ -284,6 +264,7 @@ export default function PendingOrders() {
     }
     // Always send all required fields, even if zero
     const payload = {
+      orderId,
       paymentMethod: finalPaymentMethod || '',
       isPaid: true,
       discountAmount: typeof totalDiscount === 'number' ? totalDiscount : 0,
@@ -291,9 +272,10 @@ export default function PendingOrders() {
       totalAmount: typeof discountedTotal === 'number' ? discountedTotal : 0,
       customCashAmount: typeof customCashAmount === 'number' ? customCashAmount : 0,
       customOnlineAmount: typeof customOnlineAmount === 'number' ? customOnlineAmount : 0,
+      items: order.items,
     };
     try {
-      const response = await api.post(`/pending-orders/confirm/${orderId}`, payload);
+      const response = await api.post('/orders/confirm', payload);
       // Optimistically remove the order immediately
       setPendingOrders(prev => prev.filter(order => order.orderId !== orderId));
       setNotification({ message: response.message, type: 'success' });
@@ -319,7 +301,20 @@ export default function PendingOrders() {
     saveScrollPosition();
     
     try {
-      const data = await api.patch(`/pending-orders/${orderId}/item-quantity`, { itemIndex, delta });
+      const order = pendingOrders.find(order => order.orderId === orderId);
+      if (!order) return;
+      const updatedItems = [...order.items];
+      updatedItems[itemIndex] = {
+        ...updatedItems[itemIndex],
+        quantity: updatedItems[itemIndex].quantity + delta,
+        totalPrice: updatedItems[itemIndex].price * (updatedItems[itemIndex].quantity + delta),
+      };
+      const updatePayload = {
+        orderId,
+        items: updatedItems,
+        isPaid: false,
+      };
+      const data = await api.post('/orders/confirm', updatePayload);
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
@@ -393,12 +388,18 @@ export default function PendingOrders() {
       onConfirm: async () => {
         try {
           if (isLastItem) {
-            await api.delete(`/pending-orders/${order.orderId}`);
+            await api.delete(`/orders/${order.orderId}`);
             setPendingOrders(prevOrders =>
               prevOrders.filter(o => o.orderId !== order.orderId)
             );
           } else {
-            const data = await api.delete(`/pending-orders/${order.orderId}/item/${index}`);
+            const updatedItems = order.items.filter((_, idx) => idx !== index);
+            const updatePayload = {
+              orderId: order.orderId,
+              items: updatedItems,
+              isPaid: false,
+            };
+            const data = await api.post('/orders/confirm', updatePayload);
             setPendingOrders(prevOrders =>
               prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
             );
@@ -421,7 +422,7 @@ export default function PendingOrders() {
       message: `Are you sure you want to delete the entire order #${pendingOrders.length - pendingOrders.indexOf(order)}?`,
       onConfirm: async () => {
         try {
-          await api.delete(`/pending-orders/${order.orderId}`);
+          await api.delete(`/orders/${order.orderId}`);
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)
           );

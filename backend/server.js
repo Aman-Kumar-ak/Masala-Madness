@@ -7,7 +7,6 @@ const { Server } = require('socket.io');
 const dishRoutes = require('./routes/dishRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const discountRoutes = require('./routes/discountRoutes');
-const pendingOrderRoutes = require('./routes/pendingOrderRoutes');
 const upiRoutes = require('./routes/upiRoutes');
 const authRoutes = require('./routes/authRoutes');
 const User = require('./models/User');
@@ -68,7 +67,6 @@ app.use(express.json());
 app.use('/api/dishes', dishRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/discounts', discountRoutes);
-app.use('/api/pending-orders', pendingOrderRoutes);
 app.use('/api/upi', upiRoutes);
 app.use('/api/auth', authRoutes);
 

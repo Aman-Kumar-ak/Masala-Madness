@@ -238,11 +238,10 @@ export default function WorkerCart() {
           throw new Error((data && data.message) || "Failed to process order");
         }
       } else {
-        // Add to pending logic
+        // Add to pending logic (now unified)
         setShowPendingConfirm(false);
         setShowSplashScreen(true);
-
-        const res = await api.post('/pending-orders', payload);
+        const res = await api.post('/orders', payload); // Use /orders for pending
         const data = res;
         if (data && data.message) {
           showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);

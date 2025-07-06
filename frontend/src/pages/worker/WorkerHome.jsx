@@ -57,8 +57,9 @@ export default function WorkerHome() {
 
     const fetchPendingOrdersCount = async () => {
       try {
-        const data = await api.get('/pending-orders');
-        setPendingOrdersCount(data.length || 0);
+        const allOrders = await api.get('/orders');
+        const pending = (allOrders || []).filter(order => order.isPaid === false);
+        setPendingOrdersCount(pending.length || 0);
       } catch (error) {
         console.error('Error fetching pending orders count:', error);
       }
