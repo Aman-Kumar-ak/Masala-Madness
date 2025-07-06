@@ -83,7 +83,7 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
             {formatDateIST(order.createdAt)}
           </p>
           {order.confirmedBy && (
-            <p className="text-xs text-gray-400 mt-1">Confirmed by: {order.confirmedBy}</p>
+            <p className="text-xs text-black mt-1">Confirmed by: {order.confirmedBy}</p>
           )}
         </div>
         <div className="text-right">
