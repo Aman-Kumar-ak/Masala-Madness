@@ -11,6 +11,9 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// At the top, before component definition:
+const ORDER_FILTER_KEY = 'admin-orders-filter';
+
 // OrderCard component for per-order animation
 function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST, handleDeleteClick, deleteLoading, hideDeleteButton, isDeletedSection }) {
   // Animate totalAmount with Framer Motion
@@ -221,8 +224,16 @@ const Orders = () => {
   // Track the last updated orderId for per-order animation
   const [lastUpdatedOrderId, setLastUpdatedOrderId] = useState(null);
 
-  // Add 'deleted' to the filter options
-  const [orderFilter, setOrderFilter] = useState('all'); // 'all', 'confirmed', 'pending', 'deleted'
+  // Replace:
+  // const [orderFilter, setOrderFilter] = useState('all');
+  // With:
+  const [orderFilter, setOrderFilterState] = useState(() => {
+    return localStorage.getItem(ORDER_FILTER_KEY) || 'all';
+  });
+  const setOrderFilter = (filter) => {
+    setOrderFilterState(filter);
+    localStorage.setItem(ORDER_FILTER_KEY, filter);
+  };
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, type: '', message: '', onConfirm: null });
 
@@ -240,7 +251,6 @@ const Orders = () => {
   // Fetch deleted orders for the selected date
   const loadDeletedOrders = async () => {
     try {
-      setLoading(true);
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
       const deletedOrdersData = await api.get(`/orders/deleted/${dateToQuery}`);
@@ -255,7 +265,6 @@ const Orders = () => {
   // Update loadOrders to clear deletedOrders if not in deleted filter
   const loadOrders = async () => {
     try {
-      setLoading(true);
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
       const [ordersData] = await Promise.all([
@@ -318,12 +327,25 @@ const Orders = () => {
     };
   }, [socket, selectedDate, refreshKey]);
 
-  // Add effect to load deleted orders when filter is 'deleted'
+  // Only fetch if the selected date or refreshKey has changed, not just because the list is empty
+  const ordersDate = orders[0]?.createdAt?.slice(0, 10);
+  const deletedOrdersDate = deletedOrders[0]?.createdAt?.slice(0, 10);
+
   useEffect(() => {
     if (orderFilter === 'deleted') {
-      loadDeletedOrders();
+      if (deletedOrdersDate !== selectedDate && selectedDate) {
+        setLoading(true);
+        loadDeletedOrders();
+      } else {
+        setLoading(false);
+      }
     } else {
-    loadOrders();
+      if (ordersDate !== selectedDate && selectedDate) {
+        setLoading(true);
+        loadOrders();
+      } else {
+        setLoading(false);
+      }
     }
     // eslint-disable-next-line
   }, [selectedDate, refreshKey, orderFilter]);
@@ -391,8 +413,7 @@ const Orders = () => {
         type: 'delete',
         duration: 2000
       });
-      // Force a full page reload to ensure UI is fully refreshed
-      window.location.reload();
+      await loadOrders();
     } catch (error) {
       console.error('Error deleting order:', error);
       setNotification({
@@ -591,7 +612,7 @@ const Orders = () => {
             <>
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg shadow-sm border border-orange-200 transition-all duration-300 hover:shadow-md">
-                  <h3 className="text-lg font-semibold text-gray-700">Total Orders</h3>
+                  <h3 className="text-lg font-semibold text-gray-700">Paid Orders</h3>
                   <p className="text-3xl font-bold text-orange-600 mt-2">
                     {stats.totalPaidOrders}
                   </p>
@@ -603,7 +624,7 @@ const Orders = () => {
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigate('/pending-orders'); }}
                   aria-label="View Pending Orders"
                 >
-                  <h3 className="text-lg font-semibold text-gray-700">Pending Orders</h3>
+                  <h3 className="text-lg font-semibold text-gray-700">Unpaid Orders</h3>
                   <p className="text-3xl font-bold text-yellow-600 mt-2">
                     {orders.filter(o => !o.isPaid).length}
                   </p>
