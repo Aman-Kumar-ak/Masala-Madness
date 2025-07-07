@@ -2,6 +2,7 @@ const express = require("express");
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
+const DeletedOrder = require("../models/DeletedOrder");
 
 const router = express.Router();
 
@@ -186,9 +187,8 @@ router.get("/date/:date", async (req, res) => {
 router.get("/deleted/:date", async (req, res) => {
   try {
     const { startOfDay, endOfDay } = getDateRange(req.params.date);
-    const deletedOrders = await Order.find({
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-      deleted: true
+    const deletedOrders = await DeletedOrder.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
     }).sort({ updatedAt: -1 }).lean();
     res.status(200).json(deletedOrders);
   } catch (error) {
@@ -369,7 +369,7 @@ router.get("/excel/:date", async (req, res) => {
 });
 
 // @route   DELETE /api/orders/:orderId
-// Soft delete a specific order by ID
+// Move the order to DeletedOrder collection and remove from Order collection
 router.delete("/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -384,14 +384,14 @@ router.delete("/:orderId", async (req, res) => {
     const endOfDay = new Date(orderDate);
     endOfDay.setHours(23, 59, 59, 999);
     const deletedOrderNumber = order.orderNumber;
-    // Soft delete: set deleted: true
-    order.deleted = true;
-    await order.save();
+    // Move to DeletedOrder collection
+    await DeletedOrder.create(order.toObject());
+    // Remove from Order collection
+    await Order.deleteOne({ orderId });
     // Resequence orderNumbers for non-deleted orders on the same day with higher orderNumber
     const nonDeletedOrders = await Order.find({
       createdAt: { $gte: startOfDay, $lte: endOfDay },
-      orderNumber: { $gt: deletedOrderNumber },
-      deleted: { $ne: true }
+      orderNumber: { $gt: deletedOrderNumber }
     }).sort({ orderNumber: 1 });
     for (let i = 0; i < nonDeletedOrders.length; i++) {
       nonDeletedOrders[i].orderNumber = deletedOrderNumber + i;
@@ -412,7 +412,7 @@ router.delete("/:orderId", async (req, res) => {
       });
     }
     res.status(200).json({ 
-      message: "Order soft deleted and order numbers resequenced successfully",
+      message: "Order moved to deleted orders and order numbers resequenced successfully",
       orderId: orderId
     });
   } catch (error) {
