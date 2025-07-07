@@ -506,7 +506,7 @@ const Login = () => {
                     transition={{ delay: 0.7 }}
                   >
                     <div>
-                      <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                      <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                       <div className="relative rounded-md shadow-sm">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <svg className="h-5 w-5 text-orange-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">

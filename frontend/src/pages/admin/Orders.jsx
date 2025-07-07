@@ -410,6 +410,8 @@ const Orders = () => {
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
+    setShowDeleteConfirmation(false);
+    setOrderToDelete(null);
     setDeleteLoading(true);
     setLoading(true); // Show spinner for the whole list
     try {
@@ -427,12 +429,9 @@ const Orders = () => {
         type: 'error',
         duration: 2000
       });
-      // Reload orders to ensure UI consistency
       await loadOrders();
     } finally {
       setDeleteLoading(false);
-      setShowDeleteConfirmation(false);
-      setOrderToDelete(null);
       setLoading(false);
     }
   };
@@ -481,24 +480,19 @@ const Orders = () => {
 
   // Permanently delete a single deleted order with confirmation
   const handlePermanentDeleteOne = (orderId) => {
-    setConfirmDialog({
-      open: true,
-      type: 'single',
-      message: 'Are you sure you want to permanently delete this order?',
-      onConfirm: async () => {
-        setLoading(true);
-        try {
-          await api.delete(`/orders/deleted/permanent/${orderId}`);
-          setNotification({ message: 'Order permanently deleted.', type: 'delete', duration: 2000 });
-          await loadDeletedOrders();
-        } catch (error) {
-          setNotification({ message: 'Failed to permanently delete order.', type: 'error', duration: 2000 });
-        } finally {
-          setLoading(false);
-          setConfirmDialog({ open: false, type: '', message: '', onConfirm: null });
-        }
-      }
-    });
+    setConfirmDialog({ open: false, type: '', message: '', onConfirm: null });
+    setLoading(true);
+    api.delete(`/orders/deleted/permanent/${orderId}`)
+      .then(() => {
+        setNotification({ message: 'Order permanently deleted.', type: 'delete', duration: 2000 });
+        loadDeletedOrders();
+      })
+      .catch(() => {
+        setNotification({ message: 'Failed to permanently delete order.', type: 'error', duration: 2000 });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   // Permanently delete all deleted orders for the selected date
