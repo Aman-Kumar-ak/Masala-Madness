@@ -448,4 +448,31 @@ router.post('/:orderId/mark-kot', async (req, res) => {
   }
 });
 
+// @route   DELETE /api/orders/deleted/permanent/:orderId
+router.delete('/deleted/permanent/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const result = await DeletedOrder.deleteOne({ orderId });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'Deleted order not found' });
+    }
+    res.status(200).json({ message: 'Deleted order permanently removed', orderId });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to permanently delete order', error: error.message });
+  }
+});
+
+// @route   DELETE /api/orders/deleted/permanent/all/:date
+router.delete('/deleted/permanent/all/:date', async (req, res) => {
+  try {
+    const { startOfDay, endOfDay } = getDateRange(req.params.date);
+    const result = await DeletedOrder.deleteMany({
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    });
+    res.status(200).json({ message: 'All deleted orders for date permanently removed', deletedCount: result.deletedCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to permanently delete all deleted orders', error: error.message });
+  }
+});
+
 module.exports = router;

@@ -7,11 +7,13 @@ import DeleteOrderConfirmation from "../../components/DeleteOrderConfirmation";
 import Notification from "../../components/Notification";
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSpring, animated } from '@react-spring/web';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
+import { FaTrash } from 'react-icons/fa';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // OrderCard component for per-order animation
-function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST, handleDeleteClick, deleteLoading }) {
+function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST, handleDeleteClick, deleteLoading, hideDeleteButton, isDeletedSection, isSelected, onCardClick }) {
   // Animate totalAmount with Framer Motion
   const amountRef = useRef(null);
   const [displayAmount, setDisplayAmount] = useState(order.totalAmount);
@@ -45,17 +47,25 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
 
   return (
     <div
-      className={order.isPaid ? "bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative" : "bg-red-50 p-5 rounded-lg shadow-sm border border-red-200 hover:shadow-md transition-all duration-300 relative cursor-pointer"}
+      className={
+        isDeletedSection
+          ? `${isSelected ? 'bg-red-50' : 'bg-white'} p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative cursor-pointer`
+          : order.isPaid
+            ? "bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 relative"
+            : "bg-red-50 p-5 rounded-lg shadow-sm border border-red-200 hover:shadow-md transition-all duration-300 relative cursor-pointer"
+      }
+      onClick={onCardClick}
     >
       <div className="flex justify-between items-start mb-3 relative">
         <div className="relative">
-          {!order.isPaid && (
+          {!order.isPaid && !isDeletedSection && (
             <span className="absolute -top-4 left-0 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm z-10 select-none" style={{lineHeight: '1.2', letterSpacing: '0.02em'}}>
               Pending
             </span>
           )}
           <div className="flex items-center">
             <h3 className="text-lg font-semibold mr-2 whitespace-nowrap">Order #{order.orderNumber}</h3>
+            {!hideDeleteButton && (
             <button 
               onClick={() => handleDeleteClick(order)} 
               disabled={deleteLoading}
@@ -78,6 +88,7 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
                 />
               </svg>
             </button>
+            )}
           </div>
           <p className="text-gray-500 text-sm mt-1">
             {formatDateIST(order.createdAt)}
@@ -149,6 +160,12 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
           );
         })()}
       </div>
+      {/* Pending tag for deleted section */}
+      {isDeletedSection && !order.isPaid && (
+        <div className="mt-2">
+          <span className="inline-block bg-gray-200 text-black text-xs font-semibold px-3 py-1 rounded-md" style={{ minWidth: 60, textAlign: 'left' }}>Pending</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -184,6 +201,10 @@ const Orders = () => {
 
   // Add 'deleted' to the filter options
   const [orderFilter, setOrderFilter] = useState('all'); // 'all', 'confirmed', 'pending', 'deleted'
+
+  const [selectedDeletedOrders, setSelectedDeletedOrders] = useState([]); // For holding selected deleted orders
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, type: '', message: '', onConfirm: null });
+  const [selectionMode, setSelectionMode] = useState(false);
 
   // Helper to parse custom payment amounts from the paymentMethod string
   const parseCustomPaymentAmounts = (paymentMethodString) => {
@@ -282,7 +303,7 @@ const Orders = () => {
     if (orderFilter === 'deleted') {
       loadDeletedOrders();
     } else {
-      loadOrders();
+    loadOrders();
     }
     // eslint-disable-next-line
   }, [selectedDate, refreshKey, orderFilter]);
@@ -410,6 +431,93 @@ const Orders = () => {
     if (orderFilter === 'pending') return !order.isPaid;
     return true;
   });
+
+  // Permanently delete selected deleted orders
+  const handlePermanentDeleteSelected = () => {
+    if (selectedDeletedOrders.length === 0) return;
+    setConfirmDialog({
+      open: true,
+      type: 'selected',
+      message: 'Are you sure you want to permanently delete the selected orders?',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await Promise.all(selectedDeletedOrders.map(orderId => api.delete(`/orders/deleted/permanent/${orderId}`)));
+          setNotification({ message: 'Selected deleted orders permanently deleted.', type: 'delete', duration: 2000 });
+          setSelectedDeletedOrders([]);
+          await loadDeletedOrders();
+        } catch (error) {
+          setNotification({ message: 'Failed to permanently delete selected orders.', type: 'error', duration: 2000 });
+        } finally {
+          setLoading(false);
+          setConfirmDialog({ open: false, type: '', message: '', onConfirm: null });
+        }
+      }
+    });
+  };
+
+  // Permanently delete all deleted orders for the selected date
+  const handlePermanentDeleteAll = () => {
+    if (deletedOrders.length === 0) return;
+    setConfirmDialog({
+      open: true,
+      type: 'all',
+      message: 'Are you sure you want to permanently delete ALL deleted orders for this date?',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await api.delete(`/orders/deleted/permanent/all/${selectedDate}`);
+          setNotification({ message: 'All deleted orders permanently deleted.', type: 'delete', duration: 2000 });
+          setSelectedDeletedOrders([]);
+          await loadDeletedOrders();
+        } catch (error) {
+          setNotification({ message: 'Failed to permanently delete all deleted orders.', type: 'error', duration: 2000 });
+        } finally {
+          setLoading(false);
+          setConfirmDialog({ open: false, type: '', message: '', onConfirm: null });
+        }
+      }
+    });
+  };
+
+  // Handle select/deselect for deleted orders
+  const handleSelectDeletedOrder = (orderId) => {
+    setSelectedDeletedOrders(prev => prev.includes(orderId)
+      ? prev.filter(id => id !== orderId)
+      : [...prev, orderId]);
+  };
+
+  // Enter selection mode on card click/hold
+  const handleDeletedCardClick = (orderId) => {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      setSelectedDeletedOrders([orderId]);
+    } else {
+      // In selection mode, toggle selection of the clicked card (multi-select)
+      setSelectedDeletedOrders(prev =>
+        prev.includes(orderId)
+          ? prev.filter(id => id !== orderId)
+          : [...prev, orderId]
+      );
+    }
+  };
+
+  // Exit selection mode
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedDeletedOrders([]);
+  };
+
+  // Custom Checkbox Component
+  const CustomCheckbox = ({ checked, onClick }) => (
+    <div
+      onClick={onClick}
+      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors duration-150 ${checked ? 'bg-red-600 border-red-600' : 'bg-white border-gray-400 hover:border-red-400'}`}
+      style={{ boxShadow: checked ? '0 0 0 2px #fff, 0 0 0 4px #dc2626' : undefined }}
+    >
+      {checked && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+    </div>
+  );
 
   if (loading) {
     return (
@@ -573,41 +681,85 @@ const Orders = () => {
           </div>
 
           {/* Orders List */}
-          <div className="space-y-4">
+          <div className="space-y-4 relative">
             {orderFilter === 'deleted' ? (
-              deletedOrders.length === 0 ? (
-                <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No deleted orders for this date</p>
-              ) : (
-                deletedOrders.map(order => (
-                  <div key={order.orderId}>
+              <>
+                {selectionMode && (
+                  <div className="flex items-center gap-2 mb-2 sticky top-0 z-20 bg-white/80 py-2 px-2 rounded shadow-sm">
+                    <button
+                      className="px-3 py-1 text-xs rounded-full border border-gray-300 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium"
+                      onClick={() => {
+                        if (selectedDeletedOrders.length === deletedOrders.length) {
+                          setSelectedDeletedOrders([]);
+                        } else {
+                          setSelectedDeletedOrders(deletedOrders.map(order => order.orderId));
+                        }
+                      }}
+                    >
+                      {selectedDeletedOrders.length === deletedOrders.length ? 'Unselect All' : 'Select All'}
+                    </button>
+                    <span className="text-xs text-gray-500">{selectedDeletedOrders.length} selected</span>
+                    <button
+                      className="ml-auto flex items-center justify-center w-9 h-9 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-all duration-200"
+                      style={{ boxShadow: '0 2px 8px rgba(220,38,38,0.15)' }}
+                      onClick={handlePermanentDeleteSelected}
+                      disabled={selectedDeletedOrders.length === 0}
+                      title="Delete Selected"
+                    >
+                      <FaTrash size={16} />
+                    </button>
+                    <button
+                      className="ml-2 px-2 py-1 text-xs rounded-full border border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-500"
+                      onClick={exitSelectionMode}
+                    >Cancel</button>
+                  </div>
+                )}
+                {deletedOrders.length === 0 ? (
+                  <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No deleted orders for this date</p>
+                ) : (
+                  deletedOrders.map(order => (
                     <OrderCard
+                      key={order.orderId}
                       order={order}
                       isUpdated={false}
                       parseCustomPaymentAmounts={parseCustomPaymentAmounts}
                       formatDateIST={formatDateIST}
                       handleDeleteClick={() => {}}
                       deleteLoading={false}
+                      hideDeleteButton={true}
+                      isDeletedSection={true}
+                      isSelected={selectionMode && selectedDeletedOrders.includes(order.orderId)}
+                      onCardClick={() => handleDeletedCardClick(order.orderId)}
                     />
-                    <div className="text-xs text-red-600 font-semibold mt-1 ml-2">Deleted</div>
-                  </div>
-                ))
-              )
+                  ))
+                )}
+                {/* Overlay to exit selection mode by clicking outside */}
+                {selectionMode && (
+                  <div
+                    className="fixed inset-0 z-10"
+                    style={{ pointerEvents: 'auto', background: 'transparent' }}
+                    onClick={exitSelectionMode}
+                  />
+                )}
+              </>
             ) : (
               filteredOrders.length === 0 ? (
                 <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
-              ) : (
-                filteredOrders.map(order => (
-                  <div key={order.orderId}>
-                    <OrderCard
-                      order={order}
-                      isUpdated={order.orderId === lastUpdatedOrderId}
-                      parseCustomPaymentAmounts={parseCustomPaymentAmounts}
-                      formatDateIST={formatDateIST}
-                      handleDeleteClick={handleDeleteClick}
-                      deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
-                    />
-                  </div>
-                ))
+            ) : (
+              filteredOrders.map(order => (
+                <div key={order.orderId}>
+                  <OrderCard
+                    order={order}
+                    isUpdated={order.orderId === lastUpdatedOrderId}
+                    parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                    formatDateIST={formatDateIST}
+                    handleDeleteClick={handleDeleteClick}
+                    deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
+                      hideDeleteButton={false}
+                      isDeletedSection={false}
+                  />
+                </div>
+              ))
               )
             )}
           </div>
@@ -632,6 +784,16 @@ const Orders = () => {
           onClose={() => setNotification(null)}
         />
       )}
+
+      {/* Confirmation Dialog for permanent delete actions */}
+      <ConfirmationDialog
+        isOpen={confirmDialog.open}
+        title="Confirm Permanent Deletion"
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ open: false, type: '', message: '', onConfirm: null })}
+        isLoading={loading}
+      />
     </div>
   );
 };
