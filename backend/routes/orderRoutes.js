@@ -387,7 +387,7 @@ router.delete("/:orderId", async (req, res) => {
     // Move to DeletedOrder collection
     await DeletedOrder.create({
       ...order.toObject(),
-      deletedBy: req.user?.name || req.user?.username || 'Unknown',
+      deletedBy: req.user?.name || req.user?.username,
       deletedAt: new Date(),
     });
     // Remove from Order collection

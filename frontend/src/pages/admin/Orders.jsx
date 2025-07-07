@@ -233,13 +233,7 @@ const Orders = () => {
   // Replace:
   // const [orderFilter, setOrderFilter] = useState('all');
   // With:
-  const [orderFilter, setOrderFilterState] = useState(() => {
-    return localStorage.getItem(ORDER_FILTER_KEY) || 'all';
-  });
-  const setOrderFilter = (filter) => {
-    setOrderFilterState(filter);
-    localStorage.setItem(ORDER_FILTER_KEY, filter);
-  };
+  const [orderFilter, setOrderFilter] = useState('all');
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, type: '', message: '', onConfirm: null });
 
