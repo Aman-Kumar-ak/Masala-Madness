@@ -106,10 +106,10 @@ router.post("/confirm", async (req, res) => {
 });
 
 // @route   GET /api/orders
-//Get all orders sorted by createdAt in ascending order
+//Get all orders sorted by createdAt in ascending order (exclude deleted)
 router.get("/", async (req, res) => {
   try {
-    const orders = await Order.find().sort({ updatedAt: -1 }).lean();
+    const orders = await Order.find({ deleted: { $ne: true } }).sort({ updatedAt: -1 }).lean();
     res.status(200).json(orders);
   } catch (error) {
     console.error('Fetch orders error:', error);
@@ -118,34 +118,30 @@ router.get("/", async (req, res) => {
 });
 
 // @route   GET /api/orders/today
-//Get all orders for today with stats
+//Get all orders for today with stats (exclude deleted)
 router.get("/today", async (req, res) => {
   try {
     const now = new Date();
     const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setDate(todayUTC.getDate() + 1);
-    
     const cacheKey = todayUTC.toISOString().split('T')[0];
-    
     if (ordersCache.has(cacheKey)) {
       return res.status(200).json(ordersCache.get(cacheKey));
     }
-
     const [stats, orders] = await Promise.all([
       Order.calculateStats(todayUTC, tomorrowUTC),
       Order.find({
-        createdAt: { $gte: todayUTC, $lt: tomorrowUTC }
+        createdAt: { $gte: todayUTC, $lt: tomorrowUTC },
+        deleted: { $ne: true }
       })
       .select('-__v')
       .sort({ updatedAt: -1 })
       .lean()
     ]);
-
     const result = { stats, orders };
     ordersCache.set(cacheKey, result);
     clearCacheEntry(cacheKey);
-
     res.status(200).json(result);
   } catch (error) {
     console.error('Fetch today\'s orders error:', error);
@@ -154,35 +150,51 @@ router.get("/today", async (req, res) => {
 });
 
 // @route   GET /api/orders/date/:date
-//Get orders for a specific date (YYYY-MM-DD) with stats
+//Get orders for a specific date (YYYY-MM-DD) with stats (exclude deleted)
 router.get("/date/:date", async (req, res) => {
   try {
     const { startOfDay, endOfDay } = getDateRange(req.params.date);
     const cacheKey = req.params.date;
-
     if (ordersCache.has(cacheKey)) {
       return res.status(200).json(ordersCache.get(cacheKey));
     }
-
     const [stats, orders] = await Promise.all([
       Order.calculateStats(startOfDay, endOfDay),
       Order.find({
-        createdAt: { $gte: startOfDay, $lte: endOfDay }
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        deleted: { $ne: true }
       })
       .select('-__v')
       .sort({ updatedAt: -1 })
       .lean()
     ]);
-
     const result = { stats, orders };
     ordersCache.set(cacheKey, result);
     clearCacheEntry(cacheKey);
-
     res.status(200).json(result);
   } catch (error) {
     console.error("Fetch orders by date error:", error);
     res.status(500).json({
       message: "Failed to fetch orders for the given date",
+      error: error.message,
+    });
+  }
+});
+
+// @route   GET /api/orders/deleted/:date
+// Get only deleted orders for a specific date (YYYY-MM-DD)
+router.get("/deleted/:date", async (req, res) => {
+  try {
+    const { startOfDay, endOfDay } = getDateRange(req.params.date);
+    const deletedOrders = await Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      deleted: true
+    }).sort({ updatedAt: -1 }).lean();
+    res.status(200).json(deletedOrders);
+  } catch (error) {
+    console.error("Fetch deleted orders by date error:", error);
+    res.status(500).json({
+      message: "Failed to fetch deleted orders for the given date",
       error: error.message,
     });
   }
@@ -357,7 +369,7 @@ router.get("/excel/:date", async (req, res) => {
 });
 
 // @route   DELETE /api/orders/:orderId
-// Hard delete a specific order by ID
+// Soft delete a specific order by ID
 router.delete("/:orderId", async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -372,16 +384,25 @@ router.delete("/:orderId", async (req, res) => {
     const endOfDay = new Date(orderDate);
     endOfDay.setHours(23, 59, 59, 999);
     const deletedOrderNumber = order.orderNumber;
-    // Delete the order
-    await Order.deleteOne({ orderId });
-    // Resequence orderNumbers for orders on the same day with higher orderNumber
-    await Order.updateMany(
-      {
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
-        orderNumber: { $gt: deletedOrderNumber }
-      },
-      { $inc: { orderNumber: -1 } }
-    );
+    // Soft delete: set deleted: true
+    order.deleted = true;
+    await order.save();
+    // Resequence orderNumbers for non-deleted orders on the same day with higher orderNumber
+    const nonDeletedOrders = await Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      orderNumber: { $gt: deletedOrderNumber },
+      deleted: { $ne: true }
+    }).sort({ orderNumber: 1 });
+    for (let i = 0; i < nonDeletedOrders.length; i++) {
+      nonDeletedOrders[i].orderNumber = deletedOrderNumber + i;
+      await nonDeletedOrders[i].save();
+    }
+    // Invalidate cache for the order's date
+    const dateCacheKey = orderDate.toISOString().split('T')[0];
+    ordersCache.delete(dateCacheKey);
+    // Also invalidate revenue cache if exists
+    const revenueCacheKey = `revenue_${dateCacheKey}`;
+    ordersCache.delete(revenueCacheKey);
     // Emit socket event for live deletion
     const io = req.app.get('io');
     if (io) {
@@ -391,7 +412,7 @@ router.delete("/:orderId", async (req, res) => {
       });
     }
     res.status(200).json({ 
-      message: "Order deleted and order numbers resequenced successfully",
+      message: "Order soft deleted and order numbers resequenced successfully",
       orderId: orderId
     });
   } catch (error) {

@@ -155,6 +155,7 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
+  const [deletedOrders, setDeletedOrders] = useState([]); // Store deleted orders
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalPaidOrders: 0,
@@ -181,7 +182,8 @@ const Orders = () => {
   // Track the last updated orderId for per-order animation
   const [lastUpdatedOrderId, setLastUpdatedOrderId] = useState(null);
 
-  const [orderFilter, setOrderFilter] = useState('all'); // 'all', 'confirmed', 'pending'
+  // Add 'deleted' to the filter options
+  const [orderFilter, setOrderFilter] = useState('all'); // 'all', 'confirmed', 'pending', 'deleted'
 
   // Helper to parse custom payment amounts from the paymentMethod string
   const parseCustomPaymentAmounts = (paymentMethodString) => {
@@ -194,6 +196,22 @@ const Orders = () => {
     return { cash, online };
   };
 
+  // Fetch deleted orders for the selected date
+  const loadDeletedOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const dateToQuery = selectedDate || getCurrentDate();
+      const deletedOrdersData = await api.get(`/orders/deleted/${dateToQuery}`);
+      setDeletedOrders(deletedOrdersData || []);
+    } catch (error) {
+      setError('Failed to load deleted orders. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update loadOrders to clear deletedOrders if not in deleted filter
   const loadOrders = async () => {
     try {
       setLoading(true);
@@ -209,6 +227,7 @@ const Orders = () => {
         totalRevenue: 0,
         avgOrderValue: 0
       });
+      if (orderFilter !== 'deleted') setDeletedOrders([]);
     } catch (error) {
       console.error('Error loading orders:', error);
       setError('Failed to load orders. Please try again.');
@@ -258,10 +277,15 @@ const Orders = () => {
     };
   }, [socket, selectedDate, refreshKey]);
 
+  // Add effect to load deleted orders when filter is 'deleted'
   useEffect(() => {
-    loadOrders();
+    if (orderFilter === 'deleted') {
+      loadDeletedOrders();
+    } else {
+      loadOrders();
+    }
     // eslint-disable-next-line
-  }, [selectedDate, refreshKey]);
+  }, [selectedDate, refreshKey, orderFilter]);
 
   const handleDateChange = (e) => {
     if (!e.target.value) {
@@ -317,26 +341,17 @@ const Orders = () => {
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
-    // Optimistically remove the order from the UI
-    setOrders(prevOrders => prevOrders.filter(order => order.orderId !== orderToDelete.orderId));
     setDeleteLoading(true);
+    setLoading(true); // Show spinner for the whole list
     try {
       await api.delete(`/orders/${orderToDelete.orderId}`);
-      // Fetch updated orders to update order numbers instantly
-      const dateToQuery = selectedDate || getCurrentDate();
-      const ordersData = await api.get(`/orders/date/${dateToQuery}`);
-      setOrders(ordersData.orders || []);
-      setStats(ordersData.stats || {
-        totalOrders: 0,
-        totalPaidOrders: 0,
-        totalRevenue: 0,
-        avgOrderValue: 0
-      });
       setNotification({
         message: `Order #${orderToDelete.orderNumber} has been deleted successfully`,
         type: 'delete',
         duration: 2000
       });
+      // Force a full page reload to ensure UI is fully refreshed
+      window.location.reload();
     } catch (error) {
       console.error('Error deleting order:', error);
       setNotification({
@@ -344,12 +359,13 @@ const Orders = () => {
         type: 'error',
         duration: 2000
       });
-      // If deletion fails, reload orders to restore UI
+      // Reload orders to ensure UI consistency
       await loadOrders();
     } finally {
       setDeleteLoading(false);
       setShowDeleteConfirmation(false);
       setOrderToDelete(null);
+      setLoading(false);
     }
   };
 
@@ -548,25 +564,51 @@ const Orders = () => {
             >
               Pending
             </button>
+            <button
+              className={`px-5 py-2 rounded-full font-medium whitespace-nowrap transition-colors duration-200 focus:outline-none ${orderFilter === 'deleted' ? 'bg-red-100 text-red-700 shadow-sm' : 'bg-transparent text-gray-700 hover:bg-red-50'}`}
+              onClick={() => setOrderFilter('deleted')}
+            >
+              Deleted
+            </button>
           </div>
 
           {/* Orders List */}
           <div className="space-y-4">
-            {filteredOrders.length === 0 ? (
-              <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
+            {orderFilter === 'deleted' ? (
+              deletedOrders.length === 0 ? (
+                <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No deleted orders for this date</p>
+              ) : (
+                deletedOrders.map(order => (
+                  <div key={order.orderId}>
+                    <OrderCard
+                      order={order}
+                      isUpdated={false}
+                      parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                      formatDateIST={formatDateIST}
+                      handleDeleteClick={() => {}}
+                      deleteLoading={false}
+                    />
+                    <div className="text-xs text-red-600 font-semibold mt-1 ml-2">Deleted</div>
+                  </div>
+                ))
+              )
             ) : (
-              filteredOrders.map(order => (
-                <div key={order.orderId}>
-                  <OrderCard
-                    order={order}
-                    isUpdated={order.orderId === lastUpdatedOrderId}
-                    parseCustomPaymentAmounts={parseCustomPaymentAmounts}
-                    formatDateIST={formatDateIST}
-                    handleDeleteClick={handleDeleteClick}
-                    deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
-                  />
-                </div>
-              ))
+              filteredOrders.length === 0 ? (
+                <p className="text-gray-600 text-center py-8 bg-white rounded-lg shadow-sm border border-gray-200">No orders found for this filter</p>
+              ) : (
+                filteredOrders.map(order => (
+                  <div key={order.orderId}>
+                    <OrderCard
+                      order={order}
+                      isUpdated={order.orderId === lastUpdatedOrderId}
+                      parseCustomPaymentAmounts={parseCustomPaymentAmounts}
+                      formatDateIST={formatDateIST}
+                      handleDeleteClick={handleDeleteClick}
+                      deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
+                    />
+                  </div>
+                ))
+              )
             )}
           </div>
         </div>
