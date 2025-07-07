@@ -121,6 +121,12 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
           {order.confirmedBy && (
             <p className="text-xs text-black mt-1">Confirmed by: {order.confirmedBy}</p>
           )}
+          {isDeletedSection && order.deletedBy && (
+            <p className="text-xs text-gray-700 mt-1">Deleted by: {order.deletedBy}</p>
+          )}
+          {isDeletedSection && order.deletedAt && (
+            <p className="text-xs text-gray-500 mt-0.5">Deleted at: {formatDateIST(order.deletedAt)}</p>
+          )}
         </div>
         <div className="text-right">
           <div className="flex flex-col items-end sm:items-end md:items-end lg:items-end">
@@ -686,7 +692,7 @@ const Orders = () => {
                 {deletedOrders.length > 0 && (
                   <div className="flex items-center gap-2 mb-4">
                     <button
-                      className="px-4 py-2 rounded bg-white border border-red-500 text-red-600 font-semibold hover:bg-red-50 transition-colors duration-150"
+                      className="px-3 py-1.5 rounded-full bg-red-500 text-white font-semibold text-sm shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300 transition-colors duration-150"
                       onClick={handlePermanentDeleteAll}
                     >
                       Delete All

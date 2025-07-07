@@ -385,7 +385,11 @@ router.delete("/:orderId", async (req, res) => {
     endOfDay.setHours(23, 59, 59, 999);
     const deletedOrderNumber = order.orderNumber;
     // Move to DeletedOrder collection
-    await DeletedOrder.create(order.toObject());
+    await DeletedOrder.create({
+      ...order.toObject(),
+      deletedBy: req.user?.username || 'Unknown',
+      deletedAt: new Date(),
+    });
     // Remove from Order collection
     await Order.deleteOne({ orderId });
     // Resequence orderNumbers for non-deleted orders on the same day with higher orderNumber

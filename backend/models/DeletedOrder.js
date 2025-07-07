@@ -41,6 +41,14 @@ const DeletedOrderSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  deletedBy: {
+    type: String,
+    default: null,
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
 });
 
 const DeletedOrder = mongoose.model("DeletedOrder", DeletedOrderSchema);
