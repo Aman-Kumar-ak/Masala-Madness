@@ -754,40 +754,46 @@ export default function WorkerPendingOrders() {
                                   <span className="whitespace-nowrap">₹{item.price.toFixed(2)} × {item.quantity} = ₹{(item.price * item.quantity).toFixed(2)}</span>
                                 </div>
                               </div>
-                              
-                              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                <button
-                                  onClick={() => handleQuantityChange(order.orderId, index, -1)}
-                                  disabled={item.quantity === 1}
-                                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
-                                    item.quantity === 1
-                                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                      : 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-200'
-                                  }`}
-                                  aria-label={`Decrease quantity of ${item.name}`}
-                                >
-                                  -
-                                </button>
-                                
-                                <div className="inline-flex justify-center items-center bg-white border border-gray-200 rounded-md px-2 min-w-[1.75rem] sm:min-w-[2rem] h-7 sm:h-8 text-center">
-                                  {item.quantity}
+                              <div className="flex flex-col items-end gap-1 flex-shrink-0 min-w-[60px]">
+                                {item.kotNumber && (
+                                  <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap mb-1">
+                                    KOT #{item.kotNumber}
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <button
+                                    onClick={() => handleQuantityChange(order.orderId, index, -1)}
+                                    disabled={item.quantity === 1}
+                                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                                      item.quantity === 1
+                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                        : 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-200'
+                                    }`}
+                                    aria-label={`Decrease quantity of ${item.name}`}
+                                  >
+                                    -
+                                  </button>
+                                  
+                                  <div className="inline-flex justify-center items-center bg-white border border-gray-200 rounded-md px-2 min-w-[1.75rem] sm:min-w-[2rem] h-7 sm:h-8 text-center">
+                                    {item.quantity}
+                                  </div>
+                                  
+                                  <button
+                                    onClick={() => handleQuantityChange(order.orderId, index, 1)}
+                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
+                                    aria-label={`Increase quantity of ${item.name}`}
+                                  >
+                                    +
+                                  </button>
+                                  
+                                  <button
+                                    onClick={() => handleRemoveItemOrOrder(order, item, index)}
+                                    className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
+                                    aria-label={`Remove ${item.name}`}
+                                  >
+                                    ×
+                                  </button>
                                 </div>
-                                
-                                <button
-                                  onClick={() => handleQuantityChange(order.orderId, index, 1)}
-                                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
-                                  aria-label={`Increase quantity of ${item.name}`}
-                                >
-                                  +
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleRemoveItemOrOrder(order, item, index)}
-                                  className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
-                                  aria-label={`Remove ${item.name}`}
-                                >
-                                  ×
-                                </button>
                               </div>
                             </li>
                           ))}
@@ -890,6 +896,7 @@ export default function WorkerPendingOrders() {
           onSave={handleSaveItems} 
           orderId={currentOrderId} 
           existingItems={pendingOrders.find(order => order.orderId === currentOrderId)?.items || []}
+          enableKOT={true} // Enable KOT logic for worker side
         />
       )}
       

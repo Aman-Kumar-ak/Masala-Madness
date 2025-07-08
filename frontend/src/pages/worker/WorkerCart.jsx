@@ -223,6 +223,7 @@ export default function WorkerCart() {
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
       customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
       confirmedBy: user?.name || user?.username || user?.mobileNumber,
+      printKOT // Add this line
     };
 
     try {
@@ -240,17 +241,21 @@ export default function WorkerCart() {
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
           // Send KOT data to app if printKOT is true
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+            // Ensure kotNumber: 1 for all items if this is the initial KOT print
+            const itemsWithKOT = (data.order.items || []).map(item => ({
+              name: item.name,
+              type: item.type,
+              quantity: item.quantity,
+              kotNumber: item.kotNumber || 1 // Always set to 1 for initial print
+            }));
             const kotData = {
               orderNumber: data.order.orderNumber,
               createdAt: getISTISOString(data.order.createdAt),
-              items: (data.order.items || []).map(item => ({
-                name: item.name,
-                type: item.type,
-                quantity: item.quantity
-              }))
+              items: itemsWithKOT
             };
             if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
               try {
+                console.log('[KOT][DEBUG] About to call window.AndroidBridge.sendOrderDetails with:', JSON.stringify(kotData));
                 window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
               } catch (err) {
                 console.error('Failed to send KOT to app:', err);
@@ -272,6 +277,29 @@ export default function WorkerCart() {
         const data = res;
         if (data && data.message) {
           showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
+          // Print KOT if requested
+          if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+            // Ensure kotNumber: 1 for all items if this is the initial KOT print
+            const itemsWithKOT = (data.order.items || []).map(item => ({
+              name: item.name,
+              type: item.type,
+              quantity: item.quantity,
+              kotNumber: item.kotNumber || 1 // Always set to 1 for initial print
+            }));
+            const kotData = {
+              orderNumber: data.order.orderNumber,
+              createdAt: getISTISOString(data.order.createdAt),
+              items: itemsWithKOT
+            };
+            if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
+              try {
+                console.log('[KOT][DEBUG] About to call window.AndroidBridge.sendOrderDetails with:', JSON.stringify(kotData));
+                window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+              } catch (err) {
+                console.error('Failed to send KOT to app:', err);
+              }
+            }
+          }
           clearCart();
           setTimeout(() => {
             navigate("/worker-home");
@@ -807,13 +835,35 @@ export default function WorkerCart() {
       <ConfirmationDialog
         isOpen={showPendingConfirm}
         onClose={() => setShowPendingConfirm(false)}
-        onConfirm={confirmAddToPending}
         title="Add to Pending Orders"
         message={`Add this order (₹${totalAmount.toFixed(2)}) to pending orders?`}
-        confirmText="Yes, Add to Pending"
-        cancelText="Cancel"
-        type="warning"
-        isLoading={isProcessing}
+        customContent={
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={async () => {
+                setShowPendingConfirm(false);
+                await processPayment(false, true); // Add with print
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-orange-500 hover:bg-orange-600 text-white text-base shadow transition-colors duration-200"
+              disabled={isProcessing}
+            >
+              Add with Print
+            </button>
+            <button
+              onClick={async () => {
+                setShowPendingConfirm(false);
+                await processPayment(false, false); // Add without print
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-gray-200 hover:bg-gray-300 text-gray-800 text-base shadow transition-colors duration-200"
+              disabled={isProcessing}
+            >
+              Add without Print
+            </button>
+          </div>
+        }
+        showCancel={false}
+        confirmText={null}
+        cancelText={null}
       />
 
       {/* Clear Cart Confirmation Dialog */}
