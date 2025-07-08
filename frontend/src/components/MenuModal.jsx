@@ -144,6 +144,61 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
     }
   };
 
+  // Add the handler for Save with/without KOT
+  const handleSaveKOT = async (printKOT) => {
+    if (selectedItems.length === 0) return;
+    setLoading(true);
+    // Only send new items (not already in existingItems)
+    const newItems = selectedItems.filter(sel => {
+      return !existingItems.some(
+        (ex) =>
+          (ex.id === sel.id || ex._id === sel.id) &&
+          (ex.type === (sel.portion === 'half' ? 'H' : sel.portion === 'full' ? 'F' : sel.portion === 'fixed' ? 'Fixed' : sel.portion))
+      );
+    });
+    if (newItems.length === 0) {
+      setNotification({ message: 'No new items to add.', type: 'info' });
+      setLoading(false);
+      return;
+    }
+    // Prepare newItems for backend
+    const itemsToSend = newItems.map(item => ({
+      name: item.name,
+      type: item.portion === 'half' ? 'H' : item.portion === 'full' ? 'F' : item.portion === 'fixed' ? 'Fixed' : item.portion,
+      price: item.price,
+      quantity: item.quantity || 1,
+      totalPrice: item.price * (item.quantity || 1),
+      id: item.id || item._id,
+      index: item.index
+    }));
+    try {
+      const res = await api.post(`/orders/${orderId}/add-items`, {
+        newItems: itemsToSend,
+        printKOT
+      });
+      if (printKOT && res.kotNumber && res.newItems && window.AndroidBridge && window.AndroidBridge.sendOrderDetails) {
+        const kotData = {
+          orderNumber: orderId, // or res.order.orderNumber if available
+          kotNumber: res.kotNumber,
+          createdAt: new Date().toISOString(),
+          items: res.newItems.map(item => ({
+            name: item.name,
+            type: item.type,
+            quantity: item.quantity
+          }))
+        };
+        window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+      }
+      onSave(res.order); // Pass updated order object
+      setNotification({ message: 'Items added successfully!', type: 'success' });
+    } catch (error) {
+      console.error('Error updating order:', error);
+      setNotification({ message: 'Failed to update order. Please try again.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
@@ -374,17 +429,31 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                disabled={selectedItems.length === 0 || loading}
-                className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap ${
-                  selectedItems.length === 0 || loading
-                    ? 'bg-green-300 text-green-700 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-              >
-                {loading ? "Saving..." : "Save"}
-              </button>
+              {/* New Save buttons for KOT */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSaveKOT(false)}
+                  disabled={selectedItems.length === 0 || loading}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap ${
+                    selectedItems.length === 0 || loading
+                      ? 'bg-green-300 text-green-700 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                >
+                  {loading ? "Saving..." : "Save without KOT"}
+                </button>
+                <button
+                  onClick={() => handleSaveKOT(true)}
+                  disabled={selectedItems.length === 0 || loading}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap ${
+                    selectedItems.length === 0 || loading
+                      ? 'bg-orange-300 text-orange-700 cursor-not-allowed'
+                      : 'bg-orange-500 hover:bg-orange-600 text-white'
+                  }`}
+                >
+                  {loading ? "Saving..." : "Save with KOT"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -453,6 +453,50 @@ router.post('/:orderId/mark-kot', async (req, res) => {
   }
 });
 
+// @route   POST /api/orders/:orderId/add-items
+// Add new items to a pending order, optionally print KOT
+router.post('/:orderId/add-items', async (req, res) => {
+  try {
+    const { newItems, printKOT } = req.body; // newItems: array of items to add
+    if (!Array.isArray(newItems) || newItems.length === 0) {
+      return res.status(400).json({ message: 'newItems array required' });
+    }
+    const order = await Order.findOne({ orderId: req.params.orderId });
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    // Add new items to the order
+    order.items.push(...newItems);
+    order.updatedAt = new Date();
+    let kotNumber = null;
+    if (printKOT) {
+      // Increment kotPrintCount and kotSequence
+      order.kotPrintCount = (order.kotPrintCount || 0) + 1;
+      order.kotSequence = (order.kotSequence || 0) + 1;
+      kotNumber = order.kotPrintCount;
+      // Mark new items with the new KOT number
+      for (let i = order.items.length - newItems.length; i < order.items.length; i++) {
+        order.items[i].kotNumber = order.kotSequence;
+      }
+    }
+    await order.save();
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order-update', { type: 'order-updated', order });
+    }
+    res.status(200).json({ 
+      message: 'Items added successfully', 
+      kotNumber, 
+      newItems: printKOT ? order.items.slice(-newItems.length) : [],
+      order
+    });
+  } catch (error) {
+    console.error('Add items to order error:', error);
+    res.status(500).json({ message: 'Failed to add items to order', error: error.message });
+  }
+});
+
 // @route   DELETE /api/orders/deleted/permanent/:orderId
 router.delete('/deleted/permanent/:orderId', async (req, res) => {
   try {

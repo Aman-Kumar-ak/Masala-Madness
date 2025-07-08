@@ -29,6 +29,7 @@ const OrderSchema = new mongoose.Schema({
   customCashAmount: { type: Number, default: 0 },
   customOnlineAmount: { type: Number, default: 0 },
   kotSequence: { type: Number, default: 0 }, // NEW: tracks latest KOT number
+  kotPrintCount: { type: Number, default: 0 }, // Tracks number of KOT prints
   createdAt: {
     type: Date,
     default: () => new Date(),
