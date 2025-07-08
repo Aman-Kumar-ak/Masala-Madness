@@ -6,6 +6,7 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { useNotification } from "../../components/NotificationContext";
 import { api } from '../../utils/api';
 import OptimizedImage from "../../components/OptimizedImage";
+import { useRefresh } from "../../contexts/RefreshContext";
 
 export default function Home() {
   const { cartItems, clearCart } = useCart();
@@ -25,6 +26,10 @@ export default function Home() {
   const menuSectionRef = useRef(null);
   const [printerStatus, setPrinterStatus] = useState("Not connected");
   const [showPrinterDialog, setShowPrinterDialog] = useState(false);
+  const [displayOrders, setDisplayOrders] = useState(0);
+  const [displayRevenue, setDisplayRevenue] = useState(0);
+  const [displayAvgOrder, setDisplayAvgOrder] = useState(0);
+  const { socket } = useRefresh();
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -55,19 +60,23 @@ export default function Home() {
     };
 
     fetchActiveDiscount();
-
-    const fetchPendingOrdersCount = async () => {
-      try {
-        const allOrders = await api.get('/orders');
-        const pending = (allOrders || []).filter(order => order.isPaid === false);
-        setPendingOrdersCount(pending.length || 0);
-      } catch (error) {
-        console.error('Error fetching pending orders count:', error);
-      }
-    };
-
-    fetchPendingOrdersCount();
   }, []);
+
+  // Fetch pending orders count (make it reusable)
+  const fetchPendingOrdersCount = useCallback(async () => {
+    try {
+      const allOrders = await api.get('/orders');
+      const pending = (allOrders || []).filter(order => order.isPaid === false);
+      setPendingOrdersCount(pending.length || 0);
+    } catch (error) {
+      console.error('Error fetching pending orders count:', error);
+    }
+  }, []);
+
+  // Initial fetch for pending orders count
+  useEffect(() => {
+    fetchPendingOrdersCount();
+  }, [fetchPendingOrdersCount]);
 
   const getCurrentDate = () => {
     const width = window.innerWidth;
@@ -112,10 +121,11 @@ export default function Home() {
     }
   };
 
-  // Call fetchStats when order is placed/updated
+  // Call fetchStats and fetchPendingOrdersCount when order is placed/updated
   useEffect(() => {
     const handleOrderUpdate = () => {
       fetchStats();
+      fetchPendingOrdersCount();
     };
 
     window.addEventListener('orderUpdated', handleOrderUpdate);
@@ -125,7 +135,83 @@ export default function Home() {
     return () => {
       window.removeEventListener('orderUpdated', handleOrderUpdate);
     };
-  }, []);
+  }, [fetchPendingOrdersCount]);
+
+  // Live update stats and pending orders on order-update socket event
+  useEffect(() => {
+    if (!socket) return;
+    const handleOrderUpdate = () => {
+      fetchStats();
+      fetchPendingOrdersCount();
+    };
+    socket.on('order-update', handleOrderUpdate);
+    return () => {
+      socket.off('order-update', handleOrderUpdate);
+    };
+  }, [socket, fetchPendingOrdersCount]);
+
+  // Animate Orders
+  useEffect(() => {
+    let frame;
+    let start;
+    const duration = 400;
+    const animate = (timestamp) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      const value = displayOrders + (stats.totalPaidOrders - displayOrders) * progress;
+      setDisplayOrders(progress < 1 ? value : stats.totalPaidOrders);
+      if (progress < 1) {
+        frame = requestAnimationFrame(animate);
+      }
+    };
+    if (displayOrders !== stats.totalPaidOrders) {
+      frame = requestAnimationFrame(animate);
+    }
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line
+  }, [stats.totalPaidOrders]);
+
+  // Animate Revenue
+  useEffect(() => {
+    let frame;
+    let start;
+    const duration = 400;
+    const animate = (timestamp) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      const value = displayRevenue + (stats.totalRevenue - displayRevenue) * progress;
+      setDisplayRevenue(progress < 1 ? value : stats.totalRevenue);
+      if (progress < 1) {
+        frame = requestAnimationFrame(animate);
+      }
+    };
+    if (displayRevenue !== stats.totalRevenue) {
+      frame = requestAnimationFrame(animate);
+    }
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line
+  }, [stats.totalRevenue]);
+
+  // Animate Avg Order
+  useEffect(() => {
+    let frame;
+    let start;
+    const duration = 400;
+    const animate = (timestamp) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      const value = displayAvgOrder + (stats.avgOrderValue - displayAvgOrder) * progress;
+      setDisplayAvgOrder(progress < 1 ? value : stats.avgOrderValue);
+      if (progress < 1) {
+        frame = requestAnimationFrame(animate);
+      }
+    };
+    if (displayAvgOrder !== stats.avgOrderValue) {
+      frame = requestAnimationFrame(animate);
+    }
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line
+  }, [stats.avgOrderValue]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -350,7 +436,7 @@ export default function Home() {
               </div>
               <p className="text-sm text-gray-600 text-center">Orders</p>
               <p className="text-xl font-bold text-blue-600">
-                {stats.totalPaidOrders}
+                {Math.round(displayOrders)}
                 {pendingOrdersCount > 0 && (
                   <span className="text-red-500 ml-1 text-xl font-bold">+ {pendingOrdersCount}</span>
                 )}
@@ -364,7 +450,7 @@ export default function Home() {
               </div>
               <p className="text-sm text-gray-600 text-center">Revenue</p>
               <p className="text-xl font-bold text-green-600">
-                ₹{stats.totalRevenue.toLocaleString('en-IN')}
+                ₹{Math.round(displayRevenue).toLocaleString('en-IN')}
               </p>
             </div>
 
@@ -375,7 +461,7 @@ export default function Home() {
               </div>
               <p className="text-sm text-gray-600 text-center">Avg. Order</p>
               <p className="text-xl font-bold text-purple-600">
-                ₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}
+                ₹{Math.round(displayAvgOrder).toLocaleString('en-IN')}
               </p>
             </div>
           </div>

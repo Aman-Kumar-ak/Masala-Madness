@@ -12,6 +12,7 @@ import { useRefresh } from "../../contexts/RefreshContext";
 import { API_URL } from "../../utils/config";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 const Admin = () => {
   useKeyboardScrollAdjustment();
@@ -312,9 +313,14 @@ const Admin = () => {
 
             {/* Menu Manager */}
             {loading ? (
-              <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto"></div>
-                <p className="mt-4 text-gray-600">Loading categories...</p>
+              <div className="flex flex-col items-center justify-center py-2">
+                <DotLottieReact
+                  src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+                  loop
+                  autoplay
+                  style={{ width: 180, height: 180 }}
+                />
+                <h3 className="mt-1 text-gray-600">Loading categories</h3>
               </div>
             ) : (
               <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-2 rounded-lg border border-blue-200 shadow-sm">

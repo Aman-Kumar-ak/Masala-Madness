@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { getCategoryEmoji } from '../utils/helpers';
 import { useCart } from '../components/CartContext';
 import ConfirmationDialog from './ConfirmationDialog';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) => {
   const [categories, setCategories] = useState([]);
@@ -168,7 +169,12 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <DotLottieReact
+          src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+          loop
+          autoplay
+          style={{ width: 220, height: 220 }}
+        />
       </div>
     );
   }

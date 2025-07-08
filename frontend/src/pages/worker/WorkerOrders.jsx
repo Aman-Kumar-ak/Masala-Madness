@@ -6,6 +6,7 @@ import { api } from '../../utils/api';
 // import DeleteOrderConfirmation from "../../components/DeleteOrderConfirmation"; // Removed
 import Notification from "../../components/Notification";
 // import { AnimatePresence, motion } from 'framer-motion';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -293,10 +294,14 @@ export default function WorkerOrders() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-orange-100 flex items-center justify-center">
-        <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="mt-2">Loading orders...</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-orange-100 bg-opacity-80 select-none" style={{ pointerEvents: 'auto' }}>
+        <div className="flex flex-col items-center justify-center">
+          <DotLottieReact
+            src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+            autoplay
+            loop
+            style={{ width: 240, height: 240}}
+          />
         </div>
       </div>
     );

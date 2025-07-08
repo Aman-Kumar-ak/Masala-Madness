@@ -3,6 +3,7 @@ const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
 const DeletedOrder = require("../models/DeletedOrder");
+const { adminAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -370,7 +371,7 @@ router.get("/excel/:date", async (req, res) => {
 
 // @route   DELETE /api/orders/:orderId
 // Move the order to DeletedOrder collection and remove from Order collection
-router.delete("/:orderId", async (req, res) => {
+router.delete('/:orderId', adminAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
     // Find the order to get its date and orderNumber before deletion

@@ -7,6 +7,7 @@ import useKeyboardScrollAdjustment from "../hooks/useKeyboardScrollAdjustment";
 import ConfirmationDialog from "../components/ConfirmationDialog";
 import { preloadImages } from '../utils/imageOptimizations';
 import api from '../utils/api';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 const Login = () => {
   useKeyboardScrollAdjustment();
@@ -307,10 +308,12 @@ const Login = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading Masala Madness...</p>
-        </div>
+        <DotLottieReact
+          src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+          loop
+          autoplay
+          style={{ width: 240, height: 240 }}
+        />
       </div>
     );
   }
@@ -783,12 +786,13 @@ const Login = () => {
 
       {/* Quick Login Loading Overlay */}
       {isQuickLoginLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 cursor-wait">
-          <div className="bg-white rounded-xl shadow-lg px-8 py-6 flex flex-col items-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600 mb-4"></div>
-            <div className="text-orange-700 font-semibold text-lg">Logging in...</div>
-            <div className="text-gray-500 text-sm mt-2">Please wait, do not refresh the page.</div>
-          </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center cursor-wait">
+          <DotLottieReact
+            src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+            loop
+            autoplay
+            style={{ width: 240, height: 240 }}
+          />
         </div>
       )}
     </div>

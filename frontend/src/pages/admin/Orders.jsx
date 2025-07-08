@@ -8,6 +8,7 @@ import Notification from "../../components/Notification";
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSpring, animated } from '@react-spring/web';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -68,7 +69,7 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
             <h3 className="text-lg font-semibold mr-2 whitespace-nowrap">Order #{order.orderNumber}</h3>
             {isDeletedSection && (
               <button
-                onClick={handleDeleteClick}
+                onClick={() => handleDeleteClick(order.orderId)}
                 disabled={deleteLoading}
                 className="ml-2 p-1.5 rounded-full hover:bg-red-100 focus:bg-red-100 focus:outline-none transition-colors duration-200 flex items-center justify-center"
                 aria-label="Permanently delete order"
@@ -121,8 +122,8 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
           {order.confirmedBy && (
             <p className="text-xs text-black mt-1">Confirmed by: {order.confirmedBy}</p>
           )}
-          {isDeletedSection && order.deletedBy && (
-            <p className="text-xs text-gray-700 mt-1">Deleted by: {order.deletedBy}</p>
+          {isDeletedSection && (
+            <p className="text-xs text-gray-700 mt-1">Deleted by: {order.deletedBy || 'Unknown'}</p>
           )}
           {isDeletedSection && order.deletedAt && (
             <p className="text-xs text-gray-500 mt-0.5">Deleted at: {formatDateIST(order.deletedAt)}</p>
@@ -331,7 +332,9 @@ const Orders = () => {
   const ordersDate = orders[0]?.createdAt?.slice(0, 10);
   const deletedOrdersDate = deletedOrders[0]?.createdAt?.slice(0, 10);
 
+  // In useEffect for filter switching and data loading, clear notification
   useEffect(() => {
+    setNotification(null); // Clear notification when switching filters or reloading
     if (orderFilter === 'deleted') {
       if (deletedOrdersDate !== selectedDate && selectedDate) {
         setLoading(true);
@@ -475,6 +478,8 @@ const Orders = () => {
   // Permanently delete a single deleted order with confirmation
   const handlePermanentDeleteOne = (orderId) => {
     setConfirmDialog({ open: false, type: '', message: '', onConfirm: null });
+    // Optimistically remove the order from the UI
+    setDeletedOrders(prev => prev.filter(order => order.orderId !== orderId));
     setLoading(true);
     api.delete(`/orders/deleted/permanent/${orderId}`)
       .then(() => {
@@ -486,7 +491,18 @@ const Orders = () => {
       })
       .finally(() => {
         setLoading(false);
+        setPermanentDeleteOrderId(null);
       });
+  };
+
+  // Add this function in the Orders component, before handlePermanentDeleteOne
+  const handlePermanentDeleteClick = (orderId) => {
+    setConfirmDialog({
+      open: true,
+      type: 'single',
+      message: 'Are you sure you want to permanently delete this order?',
+      onConfirm: () => handlePermanentDeleteOne(orderId)
+    });
   };
 
   // Permanently delete all deleted orders for the selected date
@@ -514,11 +530,13 @@ const Orders = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-orange-100 flex items-center justify-center">
-        <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="mt-2">Loading orders...</p>
-        </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-orange-200 bg-opacity-40">
+        <DotLottieReact
+          src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+          loop
+          autoplay
+          style={{ width: 240, height: 240 }}
+        />
       </div>
     );
   }
@@ -697,7 +715,7 @@ const Orders = () => {
                       isUpdated={false}
                       parseCustomPaymentAmounts={parseCustomPaymentAmounts}
                       formatDateIST={formatDateIST}
-                      handleDeleteClick={() => handlePermanentDeleteOne(order.orderId)}
+                      handleDeleteClick={handlePermanentDeleteClick}
                       deleteLoading={false}
                       hideDeleteButton={false}
                       isDeletedSection={true}
