@@ -9,6 +9,11 @@ import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment
 import { api } from '../../utils/api';
 import AuthContext from '../../contexts/AuthContext';
 
+function getISTISOString(date) {
+  const d = date ? new Date(date) : new Date();
+  return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false }).replace(',', '');
+}
+
 export default function WorkerCart() {
   useKeyboardScrollAdjustment();
   const { cartItems, removeFromCart, clearCart, updateQuantity } = useCart();
@@ -237,7 +242,7 @@ export default function WorkerCart() {
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
             const kotData = {
               orderNumber: data.order.orderNumber,
-              createdAt: data.order.createdAt,
+              createdAt: getISTISOString(data.order.createdAt),
               items: (data.order.items || []).map(item => ({
                 name: item.name,
                 type: item.type,

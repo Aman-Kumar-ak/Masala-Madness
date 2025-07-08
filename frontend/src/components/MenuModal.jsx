@@ -4,6 +4,11 @@ import { api } from '../utils/api';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+function getISTISOString(date) {
+  const d = date ? new Date(date) : new Date();
+  return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false }).replace(',', '');
+}
+
 const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPercentage: propsDiscountPercentage, discountAmount: propsDiscountAmount }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [notification, setNotification] = useState(null);
@@ -191,7 +196,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
         const kotData = {
           orderNumber: res.order.orderNumber, // Use the actual order number
           kotNumber: res.kotNumber,
-          createdAt: new Date().toISOString(),
+          createdAt: getISTISOString(res.order.createdAt),
           items: res.newItems.map(item => ({
             name: item.name,
             type: item.type,

@@ -9,6 +9,11 @@ import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment
 import { api } from '../../utils/api';
 import AuthContext from '../../contexts/AuthContext';
 
+function getISTISOString(date) {
+  const d = date ? new Date(date) : new Date();
+  return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false }).replace(',', '');
+}
+
 export default function Cart() {
   useKeyboardScrollAdjustment();
   const { cartItems, removeFromCart, clearCart, updateQuantity } = useCart();
@@ -230,6 +235,7 @@ export default function Cart() {
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
       customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
       confirmedBy: user?.name || user?.username || user?.mobileNumber,
+      printKOT // Ensure this is sent to backend
     };
     try {
       if (isPaid) {
@@ -246,7 +252,7 @@ export default function Cart() {
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
             const kotData = {
               orderNumber: data.order.orderNumber,
-              createdAt: data.order.createdAt,
+              createdAt: getISTISOString(data.order.createdAt),
               items: (data.order.items || []).map(item => ({
                 name: item.name,
                 type: item.type,
@@ -291,11 +297,12 @@ export default function Cart() {
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
             const kotData = {
               orderNumber: data.order.orderNumber,
-              createdAt: data.order.createdAt,
+              createdAt: getISTISOString(data.order.createdAt),
               items: (data.order.items || []).map(item => ({
                 name: item.name,
                 type: item.type,
-                quantity: item.quantity
+                quantity: item.quantity,
+                kotNumber: item.kotNumber // Include kotNumber in printout
               }))
             };
             if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
