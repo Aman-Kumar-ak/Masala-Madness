@@ -26,7 +26,7 @@ const getDateRange = (dateStr) => {
 // Confirm and create a new order or add to pending
 router.post("/confirm", async (req, res) => {
   try {
-    const { orderId, items, totalAmount, subtotal, discountAmount, discountPercentage, manualDiscount, paymentMethod, isPaid, customCashAmount, customOnlineAmount, confirmedBy } = req.body;
+    const { orderId, items, totalAmount, subtotal, discountAmount, discountPercentage, manualDiscount, paymentMethod, isPaid, customCashAmount, customOnlineAmount, confirmedBy, printKOT } = req.body;
     const now = new Date();
     // If orderId is provided, update existing order (for confirming a pending order)
     let order;
@@ -62,11 +62,18 @@ router.post("/confirm", async (req, res) => {
       .sort({ orderNumber: -1 })
       .lean();
       const orderNumber = latestOrder ? latestOrder.orderNumber + 1 : 1;
-      const processedItems = (items || []).map(item => ({
+      let processedItems = (items || []).map(item => ({
         ...item,
         type: item.type || 'H',
         totalPrice: item.totalPrice || (item.price * item.quantity)
       }));
+      let kotSequence = 0;
+      let kotPrintCount = 0;
+      if (printKOT) {
+        kotSequence = 1;
+        kotPrintCount = 1;
+        processedItems = processedItems.map(item => ({ ...item, kotNumber: 1 }));
+      }
       order = new Order({
         orderId: uuidv4(),
         orderNumber,
@@ -80,6 +87,8 @@ router.post("/confirm", async (req, res) => {
         isPaid: isPaid || false,
         customCashAmount: customCashAmount || 0,
         customOnlineAmount: customOnlineAmount || 0,
+        kotSequence,
+        kotPrintCount,
         createdAt: now,
         updatedAt: now,
         confirmedBy: confirmedBy || null,

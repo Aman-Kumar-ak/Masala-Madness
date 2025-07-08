@@ -287,6 +287,25 @@ export default function Cart() {
         const data = res;
         if (data && data.message) {
           showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
+          // Print KOT if requested
+          if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+            const kotData = {
+              orderNumber: data.order.orderNumber,
+              createdAt: data.order.createdAt,
+              items: (data.order.items || []).map(item => ({
+                name: item.name,
+                type: item.type,
+                quantity: item.quantity
+              }))
+            };
+            if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
+              try {
+                window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
+              } catch (err) {
+                console.error('Failed to send KOT to app:', err);
+              }
+            }
+          }
           clearCart();
           setTimeout(() => {
             navigate("/home");
@@ -798,10 +817,33 @@ export default function Cart() {
       <ConfirmationDialog
         isOpen={showPendingConfirm}
         onClose={() => setShowPendingConfirm(false)}
-        onConfirm={confirmAddToPending}
         title="Add to Pending Orders"
         message={`Add this order (₹${totalAmount.toFixed(2)}) to pending orders?`}
-        confirmText="Yes, Add to Pending"
+        customContent={
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={async () => {
+                setShowPendingConfirm(false);
+                await processPayment(false, true); // Add with print
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              disabled={isProcessing}
+            >
+              Add with Print
+            </button>
+            <button
+              onClick={async () => {
+                setShowPendingConfirm(false);
+                await processPayment(false, false); // Add without print
+              }}
+              className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              disabled={isProcessing}
+            >
+              Add without Print
+            </button>
+          </div>
+        }
+        confirmText={null}
         cancelText="Cancel"
         type="warning"
         isLoading={isProcessing}

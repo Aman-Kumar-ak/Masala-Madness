@@ -45,6 +45,17 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
     setSelectedItems([]); // Reset selected items every time modal opens
   }, []);
 
+  useEffect(() => {
+    // Ensure AndroidBridge is available (mock if not present)
+    if (!window.AndroidBridge) {
+      window.AndroidBridge = {
+        sendOrderDetails: (details) => {
+          console.log('[MOCK AndroidBridge] sendOrderDetails called with:', details);
+        }
+      };
+    }
+  }, []);
+
   // Helper to deduplicate items by id, portion, and index
   function deduplicateItems(items) {
     const seen = new Set();
@@ -178,7 +189,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
       });
       if (printKOT && res.kotNumber && res.newItems && window.AndroidBridge && window.AndroidBridge.sendOrderDetails) {
         const kotData = {
-          orderNumber: orderId, // or res.order.orderNumber if available
+          orderNumber: res.order.orderNumber, // Use the actual order number
           kotNumber: res.kotNumber,
           createdAt: new Date().toISOString(),
           items: res.newItems.map(item => ({
