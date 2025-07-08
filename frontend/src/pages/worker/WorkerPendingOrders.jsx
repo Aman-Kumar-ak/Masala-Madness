@@ -9,6 +9,7 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import AuthContext from '../../contexts/AuthContext';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 export default function WorkerPendingOrders() {
   useKeyboardScrollAdjustment();
@@ -605,9 +606,14 @@ export default function WorkerPendingOrders() {
         </div>
         
         {loading ? (
-          <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200">
-            <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mb-4"></div>
-            <p className="text-gray-600">Loading pending orders...</p>
+          <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200 flex flex-col items-center justify-center">
+            <div className="w-50 h-50 mx-auto flex items-center justify-center">
+              <DotLottieReact
+                src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+                loop
+                autoplay
+              />
+            </div>
           </div>
         ) : (
           <div 

@@ -8,6 +8,10 @@ import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
 import io from 'socket.io-client';
 import OptimizedImage from '../../components/OptimizedImage';
+// Add this helper at the top of the file (after imports)
+function normalizeName(name) {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
 
 const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
   return (
@@ -1075,6 +1079,7 @@ const Settings = () => {
   const isAddUserFormValid = () => {
     return (
       addUserForm.name.trim().length > 0 &&
+      !isAddUserNameDuplicate &&
       /^\d{10}$/.test(addUserForm.mobileNumber) &&
       !users.some(u => u.mobileNumber === addUserForm.mobileNumber) &&
       addUserForm.password.length >= 8 &&
@@ -1087,6 +1092,7 @@ const Settings = () => {
   const isEditUserFormValid = () => {
     return (
       editUserForm.name.trim().length > 0 &&
+      !isEditUserNameDuplicate &&
       /^\d{10}$/.test(editUserForm.mobileNumber) &&
       !users.some(u => u.mobileNumber === editUserForm.mobileNumber && u._id !== selectedUser?._id) &&
       (!editUserForm.password || editUserForm.password.length >= 8) &&
@@ -1130,6 +1136,16 @@ const Settings = () => {
       sock.disconnect();
     };
   }, []);
+
+  // In Settings component, after users state:
+  const isAddUserNameDuplicate = useMemo(() => {
+    const norm = normalizeName(addUserForm.name);
+    return norm && users.some(u => normalizeName(u.name) === norm);
+  }, [addUserForm.name, users]);
+  const isEditUserNameDuplicate = useMemo(() => {
+    const norm = normalizeName(editUserForm.name);
+    return norm && users.some(u => normalizeName(u.name) === norm && u._id !== selectedUser?._id);
+  }, [editUserForm.name, users, selectedUser]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 text-zinc-900 dark:text-zinc-900">
@@ -1345,6 +1361,9 @@ const Settings = () => {
                       <div>
                         <label className="block text-sm font-medium mb-1">Name</label>
                         <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
+                        {addUserForm.name && isAddUserNameDuplicate && (
+                          <p className="text-red-500 text-sm mt-1">A user with this name already exists.</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Mobile Number</label>
@@ -1810,6 +1829,9 @@ const Settings = () => {
             <div>
               <label className="block text-sm font-medium mb-1">Name</label>
               <input type="text" className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required value={editUserForm.name} onChange={e => setEditUserForm(f => ({ ...f, name: e.target.value }))} />
+              {editUserForm.name && isEditUserNameDuplicate && (
+                <p className="text-red-500 text-sm mt-1">A user with this name already exists.</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Mobile Number</label>
