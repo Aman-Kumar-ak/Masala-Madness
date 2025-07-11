@@ -243,8 +243,8 @@ export default function WorkerCart() {
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
             // Ensure kotNumber: 1 for all items if this is the initial KOT print
             const itemsWithKOT = (data.order.items || []).map(item => ({
-              name: item.name,
-              type: item.type,
+                name: item.name,
+                type: item.type,
               quantity: item.quantity,
               kotNumber: item.kotNumber || 1 // Always set to 1 for initial print
             }));

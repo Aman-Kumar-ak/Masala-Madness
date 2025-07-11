@@ -447,15 +447,15 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
               </button>
               {/* New Save buttons for KOT */}
               <div className="flex gap-2">
-                <button
+              <button
                   onClick={() => handleSaveKOT(false)}
-                  disabled={selectedItems.length === 0 || loading}
-                  className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap ${
-                    selectedItems.length === 0 || loading
-                      ? 'bg-green-300 text-green-700 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700 text-white'
-                  }`}
-                >
+                disabled={selectedItems.length === 0 || loading}
+                className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap ${
+                  selectedItems.length === 0 || loading
+                    ? 'bg-green-300 text-green-700 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
                   {loading ? "Saving..." : "Save without KOT"}
                 </button>
                 <button
@@ -468,7 +468,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
                   }`}
                 >
                   {loading ? "Saving..." : "Save with KOT"}
-                </button>
+              </button>
               </div>
             </div>
           </div>

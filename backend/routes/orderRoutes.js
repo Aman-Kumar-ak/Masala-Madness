@@ -380,13 +380,25 @@ router.get("/excel/:date", async (req, res) => {
 
 // @route   DELETE /api/orders/:orderId
 // Move the order to DeletedOrder collection and remove from Order collection
-router.delete('/:orderId', adminAuth, async (req, res) => {
+router.delete('/:orderId', require('../middleware/authMiddleware').authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     // Find the order to get its date and orderNumber before deletion
     const order = await Order.findOne({ orderId });
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
+    }
+    // Role-based authorization
+    if (req.user.role === 'admin') {
+      // Admin can delete any order
+      // proceed
+    } else if (req.user.role === 'worker') {
+      // Worker can only delete unpaid orders
+      if (order.isPaid) {
+        return res.status(403).json({ message: 'Access denied. Workers can only delete unpaid (pending) orders.' });
+      }
+    } else {
+      return res.status(403).json({ message: 'Access denied.' });
     }
     const orderDate = new Date(order.createdAt);
     const startOfDay = new Date(orderDate);
