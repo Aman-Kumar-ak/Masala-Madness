@@ -272,7 +272,8 @@ router.get('/excel-link/:date', require('../middleware/authMiddleware').authenti
   const signature = crypto.createHmac('sha256', SIGNED_URL_SECRET)
     .update(userId + date + expires)
     .digest('hex');
-  const url = `/api/orders/excel/${date}?user=${userId}&expires=${expires}&sig=${signature}`;
+  const baseUrl = req.protocol + '://' + req.get('host');
+  const url = `${baseUrl}/api/orders/excel/${date}?user=${userId}&expires=${expires}&sig=${signature}`;
   res.json({ url });
 });
 
