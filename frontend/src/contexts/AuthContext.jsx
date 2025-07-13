@@ -111,50 +111,51 @@ export const AuthProvider = ({ children }) => {
     };
   }, [isAuthenticated]);
   
-  // Expose a function to restore session from device token
+  // Robust session restoration: always try to restore from localStorage and refresh with deviceToken if available
   const restoreSession = async () => {
-    // Try to restore from localStorage if sessionStorage is empty and rememberMeExpiry is valid
-    const expiry = localStorage.getItem('rememberMeExpiry');
+    // 1. Restore from localStorage if sessionStorage is empty
     if (!sessionStorage.getItem('token') && localStorage.getItem('token')) {
-      if (expiry && Date.now() > parseInt(expiry, 10)) {
-        // Expired, clear localStorage and require login
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('jwtVerified');
-        localStorage.removeItem('deviceToken');
-        localStorage.removeItem('rememberMeExpiry');
-        localStorage.removeItem('lastActivityTime');
-        logoutUser();
-        setLoading(false);
-        navigate('/login');
-        return;
-      } else {
-        sessionStorage.setItem('token', localStorage.getItem('token'));
-        sessionStorage.setItem('user', localStorage.getItem('user'));
-        sessionStorage.setItem('jwtVerified', localStorage.getItem('jwtVerified'));
-        // Restore lastActivityTime as well
-        if (localStorage.getItem('lastActivityTime')) {
-          sessionStorage.setItem('lastActivityTime', localStorage.getItem('lastActivityTime'));
-        }
+      sessionStorage.setItem('token', localStorage.getItem('token'));
+      sessionStorage.setItem('user', localStorage.getItem('user'));
+      sessionStorage.setItem('jwtVerified', localStorage.getItem('jwtVerified'));
+      if (localStorage.getItem('lastActivityTime')) {
+        sessionStorage.setItem('lastActivityTime', localStorage.getItem('lastActivityTime'));
       }
     }
+    // 2. If deviceToken exists, always try to refresh session from backend
     const deviceToken = localStorage.getItem('deviceToken');
     if (deviceToken) {
       try {
         setLoading(true);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-        // Use api utility for verification
-        const response = await api.get('/auth/verify', true, false, deviceToken);
-        clearTimeout(timeoutId);
-        if (!response) {
-          console.warn('restoreSession: Device token verification failed (response not ok).');
+        // Try to refresh token using deviceToken
+        const response = await api.post('/auth/refresh-token', { deviceToken });
+        if (response && response.token && response.user) {
+          // Set tokens and user in both storages
+          sessionStorage.setItem('token', response.token);
+          sessionStorage.setItem('user', JSON.stringify(response.user));
+          sessionStorage.setItem('jwtVerified', 'true');
+          localStorage.setItem('token', response.token);
+          localStorage.setItem('user', JSON.stringify(response.user));
+          localStorage.setItem('jwtVerified', 'true');
+          // Optionally update rememberMeExpiry if present
+          if (localStorage.getItem('rememberMeExpiry')) {
+            // Extend expiry by 30 days from now
+            const expiry = Date.now() + THIRTY_DAYS_MS;
+            localStorage.setItem('rememberMeExpiry', expiry.toString());
+          }
+          setUser(response.user);
+          setIsAuthenticated(true);
+          setLoading(false);
+          return;
+        } else {
+          // If backend rejects, clear session
           logoutUser();
           setLoading(false);
           navigate('/login');
           return;
         }
       } catch (error) {
+        // If backend rejects, clear session
         logoutUser();
         setLoading(false);
         navigate('/login');
@@ -405,28 +406,8 @@ export const AuthProvider = ({ children }) => {
   
   // On app load, restore JWT and user from localStorage if not in sessionStorage and rememberMeExpiry is valid
   useEffect(() => {
-    const token = sessionStorage.getItem('token');
-    const userData = sessionStorage.getItem('user');
-    const expiry = localStorage.getItem('rememberMeExpiry');
-    if (!token && localStorage.getItem('token')) {
-      if (expiry && Date.now() > parseInt(expiry, 10)) {
-        // Expired, clear localStorage and do not restore session
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('jwtVerified');
-        localStorage.removeItem('deviceToken');
-        localStorage.removeItem('rememberMeExpiry');
-        localStorage.removeItem('lastActivityTime');
-      } else {
-        sessionStorage.setItem('token', localStorage.getItem('token'));
-        sessionStorage.setItem('user', localStorage.getItem('user'));
-        sessionStorage.setItem('jwtVerified', localStorage.getItem('jwtVerified'));
-        // Restore lastActivityTime as well
-        if (localStorage.getItem('lastActivityTime')) {
-          sessionStorage.setItem('lastActivityTime', localStorage.getItem('lastActivityTime'));
-        }
-      }
-    }
+    restoreSession();
+    // eslint-disable-next-line
   }, []);
   
   // Setup socket.io connection after login
