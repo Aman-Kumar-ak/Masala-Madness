@@ -19,18 +19,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Masala Madness" />
     
-    <!-- Preload PWA icons -->
+    <!-- Preload PWA icons (needed for install prompt and splash screens) -->
     <link rel="preload" as="image" href="/images/icons/icon-192X192.png" />
     <link rel="preload" as="image" href="/images/icons/icon-512X512.png" />
     
-    <!-- Preload important images -->
+    <!-- Preload only the main logo used above the fold -->
     <link rel="preload" as="image" href="/images/m_logo.png" />
-    <link rel="preload" as="image" href="/images/login.png" />
-    <link rel="preload" as="image" href="/images/receipt.png" />
-    <link rel="preload" as="image" href="/images/order.png" />
-    <link rel="preload" as="image" href="/images/calendar.png" />
-    <link rel="preload" as="image" href="/images/qr-code.png" />
-    <link rel="preload" as="image" href="/images/admin.png" />
+    <!-- Removed other image preloads (login, receipt, order, calendar, qr-code, admin) to avoid browser warnings and unnecessary bandwidth usage. Use lazy loading and caching for those images instead. -->
     
     <!-- Font Display Strategy -->
     <style>
