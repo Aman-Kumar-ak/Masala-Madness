@@ -27,12 +27,14 @@ router.post('/login', async (req, res) => {
     
     // Check if account is active
     if (!user.isActive) {
+      // Do not proceed further if user is disabled
       return res.status(403).json({ message: 'Your account is disabled.' });
     }
     
     // Verify password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      // Do not proceed further if password is incorrect
       return res.status(401).json({ message: 'Invalid credentials' });
     }
     
