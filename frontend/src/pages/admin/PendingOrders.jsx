@@ -768,24 +768,24 @@ export default function PendingOrders() {
                                       }`}
                                       aria-label={`Decrease quantity of ${item.name}`}
                                     >
-                                      -
+                                      <span style={{fontSize:'1.5rem',lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',width:'100%',height:'100%'}}>-</span>
                                     </button>
                                     <div className="inline-flex justify-center items-center bg-white border border-gray-200 rounded-md px-2 min-w-[1.75rem] sm:min-w-[2rem] h-7 sm:h-8 text-center">
                                       {item.quantity}
                                     </div>
                                     <button
                                       onClick={() => handleQuantityChange(order.orderId, index, 1)}
-                                      className="w-7 h-7 sm:w-8 h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
+                                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 bg-white text-orange-600 hover:bg-orange-50 border border-orange-200`}
                                       aria-label={`Increase quantity of ${item.name}`}
                                     >
-                                      +
+                                      <span style={{fontSize:'1.5rem',lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',width:'100%',height:'100%'}}>+</span>
                                     </button>
                                     <button
                                       onClick={() => handleRemoveItemOrOrder(order, item, index)}
-                                      className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200 p-0"
                                       aria-label={`Remove ${item.name}`}
                                     >
-                                      ×
+                                      <span style={{display:'flex',alignItems:'center',justifyContent:'center',width:'100%',height:'100%',fontSize:'1.5rem',lineHeight:1,textAlign:'center'}}>×</span>
                                     </button>
                                   </div>
                                 </div>

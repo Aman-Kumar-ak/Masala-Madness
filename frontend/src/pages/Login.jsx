@@ -257,12 +257,15 @@ const Login = () => {
         }, 200); // Reduced from 800ms to 200ms
       } else {
         setQuickLoginError('Session expired. Please log in again.');
-        removeAccount(account.username);
-        const updated = getSavedAccounts();
-        setSavedAccounts(updated);
-        if (updated.length === 0) {
-          setShowAccountList(false);
-          setForceShowForm(false); // Show splash, not login form
+        // Only remove account if response contains a clear invalid device indication
+        if (response && response.message && response.message.toLowerCase().includes('invalid device')) {
+          removeAccount(account.username);
+          const updated = getSavedAccounts();
+          setSavedAccounts(updated);
+          if (updated.length === 0) {
+            setShowAccountList(false);
+            setForceShowForm(false); // Show splash, not login form
+          }
         }
         window.removeEventListener('beforeunload', blockRefresh);
         window.removeEventListener('keydown', blockF5);
@@ -280,15 +283,18 @@ const Login = () => {
           setShowAccountList(false);
           setForceShowForm(false); // Show splash, not login form
         }
-      } else {
-      setQuickLoginError('Session expired. Please log in again.');
-      removeAccount(account.username);
-      const updated = getSavedAccounts();
-      setSavedAccounts(updated);
+      } else if (err?.response?.data?.message && err.response.data.message.toLowerCase().includes('invalid device')) {
+        setQuickLoginError('This device is no longer valid for quick login. Please log in manually.');
+        removeAccount(account.username);
+        const updated = getSavedAccounts();
+        setSavedAccounts(updated);
         if (updated.length === 0) {
           setShowAccountList(false);
           setForceShowForm(false); // Show splash, not login form
         }
+      } else {
+        // For all other errors (network, interruption, etc.), do NOT remove the account
+        setQuickLoginError('Session expired or network error. Please try again.');
       }
       window.removeEventListener('beforeunload', blockRefresh);
       window.removeEventListener('keydown', blockF5);
