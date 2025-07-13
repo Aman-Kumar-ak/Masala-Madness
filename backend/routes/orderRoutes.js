@@ -4,6 +4,8 @@ const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
 const DeletedOrder = require("../models/DeletedOrder");
 const { adminAuth } = require('../middleware/authMiddleware');
+const crypto = require('crypto');
+const SIGNED_URL_SECRET = process.env.SIGNED_URL_SECRET || 'supersecretkey';
 
 const router = express.Router();
 
@@ -262,121 +264,123 @@ router.get('/today-revenue', async (req, res) => {
   }
 });
 
+// Generate a signed Excel download link (valid for 5 minutes)
+router.get('/excel-link/:date', require('../middleware/authMiddleware').authenticateToken, (req, res) => {
+  const userId = req.user._id.toString();
+  const date = req.params.date;
+  const expires = Date.now() + 5 * 60 * 1000; // 5 minutes from now
+  const signature = crypto.createHmac('sha256', SIGNED_URL_SECRET)
+    .update(userId + date + expires)
+    .digest('hex');
+  const url = `/api/orders/excel/${date}?user=${userId}&expires=${expires}&sig=${signature}`;
+  res.json({ url });
+});
+
 // @route   GET /api/orders/excel/:date
 // Download Excel of orders for a specific date (YYYY-MM-DD)
-router.get("/excel/:date", async (req, res) => {
-  try {
-    const { startOfDay, endOfDay } = getDateRange(req.params.date);
-
-    const [ordersStats, orders] = await Promise.all([
-      Order.calculateStats(startOfDay, endOfDay),
-      Order.find({
-        createdAt: { $gte: startOfDay, $lte: endOfDay }
-      })
-      .sort({ createdAt: 1 })
-      .lean()
-    ]);
-
-    // Ensure stats have default values if undefined
-    const stats = {
-      totalOrders: ordersStats?.totalOrders || 0,
-      totalPaidOrders: ordersStats?.totalPaidOrders || 0,
-      totalRevenue: ordersStats?.totalRevenue || 0,
-      avgOrderValue: ordersStats?.avgOrderValue || 0
-    };
-
-    // Prepare Excel workbook and worksheet
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Orders");
-
-    // Define columns
-    worksheet.columns = [
-      { header: "OrderNumber", key: "orderNumber", width: 12 },
-      { header: "Date", key: "date", width: 12 },
-      { header: "Time (IST)", key: "time", width: 15 },
-      { header: "Dishes", key: "dishes", width: 30 },
-      { header: "Type(H/F)", key: "types", width: 10 },
-      { header: "Dishes Price", key: "dishPrice", width: 15 },
-      { header: "Total Dish(each Price)", key: "totalDish", width: 20 },
-      { header: "Subtotal", key: "subtotal", width: 15 },
-      { header: "Discount(%)", key: "discountPercentage", width: 12 },
-      { header: "Discount Amount", key: "discountAmount", width: 15 },
-      { header: "Final Amount", key: "totalAmount", width: 15 },
-      { header: "Mode of Payment", key: "paymentMethod", width: 15 },
-      { header: "Status", key: "status", width: 15 },
-    ];
-
-    // Process orders in batches for better memory usage
-    const BATCH_SIZE = 100;
-    for (let i = 0; i < orders.length; i += BATCH_SIZE) {
-      const batch = orders.slice(i, i + BATCH_SIZE);
-      
-      batch.forEach(order => {
-        const dateObj = new Date(order.createdAt);
-        worksheet.addRow({
-          orderNumber: order.orderNumber,
-          date: dateObj.toLocaleDateString('en-IN'),
-          time: dateObj.toLocaleTimeString('en-IN', { 
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            timeZone: 'Asia/Kolkata'
-          }),
-          dishes: order.items.map(i => `${i.name} x${i.quantity}`).join(", "),
-          types: order.items.map(i => i.type).join(", "),
-          dishPrice: order.items.map(i => i.price).join(", "),
-          totalDish: order.items.map(i => i.totalPrice).join(", "),
-          subtotal: order.subtotal || order.totalAmount,
-          discountPercentage: order.discountPercentage || 0,
-          discountAmount: order.discountAmount || 0,
-          totalAmount: order.totalAmount,
-          paymentMethod: order.paymentMethod,
-          status: order.isPaid ? "Successful" : "Failed"
-        });
-      });
+router.get("/excel/:date", async (req, res, next) => {
+  // Allow two ways: (1) Signed URL (for app/native), (2) adminAuth (for browser)
+  const { user, expires, sig } = req.query;
+  if (user && expires && sig) {
+    // Signed URL flow
+    const now = Date.now();
+    if (now > Number(expires)) {
+      return res.status(403).json({ message: 'Download link expired.' });
     }
-
-    // Add summary section with proper null checks
-    worksheet.addRow({});
-    worksheet.addRow({
-      orderNumber: "Summary Statistics"
-    });
-    
-    worksheet.addRow({
-      orderNumber: "Total Orders",
-      totalAmount: stats.totalOrders
-    });
-    worksheet.addRow({
-      orderNumber: "Paid Orders",
-      totalAmount: stats.totalPaidOrders
-    });
-    worksheet.addRow({
-      orderNumber: "Total Revenue",
-      totalAmount: stats.totalRevenue
-    });
-    worksheet.addRow({
-      orderNumber: "Avg. Order Value",
-      totalAmount: Math.round(stats.avgOrderValue || 0)
-    });
-
-    // Set response headers
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=orders_${req.params.date}.xlsx`
-    );
-
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (error) {
-    console.error("Excel export error:", error);
-    res.status(500).json({ message: "Failed to generate Excel", error: error.message });
+    const expectedSig = crypto.createHmac('sha256', SIGNED_URL_SECRET)
+      .update(user + req.params.date + expires)
+      .digest('hex');
+    if (sig !== expectedSig) {
+      return res.status(403).json({ message: 'Invalid signature.' });
+    }
+    // Optionally, you could check user exists here
+  } else {
+    // Fallback: require adminAuth for browser use
+    return require('../middleware/authMiddleware').adminAuth(req, res, () => downloadExcelHandler(req, res).catch(next));
   }
+  // If here, allow download
+  return downloadExcelHandler(req, res).catch(next);
 });
+
+// Extracted Excel download logic for reuse
+async function downloadExcelHandler(req, res) {
+  const { startOfDay, endOfDay } = getDateRange(req.params.date);
+  const [ordersStats, orders] = await Promise.all([
+    Order.calculateStats(startOfDay, endOfDay),
+    Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    })
+    .sort({ createdAt: 1 })
+    .lean()
+  ]);
+  const stats = {
+    totalOrders: ordersStats?.totalOrders || 0,
+    totalPaidOrders: ordersStats?.totalPaidOrders || 0,
+    totalRevenue: ordersStats?.totalRevenue || 0,
+    avgOrderValue: ordersStats?.avgOrderValue || 0
+  };
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Orders");
+  worksheet.columns = [
+    { header: "OrderNumber", key: "orderNumber", width: 12 },
+    { header: "Date", key: "date", width: 12 },
+    { header: "Time (IST)", key: "time", width: 15 },
+    { header: "Dishes", key: "dishes", width: 30 },
+    { header: "Type(H/F)", key: "types", width: 10 },
+    { header: "Dishes Price", key: "dishPrice", width: 15 },
+    { header: "Total Dish(each Price)", key: "totalDish", width: 20 },
+    { header: "Subtotal", key: "subtotal", width: 15 },
+    { header: "Discount(%)", key: "discountPercentage", width: 12 },
+    { header: "Discount Amount", key: "discountAmount", width: 15 },
+    { header: "Final Amount", key: "totalAmount", width: 15 },
+    { header: "Mode of Payment", key: "paymentMethod", width: 15 },
+    { header: "Status", key: "status", width: 15 },
+  ];
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < orders.length; i += BATCH_SIZE) {
+    const batch = orders.slice(i, i + BATCH_SIZE);
+    batch.forEach(order => {
+      const dateObj = new Date(order.createdAt);
+      worksheet.addRow({
+        orderNumber: order.orderNumber,
+        date: dateObj.toLocaleDateString('en-IN'),
+        time: dateObj.toLocaleTimeString('en-IN', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          timeZone: 'Asia/Kolkata'
+        }),
+        dishes: order.items.map(i => `${i.name} x${i.quantity}`).join(", "),
+        types: order.items.map(i => i.type).join(", "),
+        dishPrice: order.items.map(i => i.price).join(", "),
+        totalDish: order.items.map(i => i.totalPrice).join(", "),
+        subtotal: order.subtotal || order.totalAmount,
+        discountPercentage: order.discountPercentage || 0,
+        discountAmount: order.discountAmount || 0,
+        totalAmount: order.totalAmount,
+        paymentMethod: order.paymentMethod,
+        status: order.isPaid ? "Successful" : "Failed"
+      });
+    });
+  }
+  worksheet.addRow({});
+  worksheet.addRow({ orderNumber: "Summary Statistics" });
+  worksheet.addRow({ orderNumber: "Total Orders", totalAmount: stats.totalOrders });
+  worksheet.addRow({ orderNumber: "Paid Orders", totalAmount: stats.totalPaidOrders });
+  worksheet.addRow({ orderNumber: "Total Revenue", totalAmount: stats.totalRevenue });
+  worksheet.addRow({ orderNumber: "Avg. Order Value", totalAmount: Math.round(stats.avgOrderValue || 0) });
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=orders_${req.params.date}.xlsx`
+  );
+  await workbook.xlsx.write(res);
+  res.end();
+}
 
 // @route   DELETE /api/orders/:orderId
 // Move the order to DeletedOrder collection and remove from Order collection

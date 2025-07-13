@@ -113,6 +113,24 @@ const api = {
       handleError(error);
       throw error;
     }
+  },
+
+  // Get signed Excel download link
+  async getSignedExcelLink(date) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders/excel-link/${date}`, {
+        method: 'GET',
+        headers: getHeaders(true),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to get signed Excel download link');
+      }
+      const data = await response.json();
+      return data.url;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
   }
 };
 

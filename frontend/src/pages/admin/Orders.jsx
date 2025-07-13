@@ -441,17 +441,17 @@ const Orders = () => {
   // Excel download handler
   const handleDownloadExcel = async () => {
     try {
-      const blob = await api.downloadExcel(`/orders/excel/${selectedDate}`);
-      const url = window.URL.createObjectURL(blob);
+      // Get signed download link from backend
+      const signedUrl = await api.getSignedExcelLink(selectedDate);
+      // Create a temporary <a> element and trigger download
       const a = document.createElement('a');
-      a.href = url;
+      a.href = signedUrl;
       a.download = `orders_${selectedDate}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
       setNotification({
-        message: 'Excel file downloaded!',
+        message: 'Excel file download started!',
         type: 'success',
         duration: 2000
       });
