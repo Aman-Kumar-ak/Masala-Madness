@@ -32,12 +32,25 @@ export const AuthProvider = ({ children }) => {
     setIsAuthOperationInProgress(false);
   }, []);
   
+  // Update the last activity time
+  const updateLastActivityTime = () => {
+    const now = new Date().getTime().toString();
+    sessionStorage.setItem('lastActivityTime', now);
+    localStorage.setItem('lastActivityTime', now);
+  };
+  
   // Check if session has expired
   const checkSessionExpiry = () => {
-    const lastActivityTime = sessionStorage.getItem('lastActivityTime');
+    // Use the most recent lastActivityTime from either storage
+    const sessionTime = sessionStorage.getItem('lastActivityTime');
+    const localTime = localStorage.getItem('lastActivityTime');
+    const lastActivityTime = Math.max(
+      sessionTime ? parseInt(sessionTime) : 0,
+      localTime ? parseInt(localTime) : 0
+    );
     if (lastActivityTime) {
       const currentTime = new Date().getTime();
-      if (currentTime - parseInt(lastActivityTime) > SESSION_EXPIRY_TIME) {
+      if (currentTime - lastActivityTime > SESSION_EXPIRY_TIME) {
         // Session expired, log the user out
         console.log('Session expired, logging out user');
         logoutUser();
@@ -45,11 +58,6 @@ export const AuthProvider = ({ children }) => {
       }
     }
     return true;
-  };
-  
-  // Update the last activity time
-  const updateLastActivityTime = () => {
-    sessionStorage.setItem('lastActivityTime', new Date().getTime().toString());
   };
   
   // Function to handle logout
@@ -64,12 +72,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('qr_verification_expiry'); // Invalidate QR/Settings secret code access on logout
       localStorage.removeItem('admin_unlock_expiry');
       localStorage.removeItem('qr_unlock_expiry');
+      localStorage.removeItem('lastActivityTime'); // <-- clear from localStorage
     } catch (error) {
       console.error('Error in logout process:', error);
     } finally {
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
-      sessionStorage.removeItem('lastActivityTime');
+      sessionStorage.removeItem('lastActivityTime'); // <-- clear from sessionStorage
       sessionStorage.removeItem('jwtVerified');
       setUser(null);
       setIsAuthenticated(false);
@@ -114,6 +123,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('jwtVerified');
         localStorage.removeItem('deviceToken');
         localStorage.removeItem('rememberMeExpiry');
+        localStorage.removeItem('lastActivityTime');
         logoutUser();
         setLoading(false);
         navigate('/login');
@@ -122,6 +132,10 @@ export const AuthProvider = ({ children }) => {
         sessionStorage.setItem('token', localStorage.getItem('token'));
         sessionStorage.setItem('user', localStorage.getItem('user'));
         sessionStorage.setItem('jwtVerified', localStorage.getItem('jwtVerified'));
+        // Restore lastActivityTime as well
+        if (localStorage.getItem('lastActivityTime')) {
+          sessionStorage.setItem('lastActivityTime', localStorage.getItem('lastActivityTime'));
+        }
       }
     }
     const deviceToken = localStorage.getItem('deviceToken');
@@ -402,10 +416,15 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('jwtVerified');
         localStorage.removeItem('deviceToken');
         localStorage.removeItem('rememberMeExpiry');
+        localStorage.removeItem('lastActivityTime');
       } else {
         sessionStorage.setItem('token', localStorage.getItem('token'));
         sessionStorage.setItem('user', localStorage.getItem('user'));
         sessionStorage.setItem('jwtVerified', localStorage.getItem('jwtVerified'));
+        // Restore lastActivityTime as well
+        if (localStorage.getItem('lastActivityTime')) {
+          sessionStorage.setItem('lastActivityTime', localStorage.getItem('lastActivityTime'));
+        }
       }
     }
   }, []);

@@ -151,7 +151,7 @@ const Login = () => {
           } else {
             navigate('/home');
           }
-        }, 800);
+        }, 200); // Reduced from 800ms to 200ms
       } else {
         if (result.message.toLowerCase().includes('disabled')) {
           setDisabledAccountMessage('Your account is disabled. Please contact the administrator.');
@@ -254,7 +254,7 @@ const Login = () => {
           } else {
             navigate('/home');
           }
-        }, 800);
+        }, 200); // Reduced from 800ms to 200ms
       } else {
         setQuickLoginError('Session expired. Please log in again.');
         removeAccount(account.username);
