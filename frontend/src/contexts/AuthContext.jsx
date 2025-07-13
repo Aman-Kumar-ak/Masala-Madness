@@ -13,6 +13,23 @@ export const useAuth = () => useContext(AuthContext);
 const SESSION_EXPIRY_TIME = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+// --- Add helper functions for AndroidBridge integration ---
+  // Save token to Android native storage if available
+  const saveTokenToAndroid = (token) => {
+    if (window.AndroidBridge && window.AndroidBridge.saveSessionToken) {
+      window.AndroidBridge.saveSessionToken(token || '');
+    }
+  };
+  // Restore token from Android native storage if localStorage is empty
+  const restoreTokenFromAndroid = () => {
+    if (!localStorage.getItem('token') && window.AndroidBridge && window.AndroidBridge.getSessionToken) {
+      const token = window.AndroidBridge.getSessionToken();
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+    }
+  };
+
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
@@ -73,6 +90,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('admin_unlock_expiry');
       localStorage.removeItem('qr_unlock_expiry');
       localStorage.removeItem('lastActivityTime'); // <-- clear from localStorage
+      // --- Clear token from Android native storage ---
+      saveTokenToAndroid('');
     } catch (error) {
       console.error('Error in logout process:', error);
     } finally {
@@ -362,6 +381,8 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('jwtVerified');
           localStorage.removeItem('rememberMeExpiry');
         }
+        // --- Sync token to Android native storage ---
+        saveTokenToAndroid(data.token);
         return { success: true, user: data.user, deviceToken: data.deviceToken };
       } else {
         const errorMessage = (data && data.message) || 'Login failed due to unknown error.';
@@ -404,8 +425,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
   
-  // On app load, restore JWT and user from localStorage if not in sessionStorage and rememberMeExpiry is valid
+  // On app load, restore token from Android native storage if needed ---
   useEffect(() => {
+    restoreTokenFromAndroid();
     restoreSession();
     // eslint-disable-next-line
   }, []);
