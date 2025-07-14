@@ -10,6 +10,13 @@ import { AuthProvider } from './contexts/AuthContext'; // ✅ Import the AuthPro
 import { initializeFastImageLoading, preloadImages, preloadPwaIcons } from './utils/imageOptimizations'; // Import image optimization
 import { NotificationProvider } from './components/NotificationContext';
 
+// Aggressively wake up backend and DB as soon as possible for fast initial load
+Promise.all([
+  fetch('https://masala-madness.onrender.com/api/ping', { cache: 'no-store' }),
+  fetch('https://masala-madness.onrender.com/api/dishes', { cache: 'no-store' }),
+  fetch('https://masala-madness.onrender.com/api/orders/today', { cache: 'no-store' })
+]).catch(() => {});
+
 // Initialize image loading with async functions
 (async () => {
   try {
