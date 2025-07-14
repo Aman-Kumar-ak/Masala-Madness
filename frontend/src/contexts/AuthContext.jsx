@@ -568,7 +568,6 @@ export const AuthProvider = ({ children }) => {
     revokeDevice,
     setAuthOperationInProgress,
     clearAuthOperationInProgress,
-    restoreSession,
     setUser,
     setIsAuthenticated
   };
