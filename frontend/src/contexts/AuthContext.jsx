@@ -130,9 +130,13 @@ export const AuthProvider = ({ children }) => {
     };
   }, [isAuthenticated]);
   
-  // Robust session restoration: always try to restore from localStorage and refresh with deviceToken if available
-  const restoreSession = async () => {
-    // 1. Restore from localStorage if sessionStorage is empty
+  // --- Graceful session restoration with 30s window ---
+  const GRACE_PERIOD_MS = 30000; // 30 seconds
+  const RESTORE_RETRY_INTERVAL_MS = 2000; // 2 seconds
+
+  // Refactored session restoration logic
+  const robustRestoreSession = async () => {
+    // 1. Try to restore from sessionStorage/localStorage
     if (!sessionStorage.getItem('token') && localStorage.getItem('token')) {
       sessionStorage.setItem('token', localStorage.getItem('token'));
       sessionStorage.setItem('user', localStorage.getItem('user'));
@@ -141,7 +145,7 @@ export const AuthProvider = ({ children }) => {
         sessionStorage.setItem('lastActivityTime', localStorage.getItem('lastActivityTime'));
       }
     }
-    // 2. If deviceToken exists, always try to refresh session from backend
+    // 2. If deviceToken exists, try to refresh session from backend
     const deviceToken = localStorage.getItem('deviceToken');
     if (deviceToken) {
       try {
@@ -149,7 +153,7 @@ export const AuthProvider = ({ children }) => {
         // Try to refresh token using deviceToken
         const response = await api.post('/auth/refresh-token', { deviceToken });
         if (response && response.token && response.user) {
-          // Set tokens and user in both storages
+          // Set tokens and user in both storages (replace only if new)
           sessionStorage.setItem('token', response.token);
           sessionStorage.setItem('user', JSON.stringify(response.user));
           sessionStorage.setItem('jwtVerified', 'true');
@@ -165,24 +169,24 @@ export const AuthProvider = ({ children }) => {
           setUser(response.user);
           setIsAuthenticated(true);
           setLoading(false);
-          return;
-        } else {
-          // If backend rejects, clear session
-          logoutUser();
-          setLoading(false);
-          navigate('/login');
-          return;
+          return true;
         }
       } catch (error) {
-        // If backend rejects, clear session
-        logoutUser();
+        // Do not clear tokens here, just return false
         setLoading(false);
-        navigate('/login');
-        return;
+        return false;
       }
     }
+    // If we have a token in session/local, consider it restored
+    if (sessionStorage.getItem('token') || localStorage.getItem('token')) {
+      setIsAuthenticated(true);
+      setLoading(false);
+      return true;
+    }
+    setLoading(false);
+    return false;
   };
-  
+
   // Listen for online/offline events
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -319,7 +323,7 @@ export const AuthProvider = ({ children }) => {
             }
           }
         } else {
-          await restoreSession();
+          await robustRestoreSession();
         }
       } catch (error) {
         if (!window.__isPasswordDialogOpen) {
@@ -428,7 +432,7 @@ export const AuthProvider = ({ children }) => {
   // On app load, restore token from Android native storage if needed ---
   useEffect(() => {
     restoreTokenFromAndroid();
-    restoreSession();
+    robustRestoreSession();
     // eslint-disable-next-line
   }, []);
   
@@ -466,65 +470,43 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user, showError, navigate]);
   
-  // Add a fast, robust session restoration and user active check logic
+  // Replace the useEffect for session restoration with a robust version
   useEffect(() => {
-    console.log('Session restoration: Checking session or database on page load.');
-    let intervalId;
+    let isMounted = true;
     let attempts = 0;
-    const maxAttempts = 3; // Try for 3 seconds
-    if (!isAuthenticated && !loading) {
-      intervalId = setInterval(async () => {
-        attempts++;
-        // Try to restore session as usual
-        let restored = false;
-        try {
-          await restoreSession();
-          if (sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('deviceToken')) {
-            setIsAuthenticated(true);
-            setLoading(false);
-            restored = true;
-            console.log('Session restoration: Session restored from token/session.');
-          }
-        } catch {}
-        if (!restored) {
-          // If not restored, check if user is still active
-          let identifier = null;
-          try {
-            const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-            if (userStr) {
-              const userObj = JSON.parse(userStr);
-              identifier = userObj.username || userObj.mobileNumber;
-            }
-          } catch {}
-          if (identifier) {
-            try {
-              const res = await api.post('/auth/check-active', { username: identifier });
-              if (res.active) {
-                setIsAuthenticated(false);
-                setLoading(false);
-                console.log('Session restoration: Connection established with database (user is active).');
-              } else {
-                logoutUser();
-                setIsAuthenticated(false);
-                setLoading(false);
-                showError('Your account has been disabled by the administrator.');
-                navigate('/login');
-                console.log('Session restoration: User is not active, forced logout.');
-              }
-            } catch {}
-          } else {
-            console.log('Session restoration: No identifier found for database check.');
-          }
-        }
-        if (restored || attempts >= maxAttempts) {
-          clearInterval(intervalId);
-        }
-      }, 1000); // 1 second interval for fast check
-    } else if (isAuthenticated) {
-      console.log('Session restoration: User is already authenticated.');
-    }
-    return () => clearInterval(intervalId);
-  }, [isAuthenticated, loading]);
+    let restored = false;
+    setLoading(true);
+    const start = Date.now();
+
+    const tryRestore = async () => {
+      if (!isMounted) return;
+      attempts++;
+      const result = await robustRestoreSession();
+      if (result) {
+        restored = true;
+        setIsAuthenticated(true);
+        setLoading(false);
+        return;
+      }
+      if (Date.now() - start < GRACE_PERIOD_MS) {
+        setTimeout(tryRestore, RESTORE_RETRY_INTERVAL_MS);
+      } else {
+        // After grace period, only then clear tokens and logout
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('jwtVerified');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('jwtVerified');
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        navigate('/login');
+      }
+    };
+    tryRestore();
+    return () => { isMounted = false; };
+  }, []);
   
   // Update lastClosed on window/tab close
   useEffect(() => {
