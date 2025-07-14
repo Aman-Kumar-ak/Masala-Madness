@@ -439,17 +439,14 @@ const Orders = () => {
   };
 
   // Excel download handler
+  const [downloadLoading, setDownloadLoading] = useState(false);
   const handleDownloadExcel = async () => {
+    setDownloadLoading(true);
     try {
       // Get signed download link from backend
       const signedUrl = await api.getSignedExcelLink(selectedDate);
-      // Create a temporary <a> element and trigger download
-      const a = document.createElement('a');
-      a.href = signedUrl;
-      a.download = `orders_${selectedDate}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      // Use window.open for faster direct download
+      window.open(signedUrl, '_blank');
       setNotification({
         message: 'Excel file download started!',
         type: 'success',
@@ -461,6 +458,8 @@ const Orders = () => {
         type: 'error',
         duration: 2000
       });
+    } finally {
+      setDownloadLoading(false);
     }
   };
 
@@ -600,15 +599,24 @@ const Orders = () => {
                 </button>
                 <button
                   onClick={handleDownloadExcel}
-                  className="bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 flex-shrink-0 flex items-center whitespace-nowrap text-xs sm:text-sm"
+                  className="bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 flex-shrink-0 flex items-center justify-center whitespace-nowrap text-xs sm:text-sm relative min-w-[120px]"
                   title="Download Excel"
-                  disabled={orders.length === 0}
-                  style={{ opacity: orders.length === 0 ? 0.5 : 1 }}
+                  disabled={orders.length === 0 || downloadLoading}
+                  style={{ opacity: orders.length === 0 || downloadLoading ? 0.5 : 1 }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 4v12" />
-                  </svg>
-                  <span>Download Excel</span>
+                  {downloadLoading ? (
+                    <span className="flex items-center justify-center w-full">
+                      <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-b-2 border-white border-b-orange-500 mr-2"></span>
+                      <span className="ml-1 text-xs sm:text-sm">Preparing...</span>
+                    </span>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 4v12" />
+                      </svg>
+                      <span>Download Excel</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
