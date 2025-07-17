@@ -300,6 +300,7 @@ export default function Cart() {
           showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
           // Print KOT if requested
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
+            const isFirstKOT = !isPaid && printKOT;
             const kotData = {
               orderNumber: data.order.orderNumber,
               createdAt: getISTISOString(data.order.createdAt),
@@ -307,7 +308,7 @@ export default function Cart() {
                 name: item.name,
                 type: item.type,
                 quantity: item.quantity,
-                kotNumber: item.kotNumber // Include kotNumber in printout
+                kotNumber: isFirstKOT ? 1 : item.kotNumber // Set kotNumber: 1 for first KOT print
               }))
             };
             // If this is a pending order with KOT, add KOT: 1
