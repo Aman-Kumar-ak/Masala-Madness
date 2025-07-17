@@ -238,6 +238,10 @@ export default function Cart() {
       confirmedBy: user?.name || user?.username || user?.mobileNumber,
       printKOT // Ensure this is sent to backend
     };
+    // Add KOT: 1 if adding to pending with KOT
+    if (!isPaid && printKOT) {
+      payload.KOT = 1;
+    }
     try {
       if (isPaid) {
         setShowPaymentConfirm(false);
@@ -306,6 +310,10 @@ export default function Cart() {
                 kotNumber: item.kotNumber // Include kotNumber in printout
               }))
             };
+            // If this is a pending order with KOT, add KOT: 1
+            if (!isPaid && printKOT) {
+              kotData.KOT = 1;
+            }
             if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
               try {
                 window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));

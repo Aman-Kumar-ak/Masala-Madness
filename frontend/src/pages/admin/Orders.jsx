@@ -606,7 +606,7 @@ const Orders = () => {
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Select Date:
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3 sm:gap-4 md:gap-6 items-center p-2 sm:p-3 md:p-4 rounded-lg bg-orange-50 border border-orange-100">
               <div className="relative flex-1 min-w-[180px]">
                 <input
                   type="date"
@@ -620,11 +620,12 @@ const Orders = () => {
                   }}
                 />
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex flex-row gap-2 sm:gap-3 md:gap-4 flex-shrink-0">
                 <button
                   onClick={resetToCurrentDate}
-                  className="bg-orange-100 hover:bg-orange-200 text-orange-800 font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-200 flex-shrink-0 flex items-center whitespace-nowrap text-xs sm:text-sm"
+                  className="bg-orange-100 hover:bg-orange-200 text-orange-800 font-medium py-2.5 px-3 sm:px-4 md:px-5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-200 flex-shrink-0 flex items-center whitespace-nowrap text-xs sm:text-sm border border-orange-200"
                   title="Reset to today"
+                  style={{marginRight: 0}}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -633,7 +634,7 @@ const Orders = () => {
                 </button>
                 <button
                   onClick={handleDownloadExcel}
-                  className="bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 px-2 sm:px-3 md:px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 flex-shrink-0 flex items-center justify-center whitespace-nowrap text-xs sm:text-sm relative min-w-[120px]"
+                  className="bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 px-3 sm:px-4 md:px-5 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 flex-shrink-0 flex items-center justify-center whitespace-nowrap text-xs sm:text-sm relative min-w-[120px] border border-green-600"
                   title="Download Excel"
                   disabled={orders.length === 0 || downloadLoading}
                   style={{ opacity: orders.length === 0 || downloadLoading ? 0.5 : 1 }}

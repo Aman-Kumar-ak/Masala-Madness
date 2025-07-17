@@ -458,28 +458,16 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
 
           {/* Footer with action buttons */}
           <div className="border-t border-gray-200 p-4 bg-white">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-row justify-between items-center flex-wrap gap-2">
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors duration-200 text-sm whitespace-nowrap"
+                className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap shadow-sm"
                 disabled={loading}
-                style={{ minWidth: 120 }}
+                style={{ minWidth: 70 }}
               >
                 Cancel
               </button>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => handleSaveKOT(false)}
-                  disabled={selectedItems.length === 0 || loading}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-sm whitespace-nowrap ${
-                    selectedItems.length === 0 || loading
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-green-200 text-green-800 hover:bg-green-300'
-                  }`}
-                  style={{ minWidth: 120 }}
-                >
-                  {loading ? 'Saving...' : 'Save without KOT'}
-                </button>
+              <div className="flex flex-row gap-2 flex-shrink-0">
                 <button
                   onClick={async () => {
                     if (selectedItems.length === 0 || loading) return;
@@ -489,15 +477,26 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
                     }
                     await handleSaveKOT(true);
                   }}
-                  // Do NOT use disabled prop so notification always fires
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-sm whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-md font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap shadow-sm ${
                     selectedItems.length === 0 || loading || !isPrinterConnected
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-orange-200 text-orange-800 hover:bg-orange-300'
                   }`}
-                  style={{ minWidth: 120 }}
+                  style={{ minWidth: 90 }}
                 >
-                  {loading ? 'Saving...' : 'Save with KOT'}
+                  {loading ? 'Saving...' : 'Save (KOT)'}
+                </button>
+                <button
+                  onClick={() => handleSaveKOT(false)}
+                  disabled={selectedItems.length === 0 || loading}
+                  className={`px-3 py-1.5 rounded-md font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap shadow-sm ${
+                    selectedItems.length === 0 || loading
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-200 text-green-800 hover:bg-green-300'
+                  }`}
+                  style={{ minWidth: 70 }}
+                >
+                  {loading ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>

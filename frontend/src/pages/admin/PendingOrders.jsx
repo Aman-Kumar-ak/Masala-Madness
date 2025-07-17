@@ -603,13 +603,6 @@ export default function PendingOrders() {
     setIsPrinterConnected(checkPrinterConnection());
   }, [showQrCode, showCustomPaymentDialog, cashConfirmDialog]);
 
-  // Show notification if printer is not connected
-  useEffect(() => {
-    if (!isPrinterConnected) {
-      setNotification({ message: "Printer is not connected.", type: "error" });
-    }
-  }, [isPrinterConnected]);
-
   return (
     <div className="relative z-0">
       <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 pt-20 pb-12">
