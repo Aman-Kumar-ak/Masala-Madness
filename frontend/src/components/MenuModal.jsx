@@ -15,6 +15,27 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+
+  function checkPrinterConnection() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.isPrinterConnected === 'function') {
+      try {
+        const result = window.AndroidBridge.isPrinterConnected();
+        return result === true || result === "true";
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  useEffect(() => {
+    setIsPrinterConnected(checkPrinterConnection());
+    const interval = setInterval(() => {
+      setIsPrinterConnected(checkPrinterConnection());
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -437,38 +458,47 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
 
           {/* Footer with action buttons */}
           <div className="border-t border-gray-200 p-4 bg-white">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <button
                 onClick={onClose}
-                className="px-3 sm:px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap"
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors duration-200 text-sm whitespace-nowrap"
                 disabled={loading}
+                style={{ minWidth: 120 }}
               >
                 Cancel
               </button>
-              {/* New Save buttons for KOT */}
-              <div className="flex gap-2">
-              <button
+              <div className="flex gap-1">
+                <button
                   onClick={() => handleSaveKOT(false)}
-                disabled={selectedItems.length === 0 || loading}
-                className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap ${
-                  selectedItems.length === 0 || loading
-                    ? 'bg-green-300 text-green-700 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-              >
-                  {loading ? "Saving..." : "Save without KOT"}
+                  disabled={selectedItems.length === 0 || loading}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-sm whitespace-nowrap ${
+                    selectedItems.length === 0 || loading
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-200 text-green-800 hover:bg-green-300'
+                  }`}
+                  style={{ minWidth: 120 }}
+                >
+                  {loading ? 'Saving...' : 'Save without KOT'}
                 </button>
                 <button
-                  onClick={() => handleSaveKOT(true)}
-                  disabled={selectedItems.length === 0 || loading}
-                  className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-xs sm:text-sm whitespace-nowrap ${
-                    selectedItems.length === 0 || loading
-                      ? 'bg-orange-300 text-orange-700 cursor-not-allowed'
-                      : 'bg-orange-500 hover:bg-orange-600 text-white'
+                  onClick={async () => {
+                    if (selectedItems.length === 0 || loading) return;
+                    if (!isPrinterConnected) {
+                      setNotification({ message: 'Printer is not connected.', type: 'error' });
+                      return;
+                    }
+                    await handleSaveKOT(true);
+                  }}
+                  // Do NOT use disabled prop so notification always fires
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-sm whitespace-nowrap ${
+                    selectedItems.length === 0 || loading || !isPrinterConnected
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-orange-200 text-orange-800 hover:bg-orange-300'
                   }`}
+                  style={{ minWidth: 120 }}
                 >
-                  {loading ? "Saving..." : "Save with KOT"}
-              </button>
+                  {loading ? 'Saving...' : 'Save with KOT'}
+                </button>
               </div>
             </div>
           </div>
