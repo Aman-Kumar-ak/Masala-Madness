@@ -449,8 +449,10 @@ const Orders = () => {
       const response = await fetch(signedUrl);
       if (!response.ok) throw new Error('Failed to fetch Excel file');
       const blob = await response.blob();
-      // AndroidBridge integration
-      if (window.AndroidBridge && window.AndroidBridge.saveExcelBase64) {
+
+      // --- ANDROID WEBVIEW FIX ---
+      if (window.AndroidBridge && typeof window.AndroidBridge.saveExcelBase64 === 'function') {
+        // Read blob as base64 and send to Android
         const reader = new FileReader();
         reader.onloadend = function () {
           const base64data = reader.result.split(',')[1];
@@ -458,12 +460,19 @@ const Orders = () => {
             base64data,
             `orders_${selectedDate}.xlsx`
           );
+          setNotification({
+            message: 'Excel file sent to device!',
+            type: 'success',
+            duration: 2000
+          });
         };
         reader.readAsDataURL(blob);
         setDownloadLoading(false);
         return;
       }
-      // Fallback: Create a temporary anchor to trigger download
+      // --- END ANDROID FIX ---
+
+      // Fallback: Create a temporary anchor to trigger download (browser)
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
