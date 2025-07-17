@@ -30,6 +30,30 @@ export default function Home() {
   const [displayRevenue, setDisplayRevenue] = useState(0);
   const [displayAvgOrder, setDisplayAvgOrder] = useState(0);
   const { socket } = useRefresh();
+  const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+
+  // Function to check printer connection
+  function checkPrinterConnection() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.isPrinterConnected === 'function') {
+      try {
+        const result = window.AndroidBridge.isPrinterConnected();
+        return result === true || result === "true";
+      } catch {
+        return false;
+      }
+    }
+    // On web, assume not connected by default for safety
+    return false;
+  }
+
+  // Check printer connection on mount and poll every 2s for real-time updates
+  useEffect(() => {
+    setIsPrinterConnected(checkPrinterConnection());
+    const interval = setInterval(() => {
+      setIsPrinterConnected(checkPrinterConnection());
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -368,9 +392,14 @@ export default function Home() {
                     setShowPrinterDialog(true);
                   }
                 }}
-                className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center transition-all duration-200 hover:bg-green-200 ml-2"
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ml-2"
                 title="Printer Settings"
-                style={{ minWidth: 40, minHeight: 40 }}
+                style={{
+                  minWidth: 40,
+                  minHeight: 40,
+                  backgroundColor: isPrinterConnected ? '#e6fff2' : '#ffd6d6', // more saturated red
+                  border: isPrinterConnected ? '1.5px solid #b2f2d7' : '1.5px solid #ff8a8a', // stronger red border
+                }}
               >
                 <img src="/images/printer.png" alt="Printer Settings" className="w-6 h-6 object-contain" width={24} height={24} />
               </button>

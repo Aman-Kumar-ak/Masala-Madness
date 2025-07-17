@@ -445,8 +445,19 @@ const Orders = () => {
     try {
       // Get signed download link from backend
       const signedUrl = await api.getSignedExcelLink(selectedDate);
-      // Use window.open for faster direct download
-      window.open(signedUrl, '_blank');
+      // Fetch the file as a blob
+      const response = await fetch(signedUrl);
+      if (!response.ok) throw new Error('Failed to fetch Excel file');
+      const blob = await response.blob();
+      // Create a temporary anchor to trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders_${selectedDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
       setNotification({
         message: 'Excel file download started!',
         type: 'success',

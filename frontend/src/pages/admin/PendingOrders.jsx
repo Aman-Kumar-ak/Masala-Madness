@@ -51,6 +51,7 @@ export default function PendingOrders() {
   const [manualDiscounts, setManualDiscounts] = useState({});
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPrinterConnected, setIsPrinterConnected] = useState(true);
 
   const { user } = useContext(AuthContext);
 
@@ -583,6 +584,32 @@ export default function PendingOrders() {
     };
   }
 
+  // Function to check printer connection
+  function checkPrinterConnection() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.isPrinterConnected === 'function') {
+      try {
+        const result = window.AndroidBridge.isPrinterConnected();
+        return result === true || result === "true";
+      } catch {
+        return false;
+      }
+    }
+    // On web, assume always connected (or set to false for testing)
+    return true;
+  }
+
+  // Check printer connection when payment dialogs open
+  useEffect(() => {
+    setIsPrinterConnected(checkPrinterConnection());
+  }, [showQrCode, showCustomPaymentDialog, cashConfirmDialog]);
+
+  // Show notification if printer is not connected
+  useEffect(() => {
+    if (!isPrinterConnected) {
+      setNotification({ message: "Printer is not connected.", type: "error" });
+    }
+  }, [isPrinterConnected]);
+
   return (
     <div className="relative z-0">
       <div className="min-h-screen bg-gradient-to-b from-orange-50 to-orange-100 pt-20 pb-12">
@@ -962,11 +989,12 @@ export default function PendingOrders() {
                   <button
                     onClick={handleQrConfirmPayment}
                     className="w-full py-3 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2 mt-2"
+                    disabled={!isPrinterConnected}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Confirm Payment
+                    Confirm and Print
                   </button>
                 </div>
               }

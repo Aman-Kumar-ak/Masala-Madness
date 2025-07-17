@@ -57,6 +57,8 @@ export default function Qr() {
   const [lockoutMessage, setLockoutMessage] = useState("");
   const [lockoutTimer, setLockoutTimer] = useState("");
 
+  const [defaultingUpiId, setDefaultingUpiId] = useState(null); // Track which UPI is being set as default
+
   // Check authentication status on component mount and when isLoggedIn changes
   useEffect(() => {
     const verificationExpiry = localStorage.getItem('qr_unlock_expiry');
@@ -265,22 +267,28 @@ export default function Qr() {
   // Set a UPI address as default
   const setDefaultUpiAddress = async (id) => {
     if (!id) return;
-    
+    setDefaultingUpiId(id);
+    // Optimistically update UI
+    const prevAddresses = [...savedUpiAddresses];
+    const updatedAddresses = savedUpiAddresses.map(addr => ({
+      ...addr,
+      isDefault: addr._id === id
+    }));
+    setSavedUpiAddresses(updatedAddresses);
     try {
       setIsLoading(true);
-      const response = await api.patch(`/upi/${id}/default`);
-      
-      if (!response.ok) {
-        throw new Error(response.message || 'Failed to set default UPI address');
-      }
-      
-      await fetchUpiAddresses();
+      await api.patch(`/upi/${id}/default`);
+      // Optionally, you can refetch here for consistency:
+      // await fetchUpiAddresses();
       showSuccess('Default UPI address updated');
     } catch (error) {
+      // Revert on error
+      setSavedUpiAddresses(prevAddresses);
       console.error('Error setting default UPI address:', error);
       showError(error.message || 'Failed to set default UPI address');
     } finally {
       setIsLoading(false);
+      setDefaultingUpiId(null);
     }
   };
 
@@ -570,8 +578,9 @@ export default function Qr() {
                                         </svg>
                                       )
                                     ) : address.isDefault ? (
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                      // Use a green check-circle for default UPI
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707a1 1 0 00-1.414-1.414L9 11.586 7.707 10.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                       </svg>
                                     ) : (
                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -592,11 +601,11 @@ export default function Qr() {
                                         </span>
                                       )}
                                       {address.isDefault && (
-                                        <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-normal flex items-center gap-1 shadow-sm">
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                        <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-bold flex items-center gap-1 shadow-sm border border-green-300">
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707a1 1 0 00-1.414-1.414L9 11.586 7.707 10.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                           </svg>
-                                          <span className="hidden xxxs:inline">Default</span>
+                                          Default
                                         </span>
                                       )}
                                     </div>
@@ -625,10 +634,23 @@ export default function Qr() {
                                       }}
                                       className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors duration-200 shadow-sm"
                                       title="Set as default"
+                                      disabled={!!defaultingUpiId}
                                     >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                      </svg>
+                                      {defaultingUpiId === address._id ? (
+                                        // Spinner
+                                        <span className="h-5 w-5 flex items-center justify-center">
+                                          <svg className="animate-spin h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                          </svg>
+                                        </span>
+                                      ) : (
+                                        // Outlined check-circle icon for 'set as default'
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4" />
+                                        </svg>
+                                      )}
                                     </button>
                                   )}
                                   <button

@@ -34,6 +34,7 @@ export default function Cart() {
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
   const { user } = useContext(AuthContext);
+  const [isPrinterConnected, setIsPrinterConnected] = useState(true);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -365,6 +366,31 @@ export default function Cart() {
     };
   }
 
+  // Function to check printer connection
+  function checkPrinterConnection() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.isPrinterConnected === 'function') {
+      try {
+        const result = window.AndroidBridge.isPrinterConnected();
+        return result === true || result === "true";
+      } catch {
+        return false;
+      }
+    }
+    // On web, assume not connected by default for safety
+    return false;
+  }
+
+  // Check printer connection on mount and when dialogs open
+  useEffect(() => {
+    setIsPrinterConnected(checkPrinterConnection());
+  }, []);
+
+  useEffect(() => {
+    if (showPaymentConfirm || showQrCode || showCustomPaymentDialog) {
+      setIsPrinterConnected(checkPrinterConnection());
+    }
+  }, [showPaymentConfirm, showQrCode, showCustomPaymentDialog]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <BackButton />
@@ -609,14 +635,21 @@ export default function Cart() {
             <div className="flex flex-col gap-3 w-full mt-2">
               <button
                 onClick={async () => {
+                  if (!isPrinterConnected) {
+                    showError("Printer is not connected.");
+                    return;
+                  }
                   setShowQrCode(false);
                   setShowPaymentOptions(false);
                   setShowPaymentConfirm(false);
                   setShowCustomPaymentDialog(false);
                   await processPayment(true, true); // printKOT = true
                 }}
-                className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-                disabled={isProcessing}
+                className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                  ${isProcessing || !isPrinterConnected
+                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'}
+                `}
               >
                 Confirm and Print
               </button>
@@ -742,9 +775,20 @@ export default function Cart() {
             <div className="flex flex-col gap-3 w-full mt-2">
               <button
                 onClick={async () => {
-                  const totalPaid = manualPayment.cash + manualPayment.online;
+                  if (isProcessing) return;
+                  if (!isPrinterConnected) {
+                    showError("Printer is not connected.");
+                    return;
+                  }
+                  const cashFilled = manualPayment.cash !== '' && manualPayment.cash !== null && !isNaN(manualPayment.cash);
+                  const onlineFilled = manualPayment.online !== '' && manualPayment.online !== null && !isNaN(manualPayment.online);
+                  if (!cashFilled || !onlineFilled) {
+                    showError("Please fill both Cash and Online payment fields.");
+                    return;
+                  }
+                  const totalPaid = Number(manualPayment.cash) + Number(manualPayment.online);
                   if (Math.abs(totalPaid - totalAmount) > 0.01) {
-                    showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
+                    showError(`Does not match order total (₹${totalAmount.toFixed(2)})`);
                     return;
                   }
                   setShowCustomPaymentDialog(false);
@@ -754,16 +798,26 @@ export default function Cart() {
                   setShowSplashScreen(true);
                   await processPayment(true, true); // printKOT = true
                 }}
-                className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-                disabled={isProcessing}
+                className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                  ${isProcessing || !isPrinterConnected
+                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'}
+                `}
               >
                 Confirm and Print
               </button>
               <button
                 onClick={async () => {
-                  const totalPaid = manualPayment.cash + manualPayment.online;
+                  if (isProcessing) return;
+                  const cashFilled = manualPayment.cash !== '' && manualPayment.cash !== null && !isNaN(manualPayment.cash);
+                  const onlineFilled = manualPayment.online !== '' && manualPayment.online !== null && !isNaN(manualPayment.online);
+                  if (!cashFilled || !onlineFilled) {
+                    showError("Please fill both Cash and Online payment fields.");
+                    return;
+                  }
+                  const totalPaid = Number(manualPayment.cash) + Number(manualPayment.online);
                   if (Math.abs(totalPaid - totalAmount) > 0.01) {
-                    showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
+                    showError(`Does not match order total (₹${totalAmount.toFixed(2)})`);
                     return;
                   }
                   setShowCustomPaymentDialog(false);
@@ -795,9 +849,18 @@ export default function Cart() {
         customContent={
           <div className="flex flex-col gap-3">
             <button
-              onClick={handleConfirmWithKOT}
-              className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-              disabled={isProcessing}
+              onClick={async () => {
+                if (!isPrinterConnected) {
+                  showError("Printer is not connected.");
+                  return;
+                }
+                await handleConfirmWithKOT();
+              }}
+              className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                ${isProcessing || !isPrinterConnected
+                  ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                  : 'bg-orange-600 hover:bg-orange-700 text-white'}
+              `}
             >
               Confirm and Print
             </button>
@@ -830,11 +893,18 @@ export default function Cart() {
           <div className="flex flex-col gap-3">
             <button
               onClick={async () => {
+                if (!isPrinterConnected) {
+                  showError("Printer is not connected.");
+                  return;
+                }
                 setShowPendingConfirm(false);
                 await processPayment(false, true); // Add with print
               }}
-              className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-              disabled={isProcessing}
+              className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                ${isProcessing || !isPrinterConnected
+                  ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                  : 'bg-orange-600 hover:bg-orange-700 text-white'}
+              `}
             >
               Add with Print
             </button>
