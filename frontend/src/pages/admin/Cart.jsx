@@ -304,6 +304,7 @@ export default function Cart() {
             const kotData = {
               orderNumber: data.order.orderNumber,
               createdAt: getISTISOString(data.order.createdAt),
+              kotNumber: isFirstKOT ? 1 : (data.order.kotNumber || 1), // Always set root kotNumber for Android
               items: (data.order.items || []).map(item => ({
                 name: item.name,
                 type: item.type,
