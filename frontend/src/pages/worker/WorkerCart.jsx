@@ -297,21 +297,24 @@ export default function WorkerCart() {
           showSuccess(`Order added to pending. Amount: ₹${totalAmount.toFixed(2)}`);
           // Print KOT if requested
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
-            // Ensure kotNumber: 1 for all items if this is the initial KOT print
+            const isFirstKOT = !isPaid && printKOT;
             const itemsWithKOT = (data.order.items || []).map(item => ({
               name: item.name,
               type: item.type,
               quantity: item.quantity,
-              kotNumber: item.kotNumber || 1 // Always set to 1 for initial print
+              kotNumber: isFirstKOT ? 1 : (item.kotNumber || 1)
             }));
             const kotData = {
               orderNumber: data.order.orderNumber,
               createdAt: getISTISOString(data.order.createdAt),
+              kotNumber: isFirstKOT ? 1 : (data.order.kotNumber || 1),
               items: itemsWithKOT
             };
+            if (isFirstKOT) {
+              kotData.KOT = 1;
+            }
             if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
               try {
-                console.log('[KOT][DEBUG] About to call window.AndroidBridge.sendOrderDetails with:', JSON.stringify(kotData));
                 window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
               } catch (err) {
                 console.error('Failed to send KOT to app:', err);
