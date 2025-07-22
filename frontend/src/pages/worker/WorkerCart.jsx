@@ -298,17 +298,16 @@ export default function WorkerCart() {
           // Print KOT if requested
           if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
             const isFirstKOT = !isPaid && printKOT;
-            const itemsWithKOT = (data.order.items || []).map(item => ({
-              name: item.name,
-              type: item.type,
-              quantity: item.quantity,
-              kotNumber: isFirstKOT ? 1 : (item.kotNumber || 1)
-            }));
             const kotData = {
               orderNumber: data.order.orderNumber,
               createdAt: getISTISOString(data.order.createdAt),
               kotNumber: isFirstKOT ? 1 : (data.order.kotNumber || 1),
-              items: itemsWithKOT
+              items: (data.order.items || []).map(item => ({
+                name: item.name,
+                type: item.type,
+                quantity: item.quantity,
+                kotNumber: isFirstKOT ? 1 : item.kotNumber
+              }))
             };
             if (isFirstKOT) {
               kotData.KOT = 1;
