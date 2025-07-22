@@ -35,6 +35,8 @@ export default function WorkerCart() {
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
   const [showCashConfirmDialog, setShowCashConfirmDialog] = useState(false);
   const { user } = useContext(AuthContext);
+  // Printer connection state
+  const [isPrinterConnected, setIsPrinterConnected] = useState(false);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -95,6 +97,22 @@ export default function WorkerCart() {
     fetchActiveDiscount();
     fetchDefaultUpiAddress();
   }, []);
+
+  useEffect(() => {
+    setIsPrinterConnected(checkPrinterConnection());
+  }, []);
+
+  useEffect(() => {
+    if (
+      showPaymentConfirm ||
+      showQrCode ||
+      showCustomPaymentDialog ||
+      showCashConfirmDialog ||
+      showPendingConfirm
+    ) {
+      setIsPrinterConnected(checkPrinterConnection());
+    }
+  }, [showPaymentConfirm, showQrCode, showCustomPaymentDialog, showCashConfirmDialog, showPendingConfirm]);
 
   const handlePaymentMethodSelect = (method) => {
     setPaymentMethod(method);
@@ -335,6 +353,19 @@ export default function WorkerCart() {
     }
     setManualDiscount(val);
   };
+
+  function checkPrinterConnection() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.isPrinterConnected === 'function') {
+      try {
+        const result = window.AndroidBridge.isPrinterConnected();
+        return result === true || result === "true";
+      } catch {
+        return false;
+      }
+    }
+    // On web, assume not connected by default for safety
+    return false;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -580,13 +611,21 @@ export default function WorkerCart() {
             <div className="flex flex-col gap-3 w-full mt-2">
               <button
                 onClick={async () => {
+                  if (!isPrinterConnected) {
+                    showError("Printer is not connected.");
+                    return;
+                  }
                   setShowQrCode(false);
                   setShowPaymentOptions(false);
                   setShowPaymentConfirm(false);
                   setShowCustomPaymentDialog(false);
                   await processPayment(true, true); // printKOT = true
                 }}
-                className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                  ${isProcessing || !isPrinterConnected
+                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'}
+                `}
                 disabled={isProcessing}
               >
                 Confirm and Print
@@ -666,10 +705,18 @@ export default function WorkerCart() {
           <div className="flex flex-col gap-3">
             <button
               onClick={async () => {
+                if (!isPrinterConnected) {
+                  showError("Printer is not connected.");
+                  return;
+                }
                 setShowCashConfirmDialog(false);
                 await processPayment(true, true); // printKOT = true
               }}
-              className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                ${isProcessing || !isPrinterConnected
+                  ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                  : 'bg-orange-600 hover:bg-orange-700 text-white'}
+              `}
               disabled={isProcessing}
             >
               Confirm and Print
@@ -754,6 +801,10 @@ export default function WorkerCart() {
                     showError(`Total custom payment (₹${totalPaid.toFixed(2)}) does not match order total (₹${totalAmount.toFixed(2)})`);
                     return;
                   }
+                  if (!isPrinterConnected) {
+                    showError("Printer is not connected.");
+                    return;
+                  }
                   setShowCustomPaymentDialog(false);
                   setShowPaymentOptions(false);
                   setShowPaymentConfirm(false);
@@ -761,7 +812,11 @@ export default function WorkerCart() {
                   setShowSplashScreen(true);
                   await processPayment(true, true); // printKOT = true
                 }}
-                className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+                className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                  ${isProcessing || !isPrinterConnected
+                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'}
+                `}
                 disabled={isProcessing}
               >
                 Confirm and Print
@@ -803,11 +858,19 @@ export default function WorkerCart() {
           <div className="flex flex-col gap-3">
             <button
               onClick={async () => {
+                if (!isPrinterConnected) {
+                  showError("Printer is not connected.");
+                  return;
+                }
                 setShowPaymentConfirm(false);
                 setShowPaymentOptions(false);
                 await processPayment(true, true); // printKOT = true
               }}
-              className="w-full py-3 rounded-lg font-medium bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
+              className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                ${isProcessing || !isPrinterConnected
+                  ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                  : 'bg-orange-600 hover:bg-orange-700 text-white'}
+              `}
               disabled={isProcessing}
             >
               Confirm and Print
@@ -841,10 +904,18 @@ export default function WorkerCart() {
           <div className="flex flex-col gap-3">
             <button
               onClick={async () => {
+                if (!isPrinterConnected) {
+                  showError("Printer is not connected.");
+                  return;
+                }
                 setShowPendingConfirm(false);
                 await processPayment(false, true); // Add with print
               }}
-              className="w-full py-3 rounded-lg font-medium bg-orange-500 hover:bg-orange-600 text-white text-base shadow transition-colors duration-200"
+              className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                ${isProcessing || !isPrinterConnected
+                  ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                  : 'bg-orange-600 hover:bg-orange-700 text-white'}
+              `}
               disabled={isProcessing}
             >
               Add with Print
@@ -854,16 +925,17 @@ export default function WorkerCart() {
                 setShowPendingConfirm(false);
                 await processPayment(false, false); // Add without print
               }}
-              className="w-full py-3 rounded-lg font-medium bg-gray-200 hover:bg-gray-300 text-gray-800 text-base shadow transition-colors duration-200"
+              className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
               disabled={isProcessing}
             >
               Add without Print
             </button>
           </div>
         }
-        showCancel={false}
         confirmText={null}
         cancelText={null}
+        type="warning"
+        isLoading={isProcessing}
       />
 
       {/* Clear Cart Confirmation Dialog */}

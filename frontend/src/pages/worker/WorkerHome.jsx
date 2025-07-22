@@ -25,6 +25,30 @@ export default function WorkerHome() {
   const headerRef = useRef(null);
   const menuSectionRef = useRef(null);
   const [showPrinterDialog, setShowPrinterDialog] = useState(false);
+  const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+
+  // Function to check printer connection
+  function checkPrinterConnection() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.isPrinterConnected === 'function') {
+      try {
+        const result = window.AndroidBridge.isPrinterConnected();
+        return result === true || result === "true";
+      } catch {
+        return false;
+      }
+    }
+    // On web, assume not connected by default for safety
+    return false;
+  }
+
+  // Check printer connection on mount and poll every 2s for real-time updates
+  useEffect(() => {
+    setIsPrinterConnected(checkPrinterConnection());
+    const interval = setInterval(() => {
+      setIsPrinterConnected(checkPrinterConnection());
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -215,9 +239,9 @@ export default function WorkerHome() {
       {/* Date Banner */}
       <div className="bg-white shadow-sm rounded-xl mx-4 mt-4 overflow-hidden">
         <div className="container mx-auto">
-          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-blue-50">
+          <div className="flex items-center justify-between gap-1 px-3 py-2 bg-blue-50">
             {/* Left group: Refresh + Date */}
-            <div className="flex items-center gap-2 min-[380px]:gap-3">
+            <div className="flex items-center gap-1 min-[380px]:gap-1">
               {/* Refresh Button */}
               <button
                 onClick={fetchStats}
@@ -246,7 +270,7 @@ export default function WorkerHome() {
               </span>
             </div>
             {/* Right group: Printer, Settings, Orders */}
-            <div className="flex items-center gap-2 min-[380px]:gap-3">
+            <div className="flex items-center gap-1 min-[380px]:gap-2">
               {/* Printer Button */}
               <button
                 onClick={() => {
@@ -256,9 +280,14 @@ export default function WorkerHome() {
                     setShowPrinterDialog(true);
                   }
                 }}
-                className="w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full bg-green-100 flex items-center justify-center shadow-sm transition-all duration-200 hover:bg-green-200"
+                className="w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ml-2"
                 title="Printer Settings"
-                style={{ minWidth: 40, minHeight: 40 }}
+                style={{
+                  minWidth: 40,
+                  minHeight: 40,
+                  backgroundColor: isPrinterConnected ? '#e6fff2' : '#ffd6d6',
+                  border: isPrinterConnected ? '1.5px solid #b2f2d7' : '1.5px solid #ff8a8a',
+                }}
               >
                 <img src="/images/printer.png" alt="Printer Settings" className="w-8 h-8 min-[380px]:w-9 min-[380px]:h-9 object-contain" width={36} height={36} />
               </button>

@@ -304,12 +304,12 @@ export default function Cart() {
             const kotData = {
               orderNumber: data.order.orderNumber,
               createdAt: getISTISOString(data.order.createdAt),
-              kotNumber: isFirstKOT ? 1 : (data.order.kotNumber || 1), // Always set root kotNumber for Android
+              kotNumber: isFirstKOT ? 1 : (data.order.kotNumber || 1),
               items: (data.order.items || []).map(item => ({
                 name: item.name,
                 type: item.type,
                 quantity: item.quantity,
-                kotNumber: isFirstKOT ? 1 : item.kotNumber // Set kotNumber: 1 for first KOT print
+                kotNumber: isFirstKOT ? 1 : item.kotNumber
               }))
             };
             // If this is a pending order with KOT, add KOT: 1
