@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { api } from '../../utils/api';
+import BackButton from '../../components/BackButton';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
@@ -67,8 +68,9 @@ function Calendar() {
   }, [selectedDate]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-orange-50 flex flex-col items-center px-2 py-4 sm:px-0">
-      <div className="w-full max-w-lg mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-orange-50 flex flex-col items-center px-2 pt-8 sm:px-0">
+      <BackButton />
+      <div className="w-full max-w-lg mx-auto mt-2">
         <div className="bg-white rounded-xl shadow-lg p-4 sm:p-8 mb-4">
           <h1 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-2 text-center">Sales Calendar</h1>
           <p className="text-gray-600 text-base sm:text-lg mb-4 text-center">View daily sales totals and top-selling items.</p>
@@ -106,12 +108,12 @@ function Calendar() {
               ) : selectedDay ? (
                 <div className="bg-gradient-to-r from-orange-50 to-blue-50 rounded-xl p-4 shadow-md mb-2">
                   <h2 className="text-xl font-bold text-orange-700 mb-2 text-center">{formatDate(selectedDay.date)}</h2>
-                  <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-4">
-                    <div className="flex flex-col items-center">
+                  <div className="flex flex-row justify-center items-center gap-6 mb-4 flex-wrap">
+                    <div className="flex flex-col items-center min-w-[120px]">
                       <span className="text-2xl sm:text-3xl font-bold text-green-700">₹{selectedDay.totalAmount?.toLocaleString('en-IN') ?? 0}</span>
                       <span className="text-sm text-gray-500">Total Sales</span>
                     </div>
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center min-w-[100px]">
                       <span className="text-2xl sm:text-3xl font-bold text-blue-700">{selectedDay.totalOrders ?? 0}</span>
                       <span className="text-sm text-gray-500">Orders</span>
                     </div>
@@ -143,7 +145,7 @@ function Calendar() {
           {/* Monthly sales summary cards in a separate container */}
         </div>
         {months.length > 0 && (
-          <div className="w-full max-w-lg mx-auto bg-white rounded-xl shadow-lg p-4 sm:p-8 mt-6">
+          <div className="w-full max-w-lg mx-auto bg-white rounded-xl shadow-lg p-4 sm:p-8 mt-6 mb-8">
             <h3 className="text-lg font-semibold text-blue-700 mb-4 text-center">Monthly Sales</h3>
             <div className="flex flex-col gap-3">
               {months.map(month => (

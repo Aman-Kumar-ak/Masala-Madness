@@ -28,7 +28,7 @@ router.get('/sales-summary/dates', async (req, res) => {
 });
 
 // @route   GET /api/orders/sales-summary
-// Get sales summary for a specific date (YYYY-MM-DD)
+// Get sales summary for a specific date (YYYY-MM-DD), only PAID orders
 router.get('/sales-summary', async (req, res) => {
   try {
     const { date } = req.query;
@@ -36,9 +36,11 @@ router.get('/sales-summary', async (req, res) => {
       return res.status(400).json({ error: 'Date query param required.' });
     }
     const { startOfDay, endOfDay } = getDateRange(date);
+    // Only include paid orders
     const orders = await Order.find({
       createdAt: { $gte: startOfDay, $lte: endOfDay },
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      isPaid: true
     }).lean();
     let totalAmount = 0;
     let totalOrders = 0;
