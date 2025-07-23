@@ -1,3 +1,9 @@
+
+const express = require("express");
+const SalesCalendar = require("../models/SalesCalendar");
+const Order = require("../models/Order");
+const router = express.Router();
+
 // @route   GET /api/orders/monthly-summary
 // Get monthly sales totals and order counts from SalesCalendar
 router.get('/monthly-summary', async (req, res) => {
@@ -23,14 +29,6 @@ router.get('/monthly-summary', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch monthly summary.' });
   }
 });
-const express = require("express");
-const SalesCalendar = require("../models/SalesCalendar");
-
-// @route   GET /api/orders/sales-summary
-// Get daily sales totals and top-selling items for calendar view (from SalesCalendar)
-const router = express.Router();
-
-const Order = require("../models/Order");
 
 router.get('/sales-summary', async (req, res) => {
   try {
