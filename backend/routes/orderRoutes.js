@@ -9,47 +9,76 @@ const SIGNED_URL_SECRET = process.env.SIGNED_URL_SECRET || 'supersecretkey';
 
 const router = express.Router();
 
+// @route   GET /api/orders/sales-summary/dates
+// Get all available sales dates (YYYY-MM-DD)
+router.get('/sales-summary/dates', async (req, res) => {
+  try {
+    const orders = await Order.find({ deleted: { $ne: true } }).select('createdAt').lean();
+    const datesSet = new Set();
+    orders.forEach(order => {
+      const date = new Date(order.createdAt).toISOString().slice(0, 10);
+      datesSet.add(date);
+    });
+    // Sort dates descending (most recent first)
+    const dates = Array.from(datesSet).sort((a, b) => b.localeCompare(a));
+    res.json(dates);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch sales dates.' });
+  }
+});
+
 // @route   GET /api/orders/sales-summary
-// Get daily sales totals and top-selling items for calendar view
+// Get sales summary for a specific date (YYYY-MM-DD)
 router.get('/sales-summary', async (req, res) => {
   try {
-    // Fetch all non-deleted orders
+    const { date } = req.query;
+    if (!date) {
+      return res.status(400).json({ error: 'Date query param required.' });
+    }
+    const { startOfDay, endOfDay } = getDateRange(date);
+    const orders = await Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      deleted: { $ne: true }
+    }).lean();
+    let totalAmount = 0;
+    let totalOrders = 0;
+    const items = {};
+    orders.forEach(order => {
+      totalAmount += order.totalAmount || 0;
+      totalOrders += 1;
+      (order.items || []).forEach(item => {
+        if (!items[item.name]) {
+          items[item.name] = { name: item.name, quantity: 0, total: 0 };
+        }
+        items[item.name].quantity += item.quantity || 0;
+        items[item.name].total += (item.quantity || 0) * (item.price || 0);
+      });
+    });
+    const topItems = Object.values(items).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
+    res.json({ date, totalAmount, totalOrders, topItems });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch sales summary for date.' });
+  }
+});
+
+// @route   GET /api/orders/monthly-summary
+// Get monthly sales summary (total sales and orders per month)
+router.get('/monthly-summary', async (req, res) => {
+  try {
     const orders = await Order.find({ deleted: { $ne: true } }).lean();
     const summary = {};
     orders.forEach(order => {
-      const date = new Date(order.createdAt).toISOString().slice(0, 10);
-      if (!summary[date]) {
-        summary[date] = {
-          date,
-          totalAmount: 0,
-          totalOrders: 0,
-          items: {}
-        };
+      const month = new Date(order.createdAt).toISOString().slice(0, 7); // YYYY-MM
+      if (!summary[month]) {
+        summary[month] = { month, totalAmount: 0, totalOrders: 0 };
       }
-      summary[date].totalAmount += order.totalAmount || 0;
-      summary[date].totalOrders += 1;
-      (order.items || []).forEach(item => {
-        if (!summary[date].items[item.name]) {
-          summary[date].items[item.name] = { name: item.name, quantity: 0, total: 0 };
-        }
-        summary[date].items[item.name].quantity += item.quantity || 0;
-        summary[date].items[item.name].total += (item.quantity || 0) * (item.price || 0);
-      });
+      summary[month].totalAmount += order.totalAmount || 0;
+      summary[month].totalOrders += 1;
     });
-    // Format for frontend
-    const result = Object.values(summary)
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .map(day => ({
-        date: day.date,
-        totalAmount: day.totalAmount,
-        totalOrders: day.totalOrders,
-        topItems: Object.values(day.items)
-          .sort((a, b) => b.quantity - a.quantity)
-          .slice(0, 5)
-      }));
+    const result = Object.values(summary).sort((a, b) => b.month.localeCompare(a.month));
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate sales summary.' });
+    res.status(500).json({ error: 'Failed to fetch monthly summary.' });
   }
 });
 
