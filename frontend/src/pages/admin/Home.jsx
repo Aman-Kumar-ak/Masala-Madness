@@ -375,9 +375,13 @@ export default function Home() {
                   />
                 </svg>
               </button>
-              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-2xl shadow-sm">
+              <Link
+                to="/calendar"
+                className="w-12 h-12 rounded-full bg-orange-100 hover:bg-orange-200 flex items-center justify-center text-2xl shadow-sm transition-colors duration-200"
+                title="Calendar View"
+              >
                 <OptimizedImage src="/images/calendar.png" alt="Calendar" className="w-8 h-8" width={32} height={32} />
-              </div>
+              </Link>
               <div>
                 <p className="text-lg font-semibold text-gray-800">
                   {getCurrentDate()}

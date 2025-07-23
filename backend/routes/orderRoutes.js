@@ -1,3 +1,46 @@
+// @route   GET /api/orders/sales-summary
+// Get daily sales totals and top-selling items for calendar view
+router.get('/sales-summary', async (req, res) => {
+  try {
+    // Fetch all non-deleted orders
+    const orders = await Order.find({ deleted: { $ne: true } }).lean();
+    const summary = {};
+    orders.forEach(order => {
+      const date = new Date(order.createdAt).toISOString().slice(0, 10);
+      if (!summary[date]) {
+        summary[date] = {
+          date,
+          totalAmount: 0,
+          totalOrders: 0,
+          items: {}
+        };
+      }
+      summary[date].totalAmount += order.totalAmount || 0;
+      summary[date].totalOrders += 1;
+      (order.items || []).forEach(item => {
+        if (!summary[date].items[item.name]) {
+          summary[date].items[item.name] = { name: item.name, quantity: 0, total: 0 };
+        }
+        summary[date].items[item.name].quantity += item.quantity || 0;
+        summary[date].items[item.name].total += (item.quantity || 0) * (item.price || 0);
+      });
+    });
+    // Format for frontend
+    const result = Object.values(summary)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map(day => ({
+        date: day.date,
+        totalAmount: day.totalAmount,
+        totalOrders: day.totalOrders,
+        topItems: Object.values(day.items)
+          .sort((a, b) => b.quantity - a.quantity)
+          .slice(0, 5)
+      }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate sales summary.' });
+  }
+});
 const express = require("express");
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");

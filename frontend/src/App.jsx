@@ -1,17 +1,19 @@
 import React from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';  // Import Navigate for redirects
-import Home from './pages/admin/Home';  // Import your Home component
-import Cart from './pages/admin/Cart';  // Import Cart component (add other pages similarly)
-import Admin from './pages/admin/Admin';  // Import Admin page
-import Orders from './pages/admin/Orders';  // Import Orders page
-import PendingOrders from './pages/admin/PendingOrders';  // Import Pending Orders page
-import Qr from './pages/admin/Qr';  // Import QR page
+
+import Home from './pages/admin/Home';
+import Cart from './pages/admin/Cart';
+import Admin from './pages/admin/Admin';
+import Orders from './pages/admin/Orders';
+import PendingOrders from './pages/admin/PendingOrders';
+import Qr from './pages/admin/Qr';
 import Login from './pages/Login';
-import Settings from './pages/admin/Settings';  // Import Settings page
+import Settings from './pages/admin/Settings';
+import Calendar from './pages/admin/Calendar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './components/NotificationContext';
-import OfflineDetector from './components/OfflineDetector';  // Import the OfflineDetector component
+import OfflineDetector from './components/OfflineDetector';
 import WorkerHome from './pages/worker/WorkerHome';
 import WorkerCart from './pages/worker/WorkerCart';
 import WorkerSettings from './pages/worker/WorkerSettings';
@@ -90,6 +92,11 @@ const App = () => {
               <Route path="/settings" element={
                 <ProtectedRoute requiredRole="admin">
                   <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="/calendar" element={
+                <ProtectedRoute requiredRole="admin">
+                  <Calendar />
                 </ProtectedRoute>
               } />
               <Route path="/admin" element={
