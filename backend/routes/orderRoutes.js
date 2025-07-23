@@ -62,20 +62,28 @@ router.get('/sales-summary', async (req, res) => {
 });
 
 // @route   GET /api/orders/monthly-summary
-// Get monthly sales summary (total sales and orders per month)
+// Get monthly sales summary from SalesCalendar collection
 router.get('/monthly-summary', async (req, res) => {
   try {
-    const orders = await Order.find({ deleted: { $ne: true } }).lean();
-    const summary = {};
-    orders.forEach(order => {
-      const month = new Date(order.createdAt).toISOString().slice(0, 7); // YYYY-MM
-      if (!summary[month]) {
-        summary[month] = { month, totalAmount: 0, totalOrders: 0 };
+    const SalesCalendar = require('../models/SalesCalendar');
+    const months = await SalesCalendar.find({}).lean();
+    const result = months.map(monthDoc => {
+      let totalAmount = 0;
+      let totalOrders = 0;
+      if (monthDoc.days) {
+        for (const day of Object.values(monthDoc.days)) {
+          totalAmount += day.totalAmount || 0;
+          totalOrders += day.paidOrderCount || 0;
+        }
       }
-      summary[month].totalAmount += order.totalAmount || 0;
-      summary[month].totalOrders += 1;
+      return {
+        month: monthDoc.month,
+        totalAmount,
+        totalOrders
+      };
     });
-    const result = Object.values(summary).sort((a, b) => b.month.localeCompare(a.month));
+    // Sort with latest/ongoing month on top
+    result.sort((a, b) => b.month.localeCompare(a.month));
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch monthly summary.' });
