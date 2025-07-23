@@ -41,16 +41,6 @@ router.get('/sales-summary', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate sales summary.' });
   }
 });
-const express = require("express");
-const ExcelJS = require("exceljs");
-const { v4: uuidv4 } = require("uuid");
-const Order = require("../models/Order");
-const DeletedOrder = require("../models/DeletedOrder");
-const { adminAuth } = require('../middleware/authMiddleware');
-const crypto = require('crypto');
-const SIGNED_URL_SECRET = process.env.SIGNED_URL_SECRET || 'supersecretkey';
-
-const router = express.Router();
 
 // Cache orders for 30 seconds5
 const ordersCache = new Map();
