@@ -33,6 +33,30 @@ export default function Calendar() {
     fetchSales();
   }, []);
 
+
+  // Group sales by month (YYYY-MM)
+  const monthMap = {};
+  salesData.forEach(day => {
+    const monthKey = day.date.slice(0, 7); // 'YYYY-MM'
+    if (!monthMap[monthKey]) {
+      monthMap[monthKey] = { 
+        monthKey, 
+        totalAmount: 0, 
+        totalOrders: 0 
+      };
+    }
+    monthMap[monthKey].totalAmount += day.totalAmount;
+    monthMap[monthKey].totalOrders += day.totalOrders;
+  });
+  // Convert to array and sort latest month first
+  const months = Object.values(monthMap).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+
+  // Helper to format month name
+  function formatMonth(monthKey) {
+    const d = new Date(monthKey + '-01');
+    return d.toLocaleString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  }
+
   const selectedDay = salesData.find(d => d.date === selectedDate);
 
   return (
@@ -87,7 +111,7 @@ export default function Calendar() {
                             <span className="font-medium text-gray-800 flex-1 truncate">
                               {idx + 1}. {item.name}
                             </span>
-                            <span className="text-orange-600 font-bold text-base">{item.quantity} sold</span>
+                            <span className="text-orange-600 font-bold text-base">{item.quantity} sold - </span>
                             <span className="text-green-700 font-semibold text-base ml-2">₹{item.total.toLocaleString('en-IN')}</span>
                           </li>
                         ))}
@@ -102,7 +126,25 @@ export default function Calendar() {
               )}
             </>
           )}
+          {/* Monthly sales summary cards in a separate container */}
         </div>
+        {months.length > 0 && (
+          <div className="w-full max-w-lg mx-auto bg-white rounded-xl shadow-lg p-4 sm:p-8 mt-6">
+            <h3 className="text-lg font-semibold text-blue-700 mb-4 text-center">Monthly Sales</h3>
+            <div className="flex flex-col gap-3">
+              {months.map(month => (
+                <div
+                  key={month.monthKey}
+                  className="flex flex-row items-center justify-between bg-blue-50 hover:bg-blue-100 transition rounded-lg px-5 py-4 border border-blue-100 shadow-sm w-full"
+                >
+                  <span className="text-base font-bold text-blue-700">{formatMonth(month.monthKey)}</span>
+                  <span className="text-green-700 font-semibold text-lg">₹{month.totalAmount.toLocaleString('en-IN')}</span>
+                  <span className="text-xs text-gray-500">{month.totalOrders} orders</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
