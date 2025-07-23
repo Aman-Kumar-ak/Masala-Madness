@@ -141,6 +141,29 @@ router.post("/confirm", async (req, res) => {
       });
       await order.save();
     }
+
+    // Update SalesCalendar for paid orders
+    if (order.isPaid) {
+      try {
+        const SalesCalendar = require('../models/SalesCalendar');
+        const orderDate = new Date(order.createdAt);
+        const monthKey = orderDate.toISOString().slice(0, 7); // "YYYY-MM"
+        const dayKey = orderDate.toISOString().slice(8, 10);  // "DD"
+        await SalesCalendar.findOneAndUpdate(
+          { month: monthKey },
+          {
+            $inc: {
+              [`days.${dayKey}.totalAmount`]: order.totalAmount,
+              [`days.${dayKey}.paidOrderCount`]: 1,
+            }
+          },
+          { upsert: true, new: true }
+        );
+      } catch (err) {
+        console.error('Failed to update SalesCalendar:', err);
+      }
+    }
+
     // Clear relevant cache entries
     const todayKey = now.toISOString().split('T')[0];
     ordersCache.delete(todayKey);

@@ -6,6 +6,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const dishRoutes = require('./routes/dishRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const salesCalendarRoutes = require('./routes/salesCalendarRoutes');
 const discountRoutes = require('./routes/discountRoutes');
 const upiRoutes = require('./routes/upiRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -66,6 +67,7 @@ app.use(express.json());
 // Routes
 app.use('/api/dishes', dishRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/orders', salesCalendarRoutes);
 app.use('/api/discounts', discountRoutes);
 app.use('/api/upi', upiRoutes);
 app.use('/api/auth', authRoutes);

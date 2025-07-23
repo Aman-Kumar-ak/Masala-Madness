@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from "react";
 import { api } from '../../utils/api';
 
@@ -7,8 +8,14 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 }
 
+function formatMonth(monthKey) {
+  const d = new Date(monthKey + '-01');
+  return d.toLocaleString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+}
+
 export default function Calendar() {
   const [salesData, setSalesData] = useState([]);
+  const [months, setMonths] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,12 +25,15 @@ export default function Calendar() {
       setLoading(true);
       setError(null);
       try {
-        // Fetch sales summary for all available dates
+        // Fetch daily sales summary
         const data = await api.get('/orders/sales-summary');
         setSalesData(data || []);
         if (data && data.length > 0) {
           setSelectedDate(data[0].date); // Default to most recent date
         }
+        // Fetch monthly summary
+        const monthly = await api.get('/orders/monthly-summary');
+        setMonths(monthly || []);
       } catch (err) {
         setError('Failed to fetch sales data.');
       } finally {
@@ -32,30 +42,6 @@ export default function Calendar() {
     }
     fetchSales();
   }, []);
-
-
-  // Group sales by month (YYYY-MM)
-  const monthMap = {};
-  salesData.forEach(day => {
-    const monthKey = day.date.slice(0, 7); // 'YYYY-MM'
-    if (!monthMap[monthKey]) {
-      monthMap[monthKey] = { 
-        monthKey, 
-        totalAmount: 0, 
-        totalOrders: 0 
-      };
-    }
-    monthMap[monthKey].totalAmount += day.totalAmount;
-    monthMap[monthKey].totalOrders += day.totalOrders;
-  });
-  // Convert to array and sort latest month first
-  const months = Object.values(monthMap).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-
-  // Helper to format month name
-  function formatMonth(monthKey) {
-    const d = new Date(monthKey + '-01');
-    return d.toLocaleString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
-  }
 
   const selectedDay = salesData.find(d => d.date === selectedDate);
 
@@ -134,10 +120,10 @@ export default function Calendar() {
             <div className="flex flex-col gap-3">
               {months.map(month => (
                 <div
-                  key={month.monthKey}
+                  key={month.month}
                   className="flex flex-row items-center justify-between bg-blue-50 hover:bg-blue-100 transition rounded-lg px-5 py-4 border border-blue-100 shadow-sm w-full"
                 >
-                  <span className="text-base font-bold text-blue-700">{formatMonth(month.monthKey)}</span>
+                  <span className="text-base font-bold text-blue-700">{formatMonth(month.month)}</span>
                   <span className="text-green-700 font-semibold text-lg">₹{month.totalAmount.toLocaleString('en-IN')}</span>
                   <span className="text-xs text-gray-500">{month.totalOrders} orders</span>
                 </div>
