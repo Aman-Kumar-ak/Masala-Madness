@@ -1,3 +1,24 @@
+
+// @route   DELETE /api/orders/all
+// Delete all orders and all sales calendar data
+router.delete('/all', require('../middleware/authMiddleware').authenticateToken, async (req, res) => {
+  try {
+    // Only allow admin
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Only admin can delete all data.' });
+    }
+    const Order = require('../models/Order');
+    const DeletedOrder = require('../models/DeletedOrder');
+    const SalesCalendar = require('../models/SalesCalendar');
+    await Order.deleteMany({});
+    await DeletedOrder.deleteMany({});
+    await SalesCalendar.deleteMany({});
+    res.status(200).json({ message: 'All sales and orders data deleted.' });
+  } catch (err) {
+    console.error('Delete all sales/orders error:', err);
+    res.status(500).json({ message: 'Failed to delete all sales and orders.' });
+  }
+});
 const express = require("express");
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
