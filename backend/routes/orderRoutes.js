@@ -526,6 +526,10 @@ router.delete('/:orderId', require('../middleware/authMiddleware').authenticateT
     });
     // Remove from Order collection
     await Order.deleteOne({ orderId });
+
+    // Decrease amount from SalesCalendar if paid order
+    const { decreaseSalesCalendarAmount } = require('../utils/salesCalendarUtils');
+    await decreaseSalesCalendarAmount(order.createdAt, order.totalAmount, order.isPaid);
     // Resequence orderNumbers for non-deleted orders on the same day with higher orderNumber
     const nonDeletedOrders = await Order.find({
       createdAt: { $gte: startOfDay, $lte: endOfDay },
