@@ -226,7 +226,7 @@ function Calendar() {
                   <div className="text-red-500 text-center py-8">{dayError}</div>
                 ) : selectedDay ? (
                   <div className="bg-gradient-to-r from-orange-50 to-blue-50 rounded-xl p-4 shadow-md mb-2">
-                    <h2 className="text-xl font-bold text-orange-700 mb-2 text-center">{formatDate(selectedDay.date)}</h2>
+                    <h2 className="text-xl sm:text-xl font-bold text-orange-700 mb-2 text-center break-words whitespace-normal" style={{ fontSize: '1.1rem', wordBreak: 'break-word' }}>{formatDate(selectedDay.date)}</h2>
                     <div className="flex flex-row justify-center items-center gap-6 mb-4 flex-wrap">
                       <div className="flex flex-col items-center min-w-[120px]">
                         <span className="text-2xl sm:text-3xl font-bold text-green-700">₹{selectedDay.totalAmount?.toLocaleString('en-IN') ?? 0}</span>
@@ -258,7 +258,7 @@ function Calendar() {
                   </div>
                 ) : (
                   <div className="bg-gradient-to-r from-orange-50 to-blue-50 rounded-xl p-4 shadow-md mb-2">
-                    <h2 className="text-xl font-bold text-orange-700 mb-2 text-center">{selectedDate ? formatDate(selectedDate) : formatDate(new Date())}</h2>
+                    <h2 className="text-xl sm:text-xl font-bold text-orange-700 mb-2 text-center break-words whitespace-normal" style={{ fontSize: '1.1rem', wordBreak: 'break-word' }}>{selectedDate ? formatDate(selectedDate) : formatDate(new Date())}</h2>
                     <div className="flex flex-row justify-center items-center gap-6 mb-4 flex-wrap">
                       <div className="flex flex-col items-center min-w-[120px]">
                         <span className="text-2xl sm:text-3xl font-bold text-green-700">₹0</span>
