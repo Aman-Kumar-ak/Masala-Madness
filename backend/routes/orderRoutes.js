@@ -1,4 +1,13 @@
 
+const express = require("express");
+const ExcelJS = require("exceljs");
+const { v4: uuidv4 } = require("uuid");
+const Order = require("../models/Order");
+const DeletedOrder = require("../models/DeletedOrder");
+const { adminAuth } = require('../middleware/authMiddleware');
+const crypto = require('crypto');
+const SIGNED_URL_SECRET = process.env.SIGNED_URL_SECRET || 'supersecretkey';
+
 // @route   DELETE /api/orders/all
 // Delete all orders and all sales calendar data
 router.delete('/all', require('../middleware/authMiddleware').authenticateToken, async (req, res) => {
@@ -19,14 +28,6 @@ router.delete('/all', require('../middleware/authMiddleware').authenticateToken,
     res.status(500).json({ message: 'Failed to delete all sales and orders.' });
   }
 });
-const express = require("express");
-const ExcelJS = require("exceljs");
-const { v4: uuidv4 } = require("uuid");
-const Order = require("../models/Order");
-const DeletedOrder = require("../models/DeletedOrder");
-const { adminAuth } = require('../middleware/authMiddleware');
-const crypto = require('crypto');
-const SIGNED_URL_SECRET = process.env.SIGNED_URL_SECRET || 'supersecretkey';
 
 const router = express.Router();
 
