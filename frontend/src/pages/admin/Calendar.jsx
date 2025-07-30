@@ -93,10 +93,12 @@ function Calendar() {
 
   // Handler for deleting all sales and orders
   const [notification, setNotification] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   async function handleDeleteAll() {
     setShowDeleteDialog(false);
+    setDeleteLoading(true);
     try {
-      await api.delete('/orders/all'); // You need to implement this backend route
+      await api.delete('/orders/all');
       // Clear caches and refetch everything after delete
       const today = new Date();
       const yyyy = today.getFullYear();
@@ -110,9 +112,13 @@ function Calendar() {
       setDayCache({});
       setMonthsCache(null);
       setLoading(true);
-      // Optionally show a success message
-      setTimeout(() => window.location.reload(), 1000);
+      setNotification({ message: 'All sales and orders deleted successfully.', type: 'success' });
+      setTimeout(() => {
+        setDeleteLoading(false);
+        window.location.reload();
+      }, 1200);
     } catch (err) {
+      setDeleteLoading(false);
       setNotification({ message: 'Failed to delete all sales and orders.', type: 'error' });
     }
   }
@@ -133,7 +139,19 @@ function Calendar() {
           <div className="bg-white rounded-xl shadow-lg p-4 sm:p-8 mb-4">
             <h1 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-2 text-center">Sales Calendar</h1>
             <p className="text-gray-600 text-base sm:text-lg mb-4 text-center">View daily sales totals and top-selling items.</p>
-            {loading ? (
+            {deleteLoading ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="flex justify-center items-center">
+                  <DotLottieReact
+                    src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+                    loop
+                    autoplay
+                    style={{ width: 220, height: 220 }}
+                  />
+                </div>
+                <span className="text-gray-500 mt-2">Deleting all sales and orders...</span>
+              </div>
+            ) : loading ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <div className="flex justify-center items-center">
                   <DotLottieReact
@@ -150,75 +168,74 @@ function Calendar() {
             ) : (
               <>
                 {/* Date selector */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          {/* Previous date button */}
-          <button
-            type="button"
-            className="rounded-full bg-orange-100 hover:bg-orange-300 text-orange-700 px-3 py-2 shadow transition disabled:opacity-50"
-            disabled={!selectedDate || availableDates.indexOf(selectedDate) === availableDates.length - 1}
-            onClick={() => {
-              const idx = availableDates.indexOf(selectedDate);
-              if (idx < availableDates.length - 1) setSelectedDate(availableDates[idx + 1]);
-            }}
-            aria-label="Previous date"
-          >
-            &#60;
-          </button>
-          <input
-            type="date"
-            className="border rounded-lg px-6 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-300 bg-orange-50 text-center appearance-none"
-            value={selectedDate || ''}
-            min={availableDates.length > 0 ? availableDates[availableDates.length - 1] : ''}
-            max={availableDates.length > 0 ? availableDates[0] : ''}
-            onChange={e => setSelectedDate(e.target.value)}
-            pattern="\d{4}-\d{2}-\d{2}"
-            inputMode="numeric"
-            style={{ fontSize: '1.1rem', minWidth: '160px', maxWidth: '220px', paddingLeft: '18px', paddingRight: '18px' }}
-          />
-          {/* Next date button */}
-          <button
-            type="button"
-            className="rounded-full bg-orange-100 hover:bg-orange-300 text-orange-700 px-3 py-2 shadow transition disabled:opacity-50"
-            disabled={!selectedDate || availableDates.indexOf(selectedDate) === 0}
-            onClick={() => {
-              const idx = availableDates.indexOf(selectedDate);
-              if (idx > 0) setSelectedDate(availableDates[idx - 1]);
-            }}
-            aria-label="Next date"
-          >
-            &#62;
-          </button>
-        </div>
-        {/* Today and Delete buttons */}
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <button
-            type="button"
-            className="bg-blue-100 hover:bg-blue-300 text-blue-700 font-semibold px-4 py-2 rounded-lg shadow transition"
-            onClick={() => {
-              if (availableDates.length > 0) setSelectedDate(availableDates[0]);
-            }}
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            className="bg-red-100 hover:bg-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg shadow transition"
-            onClick={() => setShowDeleteDialog(true)}
-          >
-            Delete
-          </button>
-        </div>
-        <ConfirmationDialog
-          isOpen={showDeleteDialog}
-          onClose={() => setShowDeleteDialog(false)}
-          onConfirm={handleDeleteAll}
-          title="Delete All Sales & Orders?"
-          message="Are you sure you want to delete all sales and orders data? This action cannot be undone."
-          confirmText="Delete All"
-          cancelText="Cancel"
-          type="danger"
-        />
-
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  {/* Previous date button */}
+                  <button
+                    type="button"
+                    className="rounded-full bg-orange-100 hover:bg-orange-300 text-orange-700 px-3 py-2 shadow transition disabled:opacity-50"
+                    disabled={!selectedDate || availableDates.indexOf(selectedDate) === availableDates.length - 1}
+                    onClick={() => {
+                      const idx = availableDates.indexOf(selectedDate);
+                      if (idx < availableDates.length - 1) setSelectedDate(availableDates[idx + 1]);
+                    }}
+                    aria-label="Previous date"
+                  >
+                    &#60;
+                  </button>
+                  <input
+                    type="date"
+                    className="border rounded-lg px-6 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-300 bg-orange-50 text-center appearance-none"
+                    value={selectedDate || ''}
+                    min={availableDates.length > 0 ? availableDates[availableDates.length - 1] : ''}
+                    max={availableDates.length > 0 ? availableDates[0] : ''}
+                    onChange={e => setSelectedDate(e.target.value)}
+                    pattern="\d{4}-\d{2}-\d{2}"
+                    inputMode="numeric"
+                    style={{ fontSize: '1.1rem', minWidth: '160px', maxWidth: '220px', paddingLeft: '18px', paddingRight: '18px' }}
+                  />
+                  {/* Next date button */}
+                  <button
+                    type="button"
+                    className="rounded-full bg-orange-100 hover:bg-orange-300 text-orange-700 px-3 py-2 shadow transition disabled:opacity-50"
+                    disabled={!selectedDate || availableDates.indexOf(selectedDate) === 0}
+                    onClick={() => {
+                      const idx = availableDates.indexOf(selectedDate);
+                      if (idx > 0) setSelectedDate(availableDates[idx - 1]);
+                    }}
+                    aria-label="Next date"
+                  >
+                    &#62;
+                  </button>
+                </div>
+                {/* Today and Delete buttons */}
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <button
+                    type="button"
+                    className="bg-blue-100 hover:bg-blue-300 text-blue-700 font-semibold px-4 py-2 rounded-lg shadow transition"
+                    onClick={() => {
+                      if (availableDates.length > 0) setSelectedDate(availableDates[0]);
+                    }}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    className="bg-red-100 hover:bg-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg shadow transition"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    Delete
+                  </button>
+                </div>
+                <ConfirmationDialog
+                  isOpen={showDeleteDialog}
+                  onClose={() => setShowDeleteDialog(false)}
+                  onConfirm={handleDeleteAll}
+                  title="Delete All Sales & Orders?"
+                  message="Are you sure you want to delete all sales and orders data? This action cannot be undone."
+                  confirmText="Delete All"
+                  cancelText="Cancel"
+                  type="danger"
+                />
                 {/* Selected day summary */}
                 {dayLoading ? (
                   <div className="flex flex-col items-center justify-center py-8">
