@@ -55,7 +55,13 @@ function Calendar() {
       setDayLoading(true);
       setDayError(null);
       try {
-        const day = await api.get(`/orders/sales-summary?date=${selectedDate}`);
+        // Always send date in YYYY-MM-DD format
+        const dateObj = new Date(selectedDate);
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const formattedDate = `${yyyy}-${mm}-${dd}`;
+        const day = await api.get(`/orders/sales-summary?date=${formattedDate}`);
         setSelectedDay(day || null);
       } catch (err) {
         setDayError('Failed to fetch sales for selected date.');
@@ -84,18 +90,42 @@ function Calendar() {
           ) : (
             <>
               {/* Date selector */}
-              <div className="flex flex-wrap gap-2 justify-center mb-4">
-                {availableDates.map(date => (
-                  <button
-                    key={date}
-                    onClick={() => setSelectedDate(date)}
-                    className={`px-3 py-1 rounded-full font-medium text-sm transition-colors duration-200 border-2 focus:outline-none focus:ring-2 focus:ring-orange-300
-                      ${selectedDate === date ? 'bg-orange-500 text-white border-orange-500' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-orange-100 hover:border-orange-300'}`}
-                  >
-                    {formatDate(date)}
-                  </button>
-                ))}
-              </div>
+      <div className="flex items-center justify-center gap-2 mb-4">
+        {/* Previous date button */}
+        <button
+          type="button"
+          className="rounded-full bg-orange-100 hover:bg-orange-300 text-orange-700 px-3 py-2 shadow transition disabled:opacity-50"
+          disabled={!selectedDate || availableDates.indexOf(selectedDate) === availableDates.length - 1}
+          onClick={() => {
+            const idx = availableDates.indexOf(selectedDate);
+            if (idx < availableDates.length - 1) setSelectedDate(availableDates[idx + 1]);
+          }}
+          aria-label="Previous date"
+        >
+          &#60;
+        </button>
+        <input
+          type="date"
+          className="border rounded-lg px-8 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-300 bg-orange-50"
+          value={selectedDate || ''}
+          min={availableDates.length > 0 ? availableDates[availableDates.length - 1] : ''}
+          max={availableDates.length > 0 ? availableDates[0] : ''}
+          onChange={e => setSelectedDate(e.target.value)}
+        />
+        {/* Next date button */}
+        <button
+          type="button"
+          className="rounded-full bg-orange-100 hover:bg-orange-300 text-orange-700 px-3 py-2 shadow transition disabled:opacity-50"
+          disabled={!selectedDate || availableDates.indexOf(selectedDate) === 0}
+          onClick={() => {
+            const idx = availableDates.indexOf(selectedDate);
+            if (idx > 0) setSelectedDate(availableDates[idx - 1]);
+          }}
+          aria-label="Next date"
+        >
+          &#62;
+        </button>
+      </div>
 
               {/* Selected day summary */}
               {dayLoading ? (
