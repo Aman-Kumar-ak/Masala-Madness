@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import BackButton from '../../components/BackButton';
@@ -97,7 +98,12 @@ function Calendar() {
     try {
       await api.delete('/orders/all'); // You need to implement this backend route
       // Clear caches and refetch everything after delete
-      setSelectedDate(null);
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      setSelectedDate(todayStr);
       setSelectedDay(null);
       setMonths([]);
       setAvailableDates([]);
@@ -129,8 +135,15 @@ function Calendar() {
             <p className="text-gray-600 text-base sm:text-lg mb-4 text-center">View daily sales totals and top-selling items.</p>
             {loading ? (
               <div className="flex flex-col items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-500 mb-4"></div>
-                <span className="text-gray-500">Loading sales data...</span>
+                <div className="flex justify-center items-center">
+                  <DotLottieReact
+                    src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+                    loop
+                    autoplay
+                    style={{ width: 220, height: 220 }}
+                  />
+                </div>
+                <span className="text-gray-500 mt-2">Loading sales data...</span>
               </div>
             ) : error ? (
               <div className="text-red-500 text-center py-8">{error}</div>
@@ -244,7 +257,23 @@ function Calendar() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-gray-400 text-center py-8">No data for selected date.</div>
+                  <div className="bg-gradient-to-r from-orange-50 to-blue-50 rounded-xl p-4 shadow-md mb-2">
+                    <h2 className="text-xl font-bold text-orange-700 mb-2 text-center">{selectedDate ? formatDate(selectedDate) : formatDate(new Date())}</h2>
+                    <div className="flex flex-row justify-center items-center gap-6 mb-4 flex-wrap">
+                      <div className="flex flex-col items-center min-w-[120px]">
+                        <span className="text-2xl sm:text-3xl font-bold text-green-700">₹0</span>
+                        <span className="text-sm text-gray-500">Total Sales</span>
+                      </div>
+                      <div className="flex flex-col items-center min-w-[100px]">
+                        <span className="text-2xl sm:text-3xl font-bold text-blue-700">0</span>
+                        <span className="text-sm text-gray-500">Orders</span>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <h3 className="text-lg font-semibold text-orange-600 mb-2 text-center">Top-Selling Items</h3>
+                      <div className="text-gray-400 text-center py-4">No items sold on this day.</div>
+                    </div>
+                  </div>
                 )}
               </>
             )}
