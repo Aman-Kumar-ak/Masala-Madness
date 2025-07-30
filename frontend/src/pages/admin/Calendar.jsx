@@ -166,11 +166,14 @@ function Calendar() {
           </button>
           <input
             type="date"
-            className="border rounded-lg px-8 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-300 bg-orange-50"
+            className="border rounded-lg px-6 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-300 bg-orange-50 text-center appearance-none"
             value={selectedDate || ''}
             min={availableDates.length > 0 ? availableDates[availableDates.length - 1] : ''}
             max={availableDates.length > 0 ? availableDates[0] : ''}
             onChange={e => setSelectedDate(e.target.value)}
+            pattern="\d{4}-\d{2}-\d{2}"
+            inputMode="numeric"
+            style={{ fontSize: '1.1rem', minWidth: '160px', maxWidth: '220px', paddingLeft: '18px', paddingRight: '18px' }}
           />
           {/* Next date button */}
           <button
