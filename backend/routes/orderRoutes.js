@@ -1,5 +1,5 @@
-
 const express = require("express");
+const router = express.Router();
 const ExcelJS = require("exceljs");
 const { v4: uuidv4 } = require("uuid");
 const Order = require("../models/Order");
@@ -28,8 +28,6 @@ router.delete('/all', require('../middleware/authMiddleware').authenticateToken,
     res.status(500).json({ message: 'Failed to delete all sales and orders.' });
   }
 });
-
-const router = express.Router();
 
 // ...existing code...
 // @route   GET /api/orders/sales-summary/dates
