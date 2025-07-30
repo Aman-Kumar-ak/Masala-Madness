@@ -30,6 +30,7 @@ const SIGNED_URL_SECRET = process.env.SIGNED_URL_SECRET || 'supersecretkey';
 
 const router = express.Router();
 
+// ...existing code...
 // @route   GET /api/orders/sales-summary/dates
 // Get all available sales dates (YYYY-MM-DD)
 router.get('/sales-summary/dates', async (req, res) => {
