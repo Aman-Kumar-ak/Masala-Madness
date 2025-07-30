@@ -18,6 +18,8 @@ function Calendar() {
   const [months, setMonths] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null); // Data for selected date
+  const [dayCache, setDayCache] = useState({}); // Cache for daily summaries
+  const [monthsCache, setMonthsCache] = useState(null); // Cache for monthly summary
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dayLoading, setDayLoading] = useState(false);
@@ -30,6 +32,13 @@ function Calendar() {
       setLoading(true);
       setError(null);
       try {
+        // Check cache first
+        if (monthsCache && availableDates.length > 0) {
+          setMonths(monthsCache);
+          setSelectedDate(availableDates[0]);
+          setLoading(false);
+          return;
+        }
         // Fetch available sales dates
         const data = await api.get('/orders/sales-summary/dates');
         setAvailableDates(data || []);
@@ -39,6 +48,7 @@ function Calendar() {
         // Fetch monthly summary
         const monthly = await api.get('/orders/monthly-summary');
         setMonths(monthly || []);
+        setMonthsCache(monthly || []);
       } catch (err) {
         setError('Failed to fetch sales data.');
       } finally {
@@ -61,8 +71,15 @@ function Calendar() {
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const dd = String(dateObj.getDate()).padStart(2, '0');
         const formattedDate = `${yyyy}-${mm}-${dd}`;
+        // Check cache first
+        if (dayCache[formattedDate]) {
+          setSelectedDay(dayCache[formattedDate]);
+          setDayLoading(false);
+          return;
+        }
         const day = await api.get(`/orders/sales-summary?date=${formattedDate}`);
         setSelectedDay(day || null);
+        setDayCache(prev => ({ ...prev, [formattedDate]: day || null }));
       } catch (err) {
         setDayError('Failed to fetch sales for selected date.');
         setSelectedDay(null);
@@ -79,11 +96,13 @@ function Calendar() {
     setShowDeleteDialog(false);
     try {
       await api.delete('/orders/all'); // You need to implement this backend route
-      // Refetch everything after delete
+      // Clear caches and refetch everything after delete
       setSelectedDate(null);
       setSelectedDay(null);
       setMonths([]);
       setAvailableDates([]);
+      setDayCache({});
+      setMonthsCache(null);
       setLoading(true);
       // Optionally show a success message
       setTimeout(() => window.location.reload(), 1000);
