@@ -23,6 +23,7 @@ const OrderSchema = new mongoose.Schema({
   subtotal: { type: Number, required: true }, // Original amount before discount
   discountAmount: { type: Number, default: 0 },
   discountPercentage: { type: Number, default: 0 },
+  manualDiscount: { type: Number, default: 0 }, // Manual discount amount
   totalAmount: { type: Number, required: true }, // Final amount after discount
   paymentMethod: { type: String, required: true }, // Cash or Online
   isPaid: { type: Boolean, required: true },

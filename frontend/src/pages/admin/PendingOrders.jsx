@@ -76,6 +76,58 @@ export default function PendingOrders() {
       const allOrders = await api.get('/orders');
       const pending = (allOrders || []).filter(order => order.isPaid === false);
       setPendingOrders(pending);
+      
+      // Initialize manual discounts from database and fix incorrect subtotals
+      const manualDiscountsFromDB = {};
+      const fixedOrders = [];
+      
+      pending.forEach(order => {
+        if (order.manualDiscount && order.manualDiscount > 0) {
+          manualDiscountsFromDB[order.orderId] = order.manualDiscount;
+        }
+        
+        // Check and fix incorrect subtotals
+        const calculatedSubtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        if (Math.abs(calculatedSubtotal - order.subtotal) > 0.01) {
+          console.warn(`Fixing subtotal for order ${order.orderId}: ${order.subtotal} -> ${calculatedSubtotal}`);
+          const fixedOrder = {
+            ...order,
+            subtotal: calculatedSubtotal,
+            totalAmount: calculatedSubtotal - order.discountAmount
+          };
+          fixedOrders.push(fixedOrder);
+        }
+      });
+      
+      setManualDiscounts(prev => ({ ...prev, ...manualDiscountsFromDB }));
+      
+      // Update orders with fixed subtotals
+      if (fixedOrders.length > 0) {
+        setPendingOrders(prevOrders => 
+          prevOrders.map(order => {
+            const fixedOrder = fixedOrders.find(fo => fo.orderId === order.orderId);
+            return fixedOrder || order;
+          })
+        );
+        
+        // Persist fixed subtotals to database
+        fixedOrders.forEach(async (fixedOrder) => {
+          try {
+            await api.post('/orders/confirm', {
+              orderId: fixedOrder.orderId,
+              items: fixedOrder.items,
+              isPaid: false,
+              subtotal: fixedOrder.subtotal,
+              discountAmount: fixedOrder.discountAmount,
+              discountPercentage: fixedOrder.discountPercentage,
+              totalAmount: fixedOrder.totalAmount,
+              confirmedBy: user?.name || user?.username || user?.mobileNumber
+            });
+          } catch (error) {
+            console.error(`Failed to persist fixed subtotal for order ${fixedOrder.orderId}:`, error);
+          }
+        });
+      }
     } catch (error) {
       console.error('Error fetching pending orders:', error);
       setNotification({ 
@@ -223,14 +275,30 @@ export default function PendingOrders() {
   // Helper to get manual discount for an order
   const getManualDiscount = (orderId) => manualDiscounts[orderId] || 0;
 
+  // Helper to validate and fix subtotal calculation
+  const validateAndFixSubtotal = (order) => {
+    const calculatedSubtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    if (Math.abs(calculatedSubtotal - order.subtotal) > 0.01) {
+      console.warn(`Subtotal mismatch for order ${order.orderId}: stored=${order.subtotal}, calculated=${calculatedSubtotal}`);
+      return {
+        ...order,
+        subtotal: calculatedSubtotal,
+        totalAmount: calculatedSubtotal - order.discountAmount
+      };
+    }
+    return order;
+  };
+
   // Helper to calculate total discount for an order
   const calculateOrderDiscount = (order) => {
+    // First validate and fix subtotal if needed
+    const validatedOrder = validateAndFixSubtotal(order);
     let percentageDiscount = 0;
-    if (activeDiscount && order.subtotal >= activeDiscount.minOrderAmount) {
-      percentageDiscount = Math.round((order.subtotal * activeDiscount.percentage) / 100);
+    if (activeDiscount && validatedOrder.subtotal >= activeDiscount.minOrderAmount) {
+      percentageDiscount = Math.round((validatedOrder.subtotal * activeDiscount.percentage) / 100);
     }
-    const maxManual = Math.max(0, order.subtotal - percentageDiscount);
-    const manual = Math.min(getManualDiscount(order.orderId), maxManual);
+    const maxManual = Math.max(0, validatedOrder.subtotal - percentageDiscount);
+    const manual = Math.min(getManualDiscount(validatedOrder.orderId), maxManual);
     return { percentageDiscount, manualDiscount: manual, totalDiscount: percentageDiscount + manual };
   };
 
@@ -311,17 +379,28 @@ export default function PendingOrders() {
     try {
       const order = pendingOrders.find(order => order.orderId === orderId);
       if (!order) return;
+      
       const updatedItems = [...order.items];
+      const newQuantity = updatedItems[itemIndex].quantity + delta;
+      
+      if (newQuantity <= 0) {
+        // If quantity becomes 0 or negative, remove the item
+        await handleRemoveItemOrOrder(order, updatedItems[itemIndex], itemIndex);
+        return;
+      }
+      
       updatedItems[itemIndex] = {
         ...updatedItems[itemIndex],
-        quantity: updatedItems[itemIndex].quantity + delta,
-        totalPrice: updatedItems[itemIndex].price * (updatedItems[itemIndex].quantity + delta),
+        quantity: newQuantity,
+        totalPrice: updatedItems[itemIndex].price * newQuantity,
       };
+      
       // Recalculate totals
       const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const discountPercentage = order.discountPercentage || 0;
       const discountAmount = Math.round(subtotal * discountPercentage / 100);
       const totalAmount = subtotal - discountAmount;
+      
       const updatePayload = {
         orderId,
         items: updatedItems,
@@ -331,6 +410,7 @@ export default function PendingOrders() {
         discountPercentage,
         totalAmount,
       };
+      
       const data = await api.post('/orders/confirm', { ...updatePayload, confirmedBy: user?.name || user?.username || user?.mobileNumber });
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
@@ -347,49 +427,117 @@ export default function PendingOrders() {
     }
   };
 
-  // Update handleSaveItems to preserve manual discount
-  const handleSaveItems = (updatedOrder) => {
-    const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(updatedOrder);
-    let totalAmount = updatedOrder.subtotal - totalDiscount;
-    updatedOrder = {
-      ...updatedOrder,
-      discountAmount: totalDiscount,
-      discountPercentage: percentageDiscount,
-      manualDiscount,
-      totalAmount
-    };
-    setPendingOrders(prevOrders => prevOrders.map(order => {
-      if (order.orderId === updatedOrder.orderId) {
-        return updatedOrder;
-      }
-      return order;
-    }));
-    setShowMenu(false);
-    triggerRefresh(); // Ensure pending orders list is refreshed after saving
+  // Update handleSaveItems to properly handle items added from menu modal
+  const handleSaveItems = async (updatedOrder) => {
+    try {
+      // Calculate the correct subtotal from the updated items
+      const subtotal = updatedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      
+      // Calculate discounts
+      const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount({
+        ...updatedOrder,
+        subtotal
+      });
+      
+      const totalAmount = subtotal - totalDiscount;
+      
+      // Update the order with correct calculations
+      const finalUpdatedOrder = {
+        ...updatedOrder,
+        subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        manualDiscount,
+        totalAmount
+      };
+      
+      // Update in database
+      const updatePayload = {
+        orderId: updatedOrder.orderId,
+        items: updatedOrder.items,
+        isPaid: false,
+        subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        totalAmount
+      };
+      
+      const data = await api.post('/orders/confirm', { 
+        ...updatePayload, 
+        confirmedBy: user?.name || user?.username || user?.mobileNumber 
+      });
+      
+      // Update local state with the response from server
+      setPendingOrders(prevOrders => prevOrders.map(order => {
+        if (order.orderId === updatedOrder.orderId) {
+          return data.order || finalUpdatedOrder;
+        }
+        return order;
+      }));
+      
+      setShowMenu(false);
+      setNotification({ 
+        message: 'Items added successfully!', 
+        type: 'success' 
+      });
+      
+      // Trigger refresh to ensure UI is in sync
+      triggerRefresh();
+    } catch (error) {
+      console.error('Error saving items:', error);
+      setNotification({
+        message: 'Failed to save items. Please try again.',
+        type: 'error'
+      });
+    }
   };
 
   const handleRemoveManualDiscount = async (orderId) => {
-    // Directly update the local state for manualDiscounts
-    setManualDiscounts(prev => ({ ...prev, [orderId]: 0 }));
+    try {
+      // Find the order
+      const order = pendingOrders.find(o => o.orderId === orderId);
+      if (!order) return;
+      
+      // Update local state for manualDiscounts
+      setManualDiscounts(prev => ({ ...prev, [orderId]: 0 }));
 
-    // Also update the pendingOrders state to reflect the change in totalAmount and discountAmount
-    setPendingOrders(prevOrders =>
-        prevOrders.map(order => {
-            if (order.orderId === orderId) {
-                // Temporarily create an order object with 0 manual discount to recalculate
-                const tempOrder = { ...order, manualDiscount: 0 };
-                const { percentageDiscount, manualDiscount: updatedManualDiscount, totalDiscount } = calculateOrderDiscount(tempOrder);
-                return {
-                    ...order,
-                    manualDiscount: 0, // Explicitly set to 0
-                    totalAmount: order.subtotal - totalDiscount,
-                    discountAmount: totalDiscount,
-                };
-            }
-            return order;
-        })
-    );
-    setNotification({ message: "Manual discount removed successfully", type: "success" });
+      // Calculate new totals with 0 manual discount
+      const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount({
+        ...order,
+        manualDiscount: 0
+      });
+      
+      const totalAmount = order.subtotal - totalDiscount;
+      
+      // Update in database
+      const updatePayload = {
+        orderId: orderId,
+        items: order.items,
+        isPaid: false,
+        subtotal: order.subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        totalAmount
+      };
+      
+      const data = await api.post('/orders/confirm', { 
+        ...updatePayload, 
+        confirmedBy: user?.name || user?.username || user?.mobileNumber 
+      });
+      
+      // Update local state with server response
+      setPendingOrders(prevOrders =>
+        prevOrders.map(o => o.orderId === orderId ? data.order : o)
+      );
+      
+      setNotification({ message: "Manual discount removed successfully", type: "success" });
+    } catch (error) {
+      console.error('Error removing manual discount:', error);
+      setNotification({
+        message: 'Failed to remove manual discount. Please try again.',
+        type: 'error'
+      });
+    }
   };
 
   const handleRemoveItemOrOrder = async (order, item, index) => {
@@ -431,7 +579,10 @@ export default function PendingOrders() {
           }
         } catch (error) {
           console.error('Error removing item/order:', error);
-          alert('Failed to remove item/order');
+          setNotification({
+            message: 'Failed to remove item/order. Please try again.',
+            type: 'error'
+          });
         } finally {
           setConfirmDialog(null);
         }
@@ -533,7 +684,7 @@ export default function PendingOrders() {
     }
   };
 
-  const handleManualDiscountChange = (order, val) => {
+  const handleManualDiscountChange = async (order, val) => {
     const { percentageDiscount } = calculateOrderDiscount(order);
     const maxManual = Math.max(0, order.subtotal - percentageDiscount);
     if (val > maxManual) {
@@ -543,7 +694,42 @@ export default function PendingOrders() {
       });
       return;
     }
+    
+    // Update local state
     setManualDiscounts(prev => ({ ...prev, [order.orderId]: val }));
+    
+    // Calculate new totals
+    const totalDiscount = percentageDiscount + val;
+    const totalAmount = order.subtotal - totalDiscount;
+    
+    // Update in database
+    try {
+      const updatePayload = {
+        orderId: order.orderId,
+        items: order.items,
+        isPaid: false,
+        subtotal: order.subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        totalAmount
+      };
+      
+      const data = await api.post('/orders/confirm', { 
+        ...updatePayload, 
+        confirmedBy: user?.name || user?.username || user?.mobileNumber 
+      });
+      
+      // Update local state with server response
+      setPendingOrders(prevOrders =>
+        prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
+      );
+    } catch (error) {
+      console.error('Error updating manual discount:', error);
+      setNotification({
+        message: 'Failed to update manual discount. Please try again.',
+        type: 'error'
+      });
+    }
   };
 
   const handlePaymentMethodSelect = (method, order) => {
@@ -654,9 +840,10 @@ export default function PendingOrders() {
               ) : (
                 <div className="space-y-6">
                   {pendingOrders.map(order => {
-                    const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(order);
-                    const maxManual = Math.max(0, order.subtotal - percentageDiscount);
-                    const totalAmount = order.subtotal - totalDiscount;
+                    const validatedOrder = validateAndFixSubtotal(order);
+                    const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(validatedOrder);
+                    const maxManual = Math.max(0, validatedOrder.subtotal - percentageDiscount);
+                    const totalAmount = validatedOrder.subtotal - totalDiscount;
                     return (
                       <div key={order.orderId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
                         {/* Header Section */}
@@ -700,9 +887,9 @@ export default function PendingOrders() {
                           <div className="mb-4 bg-gray-50 p-4 rounded-lg">
                             <div className="flex justify-between mb-2">
                               <span className="text-gray-700 font-medium">Subtotal:</span>
-                              <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
+                              <span className="font-semibold">₹{validatedOrder.subtotal.toFixed(2)}</span>
                             </div>
-                            {activeDiscount && order.subtotal >= activeDiscount.minOrderAmount && (
+                            {activeDiscount && validatedOrder.subtotal >= activeDiscount.minOrderAmount && (
                               <div className="flex justify-between text-green-600 mb-2">
                                 <span className="font-medium flex items-center gap-1">
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -719,10 +906,10 @@ export default function PendingOrders() {
                               <div className="flex items-center gap-2">
                                 <input
                                   type="number"
-                                  value={getManualDiscount(order.orderId) || ''}
+                                  value={getManualDiscount(validatedOrder.orderId) || ''}
                                   onChange={e => {
                                     const val = Math.max(0, parseFloat(e.target.value) || 0);
-                                    handleManualDiscountChange(order, val);
+                                    handleManualDiscountChange(validatedOrder, val);
                                   }}
                                   className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
                                   placeholder="0.00"
@@ -730,9 +917,9 @@ export default function PendingOrders() {
                                   max={maxManual}
                                   step="any"
                                 />
-                                {getManualDiscount(order.orderId) > 0 && (
+                                {getManualDiscount(validatedOrder.orderId) > 0 && (
                                   <button
-                                    onClick={() => handleRemoveManualDiscount(order.orderId)}
+                                    onClick={() => handleRemoveManualDiscount(validatedOrder.orderId)}
                                     className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
                                     aria-label="Remove manual discount"
                                   >
@@ -756,7 +943,7 @@ export default function PendingOrders() {
                           {/* Items List */}
                           <h3 className="font-medium text-gray-700 mb-3">Order Items</h3>
                           <ul className="space-y-2 mb-4">
-                            {order.items.map((item, index) => (
+                            {validatedOrder.items.map((item, index) => (
                               <li key={index} className="bg-gray-50 rounded-lg p-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-2">
                                 <div className="flex flex-col min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -779,7 +966,7 @@ export default function PendingOrders() {
                                   )}
                                   <div className="flex items-center gap-1 sm:gap-2">
                                     <button
-                                      onClick={() => handleQuantityChange(order.orderId, index, -1)}
+                                      onClick={() => handleQuantityChange(validatedOrder.orderId, index, -1)}
                                       disabled={item.quantity === 1}
                                       className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
                                         item.quantity === 1
@@ -794,14 +981,14 @@ export default function PendingOrders() {
                                       {item.quantity}
                                     </div>
                                     <button
-                                      onClick={() => handleQuantityChange(order.orderId, index, 1)}
+                                      onClick={() => handleQuantityChange(validatedOrder.orderId, index, 1)}
                                       className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 bg-white text-orange-600 hover:bg-orange-50 border border-orange-200`}
                                       aria-label={`Increase quantity of ${item.name}`}
                                     >
                                       <span style={{fontSize:'1.5rem',lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',width:'100%',height:'100%'}}>+</span>
                                     </button>
                                     <button
-                                      onClick={() => handleRemoveItemOrOrder(order, item, index)}
+                                      onClick={() => handleRemoveItemOrOrder(validatedOrder, item, index)}
                                       className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200 p-0"
                                       aria-label={`Remove ${item.name}`}
                                     >
@@ -818,7 +1005,7 @@ export default function PendingOrders() {
                             <button
                               onClick={() => { 
                                 setShowMenu(true); 
-                                setCurrentOrderId(order.orderId); 
+                                setCurrentOrderId(validatedOrder.orderId); 
                               }}
                               className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
                             >
@@ -830,17 +1017,17 @@ export default function PendingOrders() {
                             
                           <button
                             onClick={() => {
-                              setPaymentOptionOrderId(order.orderId); // Open payment options dialog
-                              setCurrentOrderForQr(order); // Ensure current order is set for dialogs
+                              setPaymentOptionOrderId(validatedOrder.orderId); // Open payment options dialog
+                              setCurrentOrderForQr(validatedOrder); // Ensure current order is set for dialogs
                             }}
                             className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2 ${
-                          paymentConfirmedOrderId === order.orderId
+                          paymentConfirmedOrderId === validatedOrder.orderId
                                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : paymentOptionOrderId === order.orderId
+                          : paymentOptionOrderId === validatedOrder.orderId
                                 ? 'bg-gray-700 text-white'
                                 : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
                         }`}
-                        disabled={paymentConfirmedOrderId === order.orderId}
+                        disabled={paymentConfirmedOrderId === validatedOrder.orderId}
                       >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

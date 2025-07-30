@@ -153,8 +153,13 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
       }))
     ];
 
-    // Recalculate totals
-    const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // Recalculate totals - ensure all items have correct totalPrice
+    const updatedItemsWithCorrectTotals = updatedItems.map(item => ({
+      ...item,
+      totalPrice: item.price * item.quantity
+    }));
+    
+    const subtotal = updatedItemsWithCorrectTotals.reduce((sum, item) => sum + item.totalPrice, 0);
     // Use discountPercentage and discountAmount from props if available
     const discountPercentage = typeof propsDiscountPercentage === 'number' ? propsDiscountPercentage : 0;
     const discountAmount = Math.round(subtotal * discountPercentage / 100);
@@ -163,7 +168,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
     try {
       const data = await api.post(`/orders/confirm`, {
         orderId,
-        items: updatedItems,
+        items: updatedItemsWithCorrectTotals,
         append: false, // We are sending the full array now
         isPaid: false,
         subtotal,

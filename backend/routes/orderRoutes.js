@@ -141,10 +141,19 @@ router.post("/confirm", async (req, res) => {
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
+      
+      // Validate subtotal if items are provided
+      if (items && items.length > 0) {
+        const calculatedSubtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        if (Math.abs(calculatedSubtotal - subtotal) > 0.01) {
+          console.warn(`Subtotal mismatch for order ${orderId}: provided=${subtotal}, calculated=${calculatedSubtotal}`);
+          // Use the calculated subtotal instead of the provided one
+          subtotal = calculatedSubtotal;
+        }
+      }
       // Update fields
       order.items = items || order.items;
       order.subtotal = subtotal !== undefined ? subtotal : order.subtotal;
-      order.totalAmount = totalAmount !== undefined ? totalAmount : order.totalAmount;
       order.discountAmount = discountAmount !== undefined ? discountAmount : order.discountAmount;
       order.discountPercentage = discountPercentage !== undefined ? discountPercentage : order.discountPercentage;
       order.manualDiscount = manualDiscount !== undefined ? manualDiscount : order.manualDiscount;
@@ -152,6 +161,14 @@ router.post("/confirm", async (req, res) => {
       order.isPaid = isPaid !== undefined ? isPaid : order.isPaid;
       order.customCashAmount = customCashAmount !== undefined ? customCashAmount : order.customCashAmount;
       order.customOnlineAmount = customOnlineAmount !== undefined ? customOnlineAmount : order.customOnlineAmount;
+      
+      // Recalculate total amount to ensure consistency
+      order.totalAmount = order.subtotal - order.discountAmount;
+      
+      // Debug logging
+      console.log(`Updating order ${order.orderId}: subtotal=${order.subtotal}, discountAmount=${order.discountAmount}, totalAmount=${order.totalAmount}`);
+      console.log('Items:', order.items.map(item => `${item.name}: ${item.price} × ${item.quantity} = ${item.price * item.quantity}`));
+      
       if (confirmedBy) order.confirmedBy = confirmedBy;
       order.updatedAt = now;
       await order.save();
@@ -180,6 +197,14 @@ router.post("/confirm", async (req, res) => {
         kotPrintCount = 1;
         processedItems = processedItems.map(item => ({ ...item, kotNumber: 1 }));
       }
+      // Validate subtotal for new orders
+      const calculatedSubtotal = processedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      if (Math.abs(calculatedSubtotal - (subtotal || totalAmount)) > 0.01) {
+        console.warn(`Subtotal mismatch for new order: provided=${subtotal || totalAmount}, calculated=${calculatedSubtotal}`);
+        subtotal = calculatedSubtotal;
+        totalAmount = calculatedSubtotal - (discountAmount || 0);
+      }
+      
       order = new Order({
         orderId: uuidv4(),
         orderNumber,
@@ -625,6 +650,11 @@ router.post('/:orderId/add-items', async (req, res) => {
     }
     // Add new items to the order
     order.items.push(...newItems);
+    
+    // Recalculate totals
+    order.subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    order.totalAmount = order.subtotal - order.discountAmount;
+    
     order.updatedAt = new Date();
     let kotNumber = null;
     if (printKOT) {
