@@ -16,6 +16,19 @@ export default function WorkerPendingOrders() {
   const navigate = useNavigate();
   const [pendingOrders, setPendingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Debounce function to prevent rapid updates
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
   const [showMenu, setShowMenu] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState(null);
   const [availableItems, setAvailableItems] = useState([]);
@@ -53,6 +66,7 @@ export default function WorkerPendingOrders() {
   const [manualDiscounts, setManualDiscounts] = useState({});
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [updatingOrders, setUpdatingOrders] = useState(new Set()); // Track which orders are being updated
 
   const { user } = useContext(AuthContext);
 
@@ -77,6 +91,58 @@ export default function WorkerPendingOrders() {
       const allOrders = await api.get('/orders');
       const pending = (allOrders || []).filter(order => order.isPaid === false);
       setPendingOrders(pending);
+      
+      // Initialize manual discounts from database and fix incorrect subtotals
+      const manualDiscountsFromDB = {};
+      const fixedOrders = [];
+      
+      pending.forEach(order => {
+        if (order.manualDiscount && order.manualDiscount > 0) {
+          manualDiscountsFromDB[order.orderId] = order.manualDiscount;
+        }
+        
+        // Check and fix incorrect subtotals
+        const calculatedSubtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        if (Math.abs(calculatedSubtotal - order.subtotal) > 0.01) {
+          console.warn(`Fixing subtotal for order ${order.orderId}: ${order.subtotal} -> ${calculatedSubtotal}`);
+          const fixedOrder = {
+            ...order,
+            subtotal: calculatedSubtotal,
+            totalAmount: calculatedSubtotal - order.discountAmount
+          };
+          fixedOrders.push(fixedOrder);
+        }
+      });
+      
+      setManualDiscounts(prev => ({ ...prev, ...manualDiscountsFromDB }));
+      
+      // Update orders with fixed subtotals
+      if (fixedOrders.length > 0) {
+        setPendingOrders(prevOrders => 
+          prevOrders.map(order => {
+            const fixedOrder = fixedOrders.find(fo => fo.orderId === order.orderId);
+            return fixedOrder || order;
+          })
+        );
+        
+        // Persist fixed subtotals to database (don't wait for completion)
+        fixedOrders.forEach(async (fixedOrder) => {
+          try {
+            await api.post('/orders/confirm', {
+              orderId: fixedOrder.orderId,
+              items: fixedOrder.items,
+              isPaid: false,
+              subtotal: fixedOrder.subtotal,
+              discountAmount: fixedOrder.discountAmount,
+              discountPercentage: fixedOrder.discountPercentage,
+              totalAmount: fixedOrder.totalAmount,
+              confirmedBy: user?.name || user?.username || user?.mobileNumber
+            });
+          } catch (error) {
+            console.error(`Failed to persist fixed subtotal for order ${fixedOrder.orderId}:`, error);
+          }
+        });
+      }
     } catch (error) {
       console.error('Error fetching pending orders:', error);
       setNotification({ 
@@ -89,6 +155,14 @@ export default function WorkerPendingOrders() {
     }
   }, [restoreScrollPosition]);
 
+  // Debounced update function to prevent rapid state updates
+  const debouncedSetPendingOrders = useCallback(
+    debounce((updater) => {
+      setPendingOrders(updater);
+    }, 100),
+    []
+  );
+
   // Listen for socket events
   useEffect(() => {
     if (socket) {
@@ -98,6 +172,17 @@ export default function WorkerPendingOrders() {
         if (data.type === 'order-confirmed') {
           // Remove the order from pending orders if it was just confirmed
           setPendingOrders(prev => prev.filter(order => order.orderId !== data.pendingOrderId));
+        } else if (data.type === 'order-updated' && data.order) {
+          // Update specific order without full refresh
+          debouncedSetPendingOrders(prev => prev.map(order => 
+            order.orderId === data.order.orderId ? data.order : order
+          ));
+        } else if (data.type === 'order-deleted') {
+          // Remove deleted order
+          debouncedSetPendingOrders(prev => prev.filter(order => order.orderId !== data.orderId));
+        } else if (data.type === 'new-order' && data.order && !data.order.isPaid) {
+          // Add new pending order without full refresh
+          addNewOrder(data.order);
         } else {
           // For other update types, save scroll position before refresh
           saveScrollPosition();
@@ -114,7 +199,7 @@ export default function WorkerPendingOrders() {
         socket.off('order-update', orderUpdateHandler);
       };
     }
-  }, [socket, fetchPendingOrders]);
+  }, [socket, fetchPendingOrders, debouncedSetPendingOrders]);
 
   // Effect for initial data fetching
   useEffect(() => {
@@ -156,9 +241,9 @@ export default function WorkerPendingOrders() {
     fetchAvailableItems();
     fetchActiveDiscount();
     fetchDefaultUpiAddress();
-  }, [refresh, fetchPendingOrders]);
+  }, [fetchPendingOrders]); // Removed refresh dependency to prevent unnecessary refreshes
 
-  // Periodic refresh for data sync - backup for socket issues
+  // Periodic refresh for data sync - backup for socket issues (reduced frequency)
   useEffect(() => {
     const interval = setInterval(() => {
       if (!connected && !document.hidden) { // Only refresh if socket not connected and tab is visible
@@ -166,7 +251,7 @@ export default function WorkerPendingOrders() {
         saveScrollPosition(); // Save position before refresh
         fetchPendingOrders();
       }
-    }, 10000); // Refresh every 10 seconds if socket not connected and tab is visible
+    }, 30000); // Refresh every 30 seconds instead of 10 seconds
 
     const handleVisibilityChange = () => {
       if (!document.hidden && !connected) {
@@ -224,14 +309,42 @@ export default function WorkerPendingOrders() {
   // Helper to get manual discount for an order
   const getManualDiscount = (orderId) => manualDiscounts[orderId] || 0;
 
+  // Helper to add new order to pending orders (for real-time updates)
+  const addNewOrder = (newOrder) => {
+    setPendingOrders(prev => {
+      // Check if order already exists
+      const exists = prev.some(order => order.orderId === newOrder.orderId);
+      if (!exists) {
+        return [newOrder, ...prev];
+      }
+      return prev;
+    });
+  };
+
+  // Helper to validate and fix subtotal calculation
+  const validateAndFixSubtotal = (order) => {
+    const calculatedSubtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    if (Math.abs(calculatedSubtotal - order.subtotal) > 0.01) {
+      console.warn(`Subtotal mismatch for order ${order.orderId}: stored=${order.subtotal}, calculated=${calculatedSubtotal}`);
+      return {
+        ...order,
+        subtotal: calculatedSubtotal,
+        totalAmount: calculatedSubtotal - order.discountAmount
+      };
+    }
+    return order;
+  };
+
   // Helper to calculate total discount for an order
   const calculateOrderDiscount = (order) => {
+    // First validate and fix subtotal if needed
+    const validatedOrder = validateAndFixSubtotal(order);
     let percentageDiscount = 0;
-    if (activeDiscount && order.subtotal >= activeDiscount.minOrderAmount) {
-      percentageDiscount = Math.round((order.subtotal * activeDiscount.percentage) / 100);
+    if (activeDiscount && validatedOrder.subtotal >= activeDiscount.minOrderAmount) {
+      percentageDiscount = Math.round((validatedOrder.subtotal * activeDiscount.percentage) / 100);
     }
-    const maxManual = Math.max(0, order.subtotal - percentageDiscount);
-    const manual = Math.min(getManualDiscount(order.orderId), maxManual);
+    const maxManual = Math.max(0, validatedOrder.subtotal - percentageDiscount);
+    const manual = Math.min(getManualDiscount(validatedOrder.orderId), maxManual);
     return { percentageDiscount, manualDiscount: manual, totalDiscount: percentageDiscount + manual };
   };
 
@@ -295,8 +408,7 @@ export default function WorkerPendingOrders() {
       // Optimistically remove the order immediately
       setPendingOrders(prev => prev.filter(order => order.orderId !== orderId));
       setNotification({ message: data.message, type: 'success' });
-      // Trigger refresh to ensure UI is in sync with backend
-      triggerRefresh();
+      // No need for triggerRefresh() - we're updating state directly
       
       // Delay navigation and notification removal to synchronize with splash screen
       setTimeout(() => {
@@ -326,6 +438,10 @@ export default function WorkerPendingOrders() {
 
   const handleQuantityChange = async (orderId, itemIndex, delta) => {
     saveScrollPosition();
+    
+    // Add to updating orders set
+    setUpdatingOrders(prev => new Set(prev).add(orderId));
+    
     try {
       // Find the order and update the item quantity
       const order = pendingOrders.find(order => order.orderId === orderId);
@@ -354,6 +470,7 @@ export default function WorkerPendingOrders() {
         totalAmount,
         confirmedBy: user?.name || user?.username || user?.mobileNumber,
       });
+      // Update local state immediately without waiting for socket
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
@@ -364,51 +481,126 @@ export default function WorkerPendingOrders() {
         message: "Failed to update quantity. Please try again.",
         type: "error"
       });
+    } finally {
+      // Remove from updating orders set
+      setUpdatingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
     }
   };
 
-  // Update handleSaveItems to preserve manual discount
-  const handleSaveItems = (updatedOrder) => {
-    const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(updatedOrder);
-    let totalAmount = updatedOrder.subtotal - totalDiscount;
-    updatedOrder = {
-      ...updatedOrder,
-      discountAmount: totalDiscount,
-      discountPercentage: percentageDiscount,
-      manualDiscount,
-      totalAmount
-    };
-    setPendingOrders(prevOrders => prevOrders.map(order => {
-      if (order.orderId === updatedOrder.orderId) {
-        return updatedOrder;
-      }
-      return order;
-    }));
-    setShowMenu(false);
+  // Update handleSaveItems to properly handle items added from menu modal
+  const handleSaveItems = async (updatedOrder) => {
+    try {
+      // Calculate the correct subtotal from the updated items
+      const subtotal = updatedOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      
+      // Calculate discounts
+      const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount({
+        ...updatedOrder,
+        subtotal
+      });
+      
+      const totalAmount = subtotal - totalDiscount;
+      
+      // Update the order with correct calculations
+      const finalUpdatedOrder = {
+        ...updatedOrder,
+        subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        manualDiscount,
+        totalAmount
+      };
+      
+      // Update in database
+      const updatePayload = {
+        orderId: updatedOrder.orderId,
+        items: updatedOrder.items,
+        isPaid: false,
+        subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        totalAmount
+      };
+      
+      const data = await api.post('/orders/confirm', { 
+        ...updatePayload, 
+        confirmedBy: user?.name || user?.username || user?.mobileNumber 
+      });
+      
+      // Update local state with the response from server - no full refresh needed
+      setPendingOrders(prevOrders => prevOrders.map(order => {
+        if (order.orderId === updatedOrder.orderId) {
+          return data.order || finalUpdatedOrder;
+        }
+        return order;
+      }));
+      
+      setShowMenu(false);
+      setNotification({ 
+        message: 'Items added successfully!', 
+        type: 'success' 
+      });
+      
+      // No need for triggerRefresh() - we're updating state directly
+    } catch (error) {
+      console.error('Error saving items:', error);
+      setNotification({
+        message: 'Failed to save items. Please try again.',
+        type: 'error'
+      });
+    }
   };
 
   const handleRemoveManualDiscount = async (orderId) => {
-    // Directly update the local state for manualDiscounts
-    setManualDiscounts(prev => ({ ...prev, [orderId]: 0 }));
+    try {
+      // Find the order
+      const order = pendingOrders.find(o => o.orderId === orderId);
+      if (!order) return;
+      
+      // Update local state for manualDiscounts
+      setManualDiscounts(prev => ({ ...prev, [orderId]: 0 }));
 
-    // Also update the pendingOrders state to reflect the change in totalAmount and discountAmount
-    setPendingOrders(prevOrders =>
-        prevOrders.map(order => {
-            if (order.orderId === orderId) {
-                // Temporarily create an order object with 0 manual discount to recalculate
-                const tempOrder = { ...order, manualDiscount: 0 };
-                const { percentageDiscount, manualDiscount: updatedManualDiscount, totalDiscount } = calculateOrderDiscount(tempOrder);
-                return {
-                    ...order,
-                    manualDiscount: 0, // Explicitly set to 0
-                    totalAmount: order.subtotal - totalDiscount,
-                    discountAmount: totalDiscount,
-                };
-            }
-            return order;
-        })
-    );
-    setNotification({ message: "Manual discount removed successfully", type: "success" });
+      // Calculate new totals with 0 manual discount
+      const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount({
+        ...order,
+        manualDiscount: 0
+      });
+      
+      const totalAmount = order.subtotal - totalDiscount;
+      
+      // Update in database
+      const updatePayload = {
+        orderId: orderId,
+        items: order.items,
+        isPaid: false,
+        subtotal: order.subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        totalAmount
+      };
+      
+      const data = await api.post('/orders/confirm', { 
+        ...updatePayload, 
+        confirmedBy: user?.name || user?.username || user?.mobileNumber 
+      });
+      
+      // Update local state immediately without waiting for socket
+      setPendingOrders(prevOrders =>
+        prevOrders.map(o => o.orderId === orderId ? data.order : o)
+      );
+      
+      setNotification({ message: "Manual discount removed successfully", type: "success" });
+    } catch (error) {
+      console.error('Error removing manual discount:', error);
+      setNotification({
+        message: 'Failed to remove manual discount. Please try again.',
+        type: 'error'
+      });
+    }
   };
 
   const handleRemoveItemOrOrder = async (order, item, index) => {
@@ -444,6 +636,7 @@ export default function WorkerPendingOrders() {
               totalAmount,
               confirmedBy: user?.name || user?.username || user?.mobileNumber,
             });
+            // Update local state immediately without waiting for socket
             setPendingOrders(prevOrders =>
               prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
             );
@@ -467,6 +660,8 @@ export default function WorkerPendingOrders() {
         setIsDeleting(true);
         try {
           await api.delete(`/orders/${order.orderId}`);
+          
+          // Update local state immediately without waiting for socket
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)
           );
@@ -551,7 +746,7 @@ export default function WorkerPendingOrders() {
     }
   };
 
-  const handleManualDiscountChange = (order, val) => {
+  const handleManualDiscountChange = async (order, val) => {
     const { percentageDiscount } = calculateOrderDiscount(order);
     const maxManual = Math.max(0, order.subtotal - percentageDiscount);
     if (val > maxManual) {
@@ -561,7 +756,42 @@ export default function WorkerPendingOrders() {
       });
       return;
     }
+    
+    // Update local state
     setManualDiscounts(prev => ({ ...prev, [order.orderId]: val }));
+    
+    // Calculate new totals
+    const totalDiscount = percentageDiscount + val;
+    const totalAmount = order.subtotal - totalDiscount;
+    
+    // Update in database
+    try {
+      const updatePayload = {
+        orderId: order.orderId,
+        items: order.items,
+        isPaid: false,
+        subtotal: order.subtotal,
+        discountAmount: totalDiscount,
+        discountPercentage: percentageDiscount,
+        totalAmount
+      };
+      
+      const data = await api.post('/orders/confirm', { 
+        ...updatePayload, 
+        confirmedBy: user?.name || user?.username || user?.mobileNumber 
+      });
+      
+      // Update local state immediately without waiting for socket
+      setPendingOrders(prevOrders =>
+        prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
+      );
+    } catch (error) {
+      console.error('Error updating manual discount:', error);
+      setNotification({
+        message: 'Failed to update manual discount. Please try again.',
+        type: 'error'
+      });
+    }
   };
 
   const handlePaymentMethodSelect = (method, order) => {
@@ -607,11 +837,12 @@ export default function WorkerPendingOrders() {
         
         {loading ? (
           <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200 flex flex-col items-center justify-center">
-            <div className="w-50 h-50 mx-auto flex items-center justify-center">
+            <div className="flex justify-center items-center py-12">
               <DotLottieReact
                 src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
                 loop
                 autoplay
+                style={{ width: 220, height: 220 }}
               />
             </div>
           </div>
@@ -646,22 +877,35 @@ export default function WorkerPendingOrders() {
             ) : (
               <div className="space-y-6">
                 {pendingOrders.map(order => {
-                  const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(order);
-                  const maxManual = Math.max(0, order.subtotal - percentageDiscount);
-                  const totalAmount = order.subtotal - totalDiscount;
+                  const validatedOrder = validateAndFixSubtotal(order);
+                  const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(validatedOrder);
+                  const maxManual = Math.max(0, validatedOrder.subtotal - percentageDiscount);
+                  const totalAmount = validatedOrder.subtotal - totalDiscount;
                   return (
-                    <div key={order.orderId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
+                    <div key={order.orderId} className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative ${
+                      updatingOrders.has(validatedOrder.orderId) ? 'opacity-75' : ''
+                    }`}>
+                      {updatingOrders.has(validatedOrder.orderId) && (
+                        <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-10">
+                          <DotLottieReact
+                            src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+                            loop
+                            autoplay
+                            style={{ width: 120, height: 120 }}
+                          />
+                        </div>
+                      )}
                       {/* Header Section */}
                       <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-4 border-b border-gray-200 flex justify-between items-start">
                         <div>
                           <h2 className="font-bold text-xl text-gray-800 flex items-center gap-2">
-                            <span>Order #{order.orderNumber ?? (pendingOrders.length - pendingOrders.indexOf(order))}</span>
+                            <span>Order #{validatedOrder.orderNumber ?? (pendingOrders.length - pendingOrders.indexOf(validatedOrder))}</span>
                           </h2>
                           <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            {new Date(order.createdAt).toLocaleString("en-IN", {
+                            {new Date(validatedOrder.createdAt).toLocaleString("en-IN", {
                               year: "numeric",
                               month: "short",
                               day: "numeric",
@@ -673,7 +917,7 @@ export default function WorkerPendingOrders() {
                         </div>
 
                         <button
-                          onClick={() => handleRemoveEntireOrder(order)}
+                          onClick={() => handleRemoveEntireOrder(validatedOrder)}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-colors duration-200 font-medium text-sm"
                           aria-label="Delete entire order"
                         >
@@ -689,9 +933,9 @@ export default function WorkerPendingOrders() {
                         <div className="mb-4 bg-gray-50 p-4 rounded-lg">
                           <div className="flex justify-between mb-2">
                             <span className="text-gray-700 font-medium">Subtotal:</span>
-                            <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
+                            <span className="font-semibold">₹{validatedOrder.subtotal.toFixed(2)}</span>
                           </div>
-                          {activeDiscount && order.subtotal >= activeDiscount.minOrderAmount && (
+                          {activeDiscount && validatedOrder.subtotal >= activeDiscount.minOrderAmount && (
                             <div className="flex justify-between text-green-600 mb-2">
                               <span className="font-medium flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -708,10 +952,10 @@ export default function WorkerPendingOrders() {
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                value={getManualDiscount(order.orderId) || ''}
+                                value={getManualDiscount(validatedOrder.orderId) || ''}
                                 onChange={e => {
                                   const val = Math.max(0, parseFloat(e.target.value) || 0);
-                                  handleManualDiscountChange(order, val);
+                                  handleManualDiscountChange(validatedOrder, val);
                                 }}
                                 className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
                                 placeholder="0.00"
@@ -719,9 +963,9 @@ export default function WorkerPendingOrders() {
                                 max={maxManual}
                                 step="any"
                               />
-                              {getManualDiscount(order.orderId) > 0 && (
+                                                              {getManualDiscount(validatedOrder.orderId) > 0 && (
                                 <button
-                                  onClick={() => handleRemoveManualDiscount(order.orderId)}
+                                                                      onClick={() => handleRemoveManualDiscount(validatedOrder.orderId)}
                                   className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
                                   aria-label="Remove manual discount"
                                 >
@@ -745,7 +989,7 @@ export default function WorkerPendingOrders() {
                         {/* Items List */}
                         <h3 className="font-medium text-gray-700 mb-3">Order Items</h3>
                         <ul className="space-y-2 mb-4">
-                          {order.items.map((item, index) => (
+                          {validatedOrder.items.map((item, index) => (
                             <li key={index} className="bg-gray-50 rounded-lg p-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-2">
                               <div className="flex flex-col min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -768,7 +1012,7 @@ export default function WorkerPendingOrders() {
                                 )}
                                 <div className="flex items-center gap-1 sm:gap-2">
                                   <button
-                                    onClick={() => handleQuantityChange(order.orderId, index, -1)}
+                                    onClick={() => handleQuantityChange(validatedOrder.orderId, index, -1)}
                                     disabled={item.quantity === 1}
                                     className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
                                       item.quantity === 1
@@ -785,7 +1029,7 @@ export default function WorkerPendingOrders() {
                                   </div>
                                   
                                   <button
-                                    onClick={() => handleQuantityChange(order.orderId, index, 1)}
+                                    onClick={() => handleQuantityChange(validatedOrder.orderId, index, 1)}
                                     className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-orange-600 border border-orange-200 flex items-center justify-center hover:bg-orange-50 transition-colors duration-200"
                                     aria-label={`Increase quantity of ${item.name}`}
                                   >
@@ -793,7 +1037,7 @@ export default function WorkerPendingOrders() {
                                   </button>
                                   
                                   <button
-                                    onClick={() => handleRemoveItemOrOrder(order, item, index)}
+                                    onClick={() => handleRemoveItemOrOrder(validatedOrder, item, index)}
                                     className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
                                     aria-label={`Remove ${item.name}`}
                                   >
@@ -810,8 +1054,9 @@ export default function WorkerPendingOrders() {
                           <button
                             onClick={() => { 
                               setShowMenu(true); 
-                              setCurrentOrderId(order.orderId); 
+                              setCurrentOrderId(validatedOrder.orderId); 
                             }}
+                            disabled={updatingOrders.has(validatedOrder.orderId)}
                             className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -822,22 +1067,22 @@ export default function WorkerPendingOrders() {
                           
                         <button
                           onClick={() => {
-                            setPaymentOptionOrderId(order.orderId); // Open payment options dialog
-                            setCurrentOrderForQr(order); // Ensure current order is set for dialogs
+                            setPaymentOptionOrderId(validatedOrder.orderId); // Open payment options dialog
+                            setCurrentOrderForQr(validatedOrder); // Ensure current order is set for dialogs
                           }}
                           className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2 ${
-                        paymentConfirmedOrderId === order.orderId
+                        paymentConfirmedOrderId === validatedOrder.orderId
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : paymentOptionOrderId === order.orderId
+                          : paymentOptionOrderId === validatedOrder.orderId
                               ? 'bg-gray-700 text-white'
                               : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
                       }`}
-                      disabled={paymentConfirmedOrderId === order.orderId}
+                      disabled={paymentConfirmedOrderId === validatedOrder.orderId || updatingOrders.has(validatedOrder.orderId)}
                     >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span>{paymentOptionOrderId === order.orderId ? 'Cancel' : 'Confirm'}</span>
+                          <span>{paymentOptionOrderId === validatedOrder.orderId ? 'Cancel' : 'Confirm'}</span>
                         </button>
                         </div>
 
@@ -1011,7 +1256,14 @@ export default function WorkerPendingOrders() {
 
       {showSplashScreen && (
         <div className="fixed inset-0 bg-white bg-opacity-80 backdrop-blur-sm z-[100] flex items-center justify-center flex-col pointer-events-auto">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+          <div className="flex justify-center items-center mb-4">
+            <DotLottieReact
+              src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+              loop
+              autoplay
+              style={{ width: 120, height: 120 }}
+            />
+          </div>
           <p className="text-gray-700 text-xl font-medium">Confirming Order Payment...</p>
         </div>
       )}

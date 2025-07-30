@@ -16,6 +16,19 @@ export default function PendingOrders() {
   const navigate = useNavigate();
   const [pendingOrders, setPendingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Debounce function to prevent rapid updates
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
   const [showMenu, setShowMenu] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState(null);
   const [availableItems, setAvailableItems] = useState([]);
@@ -52,6 +65,7 @@ export default function PendingOrders() {
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPrinterConnected, setIsPrinterConnected] = useState(true);
+  const [updatingOrders, setUpdatingOrders] = useState(new Set()); // Track which orders are being updated
 
   const { user } = useContext(AuthContext);
 
@@ -110,7 +124,7 @@ export default function PendingOrders() {
           })
         );
         
-        // Persist fixed subtotals to database
+        // Persist fixed subtotals to database (don't wait for completion)
         fixedOrders.forEach(async (fixedOrder) => {
           try {
             await api.post('/orders/confirm', {
@@ -140,6 +154,14 @@ export default function PendingOrders() {
     }
   }, [restoreScrollPosition]);
 
+  // Debounced update function to prevent rapid state updates
+  const debouncedSetPendingOrders = useCallback(
+    debounce((updater) => {
+      setPendingOrders(updater);
+    }, 100),
+    []
+  );
+
   // Listen for socket events
   useEffect(() => {
     if (socket) {
@@ -149,6 +171,17 @@ export default function PendingOrders() {
         if (data.type === 'order-confirmed') {
           // Remove the order from pending orders if it was just confirmed
           setPendingOrders(prev => prev.filter(order => order.orderId !== data.pendingOrderId));
+        } else if (data.type === 'order-updated' && data.order) {
+          // Update specific order without full refresh
+          debouncedSetPendingOrders(prev => prev.map(order => 
+            order.orderId === data.order.orderId ? data.order : order
+          ));
+        } else if (data.type === 'order-deleted') {
+          // Remove deleted order
+          debouncedSetPendingOrders(prev => prev.filter(order => order.orderId !== data.orderId));
+        } else if (data.type === 'new-order' && data.order && !data.order.isPaid) {
+          // Add new pending order without full refresh
+          addNewOrder(data.order);
         } else {
           // For other update types, save scroll position before refresh
           saveScrollPosition();
@@ -165,7 +198,7 @@ export default function PendingOrders() {
         socket.off('order-update', orderUpdateHandler);
       };
     }
-  }, [socket, fetchPendingOrders]);
+  }, [socket, fetchPendingOrders, debouncedSetPendingOrders]);
 
   // Effect for initial data fetching
   useEffect(() => {
@@ -207,9 +240,9 @@ export default function PendingOrders() {
     fetchAvailableItems();
     fetchActiveDiscount();
     fetchDefaultUpiAddress();
-  }, [refresh, fetchPendingOrders]);
+  }, [fetchPendingOrders]); // Removed refresh dependency to prevent unnecessary refreshes
 
-  // Periodic refresh for data sync - backup for socket issues
+  // Periodic refresh for data sync - backup for socket issues (reduced frequency)
   useEffect(() => {
     const interval = setInterval(() => {
       if (!connected && !document.hidden) { // Only refresh if socket not connected and tab is visible
@@ -217,7 +250,7 @@ export default function PendingOrders() {
         saveScrollPosition(); // Save position before refresh
         fetchPendingOrders();
       }
-    }, 10000); // Refresh every 10 seconds if socket not connected and tab is visible
+    }, 30000); // Refresh every 30 seconds instead of 10 seconds
 
     const handleVisibilityChange = () => {
       if (!document.hidden && !connected) {
@@ -274,6 +307,18 @@ export default function PendingOrders() {
 
   // Helper to get manual discount for an order
   const getManualDiscount = (orderId) => manualDiscounts[orderId] || 0;
+
+  // Helper to add new order to pending orders (for real-time updates)
+  const addNewOrder = (newOrder) => {
+    setPendingOrders(prev => {
+      // Check if order already exists
+      const exists = prev.some(order => order.orderId === newOrder.orderId);
+      if (!exists) {
+        return [newOrder, ...prev];
+      }
+      return prev;
+    });
+  };
 
   // Helper to validate and fix subtotal calculation
   const validateAndFixSubtotal = (order) => {
@@ -355,8 +400,7 @@ export default function PendingOrders() {
       // Optimistically remove the order immediately
       setPendingOrders(prev => prev.filter(order => order.orderId !== orderId));
       setNotification({ message: response.message, type: 'success' });
-      // Trigger refresh to ensure UI is in sync with backend
-      triggerRefresh();
+      // No need for triggerRefresh() - we're updating state directly
       if (newPendingOrders.length === 0) {
         setTimeout(() => navigate('/'), 1500);
       }
@@ -375,6 +419,9 @@ export default function PendingOrders() {
   const handleQuantityChange = async (orderId, itemIndex, delta) => {
     // Save scroll position before update
     saveScrollPosition();
+    
+    // Add to updating orders set
+    setUpdatingOrders(prev => new Set(prev).add(orderId));
     
     try {
       const order = pendingOrders.find(order => order.orderId === orderId);
@@ -412,6 +459,8 @@ export default function PendingOrders() {
       };
       
       const data = await api.post('/orders/confirm', { ...updatePayload, confirmedBy: user?.name || user?.username || user?.mobileNumber });
+      
+      // Update local state immediately without waiting for socket
       setPendingOrders(prevOrders =>
         prevOrders.map(order => order.orderId === orderId ? data.order : order)
       );
@@ -423,6 +472,13 @@ export default function PendingOrders() {
       setNotification({
         message: "Failed to update quantity. Please try again.",
         type: "error"
+      });
+    } finally {
+      // Remove from updating orders set
+      setUpdatingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
       });
     }
   };
@@ -467,7 +523,7 @@ export default function PendingOrders() {
         confirmedBy: user?.name || user?.username || user?.mobileNumber 
       });
       
-      // Update local state with the response from server
+      // Update local state with the response from server - no full refresh needed
       setPendingOrders(prevOrders => prevOrders.map(order => {
         if (order.orderId === updatedOrder.orderId) {
           return data.order || finalUpdatedOrder;
@@ -481,8 +537,7 @@ export default function PendingOrders() {
         type: 'success' 
       });
       
-      // Trigger refresh to ensure UI is in sync
-      triggerRefresh();
+      // No need for triggerRefresh() - we're updating state directly
     } catch (error) {
       console.error('Error saving items:', error);
       setNotification({
@@ -525,7 +580,7 @@ export default function PendingOrders() {
         confirmedBy: user?.name || user?.username || user?.mobileNumber 
       });
       
-      // Update local state with server response
+      // Update local state immediately without waiting for socket
       setPendingOrders(prevOrders =>
         prevOrders.map(o => o.orderId === orderId ? data.order : o)
       );
@@ -573,6 +628,8 @@ export default function PendingOrders() {
               totalAmount,
             };
             const data = await api.post('/orders/confirm', { ...updatePayload, confirmedBy: user?.name || user?.username || user?.mobileNumber });
+            
+            // Update local state immediately without waiting for socket
             setPendingOrders(prevOrders =>
               prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
             );
@@ -600,6 +657,8 @@ export default function PendingOrders() {
         setIsDeleting(true);
         try {
           await api.delete(`/orders/${order.orderId}`);
+          
+          // Update local state immediately without waiting for socket
           setPendingOrders(prevOrders =>
             prevOrders.filter(o => o.orderId !== order.orderId)
           );
@@ -719,7 +778,7 @@ export default function PendingOrders() {
         confirmedBy: user?.name || user?.username || user?.mobileNumber 
       });
       
-      // Update local state with server response
+      // Update local state immediately without waiting for socket
       setPendingOrders(prevOrders =>
         prevOrders.map(o => o.orderId === order.orderId ? data.order : o)
       );
@@ -809,11 +868,12 @@ export default function PendingOrders() {
           
           {loading ? (
             <div className="bg-white rounded-lg shadow-sm p-10 text-center border border-gray-200 flex flex-col items-center justify-center">
-              <div className="w-50 h-50 mx-auto flex items-center justify-center">
+              <div className="flex justify-center items-center py-12">
                 <DotLottieReact
                   src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
                   loop
                   autoplay
+                  style={{ width: 220, height: 220 }}
                 />
               </div>
             </div>
@@ -845,7 +905,19 @@ export default function PendingOrders() {
                     const maxManual = Math.max(0, validatedOrder.subtotal - percentageDiscount);
                     const totalAmount = validatedOrder.subtotal - totalDiscount;
                     return (
-                      <div key={order.orderId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
+                      <div key={order.orderId} className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative ${
+                        updatingOrders.has(validatedOrder.orderId) ? 'opacity-75' : ''
+                      }`}>
+                        {updatingOrders.has(validatedOrder.orderId) && (
+                          <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-10">
+                            <DotLottieReact
+                              src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+                              loop
+                              autoplay
+                              style={{ width: 120, height: 120 }}
+                            />
+                          </div>
+                        )}
                         {/* Header Section */}
                         <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-4 border-b border-gray-200 flex justify-between items-start">
                           <div>
@@ -967,7 +1039,7 @@ export default function PendingOrders() {
                                   <div className="flex items-center gap-1 sm:gap-2">
                                     <button
                                       onClick={() => handleQuantityChange(validatedOrder.orderId, index, -1)}
-                                      disabled={item.quantity === 1}
+                                      disabled={item.quantity === 1 || updatingOrders.has(validatedOrder.orderId)}
                                       className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
                                         item.quantity === 1
                                           ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -982,6 +1054,7 @@ export default function PendingOrders() {
                                     </div>
                                     <button
                                       onClick={() => handleQuantityChange(validatedOrder.orderId, index, 1)}
+                                      disabled={updatingOrders.has(validatedOrder.orderId)}
                                       className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors duration-200 bg-white text-orange-600 hover:bg-orange-50 border border-orange-200`}
                                       aria-label={`Increase quantity of ${item.name}`}
                                     >
@@ -989,6 +1062,7 @@ export default function PendingOrders() {
                                     </button>
                                     <button
                                       onClick={() => handleRemoveItemOrOrder(validatedOrder, item, index)}
+                                      disabled={updatingOrders.has(validatedOrder.orderId)}
                                       className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors duration-200 p-0"
                                       aria-label={`Remove ${item.name}`}
                                     >
@@ -1007,6 +1081,7 @@ export default function PendingOrders() {
                                 setShowMenu(true); 
                                 setCurrentOrderId(validatedOrder.orderId); 
                               }}
+                              disabled={updatingOrders.has(validatedOrder.orderId)}
                               className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1027,7 +1102,7 @@ export default function PendingOrders() {
                                 ? 'bg-gray-700 text-white'
                                 : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
                         }`}
-                        disabled={paymentConfirmedOrderId === validatedOrder.orderId}
+                        disabled={paymentConfirmedOrderId === validatedOrder.orderId || updatingOrders.has(validatedOrder.orderId)}
                       >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1204,7 +1279,14 @@ export default function PendingOrders() {
 
       {showSplashScreen && (
         <div className="fixed inset-0 bg-white bg-opacity-80 backdrop-blur-sm z-[100] flex items-center justify-center flex-col">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-4"></div>
+          <div className="flex justify-center items-center mb-4">
+            <DotLottieReact
+              src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+              loop
+              autoplay
+              style={{ width: 120, height: 120 }}
+            />
+          </div>
           <p className="text-gray-700 text-xl font-medium">Confirming Order Payment...</p>
         </div>
       )}

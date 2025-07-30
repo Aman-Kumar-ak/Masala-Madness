@@ -176,8 +176,11 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
         discountAmount,
         discountPercentage
       });
+      
+      // Close modal immediately after successful save
       onSave(data.order);  // Pass updated order object
       setNotification({ message: 'Items added successfully!', type: 'success' });
+      onClose(); // Close modal immediately
     } catch (error) {
       console.error('Error updating order:', error);
       setNotification({ message: 'Failed to update order. Please try again.', type: 'error' });
@@ -233,6 +236,7 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
       }
       onSave(res.order); // Pass updated order object
       setNotification({ message: 'Items added successfully!', type: 'success' });
+      onClose(); // Close modal immediately
     } catch (error) {
       console.error('Error updating order:', error);
       setNotification({ message: 'Failed to update order. Please try again.', type: 'error' });
