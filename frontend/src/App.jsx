@@ -19,6 +19,7 @@ import WorkerCart from './pages/worker/WorkerCart';
 import WorkerSettings from './pages/worker/WorkerSettings';
 import WorkerOrders from './pages/worker/WorkerOrders';
 import WorkerPendingOrders from './pages/worker/WorkerPendingOrders';
+import PrivacyPolicy from './pages/privacy-policy';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
@@ -62,6 +63,9 @@ const App = () => {
               
               {/* Auth Routes */}
               <Route path="/login" element={<Login />} />
+              
+              {/* Public Routes */}
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               
               {/* Protected Routes */}
               <Route path="/home" element={

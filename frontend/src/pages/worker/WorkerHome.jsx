@@ -173,7 +173,11 @@ export default function WorkerHome() {
           <div className="flex justify-between items-center py-3">
             {/* Logo and Title */}
             <div className="flex items-center space-x-2">
-              <div className="w-11 h-11 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full p-0.5 shadow-sm flex items-center justify-center">
+              <Link
+                to="/privacy-policy"
+                className="w-11 h-11 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full p-0.5 shadow-sm flex items-center justify-center hover:bg-gradient-to-br hover:from-orange-200 hover:to-orange-100 transition-all duration-200 cursor-pointer"
+                aria-label="View Privacy Policy"
+              >
                 <OptimizedImage 
                   src="/images/m_logo.png" 
                   alt="Masala Madness Logo" 
@@ -181,7 +185,7 @@ export default function WorkerHome() {
                   width={36}
                   height={36}
                 />
-              </div>
+              </Link>
               <div className="text-left">
                 <h1 className="text-2xl font-bold text-gray-800 bg-gradient-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent whitespace-nowrap max-[380px]:text-xl max-[320px]:text-lg">Masala Madness</h1>
                 <p className="text-xs text-gray-500 -mt-1">Authentic Chinese Cuisine</p>
