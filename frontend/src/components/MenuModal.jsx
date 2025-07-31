@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import Notification from './Notification';
 import { api } from '../utils/api';
 
@@ -363,7 +364,14 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
           <div className="flex-grow overflow-y-auto p-4 bg-gray-50">
             {loading ? (
               <div className="flex flex-col items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500 mb-4"></div>
+                <div className="flex justify-center items-center mb-2">
+                  <DotLottieReact
+                    src="https://lottie.host/9a942832-f4ef-42c2-be65-d6955d96c3e1/wuEXuiDlyw.lottie"
+                    loop
+                    autoplay
+                    style={{ width: 220, height: 220 }}
+                  />
+                </div>
                 <p className="text-gray-600">Loading menu items...</p>
               </div>
             ) : (

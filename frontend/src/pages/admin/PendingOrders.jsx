@@ -1191,6 +1191,12 @@ export default function PendingOrders() {
           onConfirm={confirmDialog.onConfirm}
           onCancel={confirmDialog.onCancel}
           isLoading={isDeleting}
+          confirmText={isDeleting ? (
+            <span className="flex items-center gap-2">
+              <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+              Processing...
+            </span>
+          ) : "Confirm"}
         />
       )}
 
