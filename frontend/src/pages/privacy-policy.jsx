@@ -1,4 +1,5 @@
 import React from 'react';
+import { PRIVACY_POLICY_LAST_UPDATED } from '../utils/config';
 import { Link } from 'react-router-dom';
 import OptimizedImage from '../components/OptimizedImage';
 
@@ -53,7 +54,7 @@ const PrivacyPolicy = () => {
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-800 mb-2">Masala Madness</h2>
             <p className="text-orange-600 font-semibold">Privacy Policy</p>
-            <p className="text-sm text-gray-500 mt-2">Last updated: {new Date().toLocaleDateString()}</p>
+            <p className="text-sm text-gray-500 mt-2">Last updated: {new Date(PRIVACY_POLICY_LAST_UPDATED).toLocaleDateString()}</p>
           </div>
 
           <div className="space-y-6 text-gray-700">

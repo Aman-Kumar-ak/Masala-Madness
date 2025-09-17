@@ -28,6 +28,28 @@ const MenuManager = ({ categories, onUpdate }) => {
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [showSplashScreen, setShowSplashScreen] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+
+  const markUpdatedNow = () => {
+    setLastUpdatedAt(new Date());
+  };
+
+  const formatUpdatedAt = (date) => {
+    if (!date) return '';
+    try {
+      return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+    } catch (e) {
+      return date.toLocaleString();
+    }
+  };
+
+  // Initialize timestamp on first mount so the label shows immediately
+  useEffect(() => {
+    if (!lastUpdatedAt) {
+      setLastUpdatedAt(new Date());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   const categoryFormRef = useRef(null);
 
@@ -89,6 +111,7 @@ const MenuManager = ({ categories, onUpdate }) => {
       setNewCategory('');
       setShowCategoryInput(false);
       await onUpdate();
+      markUpdatedNow();
       setNotification({
         message: 'Category added successfully!',
         type: 'success'
@@ -150,6 +173,7 @@ const MenuManager = ({ categories, onUpdate }) => {
       setNewDish({ categoryId: '', name: '', priceHalf: '', priceFull: '', price: '', hasHalfFull: true });
       setShowAddDishModal(false);
       await onUpdate();
+      markUpdatedNow();
       
       setNotification({
         message: 'Dish added successfully!',
@@ -208,6 +232,7 @@ const MenuManager = ({ categories, onUpdate }) => {
       setEditingDish(null);
       setShowEditDishModal(false);
       await onUpdate();
+      markUpdatedNow();
       
       setNotification({
         message: 'Dish updated successfully!',
@@ -251,6 +276,7 @@ const MenuManager = ({ categories, onUpdate }) => {
         try {
           await api.delete(`/dishes/${categoryId}`);
           await onUpdate();
+          markUpdatedNow();
           setNotification({
             message: `Category "${category.categoryName}" deleted successfully!`,
             type: 'delete'
@@ -307,6 +333,7 @@ const MenuManager = ({ categories, onUpdate }) => {
         try {
           await api.delete(`/dishes/${categoryId}/dish/${dishId}`);
           await onUpdate();
+          markUpdatedNow();
           setNotification({
             message: `Dish "${dish.name}" deleted successfully!`,
             type: 'delete'
@@ -362,14 +389,19 @@ const MenuManager = ({ categories, onUpdate }) => {
       {...fadeIn}
     >
       <div className="mb-6">
-        <motion.h2 
-          className="text-2xl font-bold mb-6 text-orange-700 border-b pb-3"
+        <motion.div
+          className="flex flex-col items-center sm:flex-row sm:items-center sm:justify-between mb-6 border-b pb-3"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          Menu Management
-        </motion.h2>
+          <h2 className="text-2xl font-bold text-orange-700 text-center sm:text-left">Menu Management</h2>
+          {lastUpdatedAt && (
+            <div className="text-xs text-gray-500 whitespace-nowrap mt-2 sm:mt-0 text-center sm:text-right">
+              Updated at - {formatUpdatedAt(lastUpdatedAt)}
+            </div>
+          )}
+        </motion.div>
 
         <motion.div 
           className="flex flex-col gap-4 mb-6"

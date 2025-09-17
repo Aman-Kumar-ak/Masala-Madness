@@ -272,8 +272,11 @@ const Login = () => {
         setIsQuickLoginLoading(false);
       }
     } catch (err) {
-      // Handle disabled account (403 or error message)
-      if ((err?.response?.status === 403) || (err?.message && err.message.toLowerCase().includes('disabled'))) {
+      // Errors from api.js (fetch) expose status and data.message
+      const status = err?.status;
+      const msg = err?.data?.message?.toLowerCase?.() || err?.message?.toLowerCase?.() || '';
+
+      if (status === 403 && msg.includes('disabled')) {
         setQuickLoginError('Your account is disabled. Please contact the administrator.');
         if (typeof showError === 'function') showError('Your account is disabled. Please contact the administrator.');
         removeAccount(account.username);
@@ -283,7 +286,7 @@ const Login = () => {
           setShowAccountList(false);
           setForceShowForm(false); // Show splash, not login form
         }
-      } else if (err?.response?.data?.message && err.response.data.message.toLowerCase().includes('invalid device')) {
+      } else if (msg.includes('invalid device')) {
         setQuickLoginError('This device is no longer valid for quick login. Please log in manually.');
         removeAccount(account.username);
         const updated = getSavedAccounts();
@@ -292,6 +295,12 @@ const Login = () => {
           setShowAccountList(false);
           setForceShowForm(false); // Show splash, not login form
         }
+      } else if (msg.includes('expired')) {
+        // Device token expired after 30 days of inactivity — keep account and open password form
+        setQuickLoginError('Quick session expired. Please enter your password to continue.');
+        setUsername(account.username);
+        setShowAccountList(false);
+        setForceShowForm(true);
       } else {
         // For all other errors (network, interruption, etc.), do NOT remove the account
         setQuickLoginError('Session expired or network error. Please try again.');

@@ -104,27 +104,46 @@ export default function Home() {
 
   const getCurrentDate = () => {
     const width = window.innerWidth;
-    let options;
+    const now = new Date();
+    if (width > 400) {
+      // Example: WED 17, SEP 2025
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata',
+      }).formatToParts(now);
+      const get = (type) => (parts.find(p => p.type === type)?.value || '').toUpperCase();
+      const weekday = get('weekday');
+      const day = parts.find(p => p.type === 'day')?.value || '';
+      const month = get('month');
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      return `${weekday} ${day}, ${month} ${year}`;
+    }
     if (width < 380) {
-      // Short format for very small screens
-      options = {
+      // Compact uppercase short format with two-digit year
+      const parts = new Intl.DateTimeFormat('en-GB', {
         weekday: 'short',
         day: '2-digit',
         month: 'short',
         year: '2-digit',
         timeZone: 'Asia/Kolkata',
-      };
-    } else {
-      // Full format for normal screens
-      options = {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'Asia/Kolkata',
-      };
+      }).formatToParts(now);
+      const get = (type) => (parts.find(p => p.type === type)?.value || '').toUpperCase();
+      const weekday = get('weekday');
+      const day = parts.find(p => p.type === 'day')?.value || '';
+      const month = get('month');
+      return `${weekday} ${day}, ${month}`;
     }
-    return new Date().toLocaleString('en-IN', options);
+    // Default medium format for 380-400px
+    return new Intl.DateTimeFormat('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    }).format(now);
   };
 
   const fetchStats = async () => {
