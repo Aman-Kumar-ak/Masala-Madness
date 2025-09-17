@@ -43,13 +43,6 @@ const MenuManager = ({ categories, onUpdate }) => {
     }
   };
 
-  // Initialize timestamp on first mount so the label shows immediately
-  useEffect(() => {
-    if (!lastUpdatedAt) {
-      setLastUpdatedAt(new Date());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   
   const categoryFormRef = useRef(null);
 
