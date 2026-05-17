@@ -5,7 +5,7 @@
 // Common images that appear across the app
 // NOTE: This list is now deprecated. Use preloadImages with specific URLs per page.
 const COMMON_IMAGES = [
-  '/images/m_logo.svg',  // Use SVG version
+  '/images/m_logo.png',
   '/images/login.png',
   '/images/receipt.png',
   '/images/order.png',

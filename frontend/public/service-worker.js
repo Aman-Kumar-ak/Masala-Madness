@@ -1,5 +1,5 @@
 // Change this version number whenever you make updates to force cache refresh
-const VERSION = '8';
+const VERSION = '9';
 const DEPLOYMENT_ID = Date.now().toString(36);
 const STATIC_CACHE = `static-cache-v${VERSION}-${DEPLOYMENT_ID}`;
 const DYNAMIC_CACHE = `dynamic-cache-v${VERSION}-${DEPLOYMENT_ID}`;
@@ -138,6 +138,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Dev server: always use network (avoid stale cached Vite bundles)
+  if (
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.includes('/node_modules/')
+  ) {
+    return;
+  }
 
   // Network-first for API requests
   if (request.url.includes('/api/')) {

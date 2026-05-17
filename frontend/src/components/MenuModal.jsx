@@ -230,8 +230,11 @@ const MenuModal = ({ onClose, onSave, orderId, existingItems = [], discountPerce
           items: res.newItems.map(item => ({
             name: item.name,
             type: item.type,
-            quantity: item.quantity
-          }))
+            quantity: item.quantity,
+            price: item.price,
+            totalPrice: item.totalPrice
+          })),
+          totalAmount: res.order.totalAmount
         };
         window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
       }

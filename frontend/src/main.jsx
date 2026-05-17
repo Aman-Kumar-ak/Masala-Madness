@@ -22,7 +22,7 @@ Promise.all([
   try {
     // Start preloading universal images immediately before any React rendering
     // (e.g., logo that appears on all pages)
-    await preloadImages(['/images/m_logo.svg', '/images/logo/logo.png']);
+    await preloadImages(['/images/m_logo.png', '/images/logo/logo.png']);
     
     // Preload PWA icons for better offline experience, as they are universal
     await preloadPwaIcons();
@@ -48,8 +48,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </BrowserRouter>
 );
 
-// Register the service worker for caching and offline support
-if ('serviceWorker' in navigator) {
+// Unregister service worker during local dev so fresh code always loads
+if ('serviceWorker' in navigator && import.meta.env.DEV) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => registration.unregister());
+  });
+}
+
+// Register the service worker for caching and offline support (production only)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     // Clear any existing caches before registering the service worker
     if ('caches' in window) {

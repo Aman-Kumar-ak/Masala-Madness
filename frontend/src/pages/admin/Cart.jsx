@@ -8,6 +8,7 @@ import { useNotification } from "../../components/NotificationContext";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
 import AuthContext from '../../contexts/AuthContext';
+import { buildKotDataFromOrder, sendKotToPrinter } from '../../utils/kotPrint';
 
 function getISTISOString(date) {
   const d = date ? new Date(date) : new Date();
@@ -35,6 +36,7 @@ export default function Cart() {
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
   const { user } = useContext(AuthContext);
   const [isPrinterConnected, setIsPrinterConnected] = useState(true);
+  const [savedKotData, setSavedKotData] = useState(null);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -197,18 +199,7 @@ export default function Cart() {
     setShowPendingConfirm(false);
   };
 
-  const handleConfirmWithKOT = async () => {
-    setShowPaymentConfirm(false);
-    setShowPaymentOptions(false);
-    setShowQrCode(false);
-    setShowCustomPaymentDialog(false);
-    setShowSplashScreen(true);
-    await processPayment(true, true); // true = isPaid, true = printKOT
-  };
-
-  const processPayment = async (isPaid, printKOT = false) => {
-    if (isProcessing) return;
-    setIsProcessing(true);
+  const buildOrderPayload = (isPaid, printKOT = false) => {
     let finalPaymentMethod = paymentMethod;
     let customCashAmount = 0;
     let customOnlineAmount = 0;
@@ -236,12 +227,77 @@ export default function Cart() {
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
       customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
       confirmedBy: user?.name || user?.username || user?.mobileNumber,
-      printKOT // Ensure this is sent to backend
+      printKOT
     };
-    // Add KOT: 1 if adding to pending with KOT
     if (!isPaid && printKOT) {
       payload.KOT = 1;
     }
+    return payload;
+  };
+
+  const finalizeAfterPrintSession = () => {
+    setSavedKotData(null);
+    setShowPaymentConfirm(false);
+    setShowPaymentOptions(false);
+    setShowQrCode(false);
+    setShowCustomPaymentDialog(false);
+    clearCart();
+    navigate("/");
+  };
+
+  const closePaymentFlowDialog = () => {
+    if (savedKotData) {
+      finalizeAfterPrintSession();
+    } else {
+      setShowPaymentConfirm(false);
+      setShowPaymentOptions(false);
+      setShowQrCode(false);
+      setShowCustomPaymentDialog(false);
+    }
+  };
+
+  const handleConfirmAndPrint = async () => {
+    if (!isPrinterConnected) {
+      showError("Printer is not connected.");
+      return;
+    }
+    if (savedKotData) {
+      if (sendKotToPrinter(savedKotData)) {
+        showSuccess("Sent to printer.");
+      } else {
+        showError("Failed to send to printer.");
+      }
+      return;
+    }
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      const res = await api.post('/orders/confirm', buildOrderPayload(true, true));
+      const data = res;
+      if (data?.message && data?.order) {
+        showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
+        const kotData = buildKotDataFromOrder(data.order);
+        if (kotData) {
+          setSavedKotData(kotData);
+          if (!sendKotToPrinter(kotData)) {
+            showError("Order saved but printer is unavailable.");
+          }
+        }
+      } else {
+        throw new Error((data && data.message) || "Failed to process order");
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+      showError("Failed to process order: " + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const processPayment = async (isPaid, printKOT = false) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const payload = buildOrderPayload(isPaid, printKOT);
     try {
       if (isPaid) {
         setShowPaymentConfirm(false);
@@ -254,33 +310,10 @@ export default function Cart() {
         if (data && data.message) {
           showSuccess(`Payment successful! Order confirmed for ₹${totalAmount.toFixed(2)}`);
           // Send KOT data to app if available
-          if (printKOT && window.AndroidBridge && window.AndroidBridge.sendOrderDetails && data.order) {
-            const kotData = {
-              orderNumber: data.order.orderNumber,
-              createdAt: getISTISOString(data.order.createdAt),
-              items: (data.order.items || []).map(item => ({
-                name: item.name,
-                type: item.type,
-                quantity: item.quantity
-              }))
-            };
-            if (kotData.orderNumber && kotData.createdAt && kotData.items.length > 0) {
-              try {
-                console.log('[DEBUG] data from /orders/confirm:', data);
-                console.log('[DEBUG] window.AndroidBridge:', window.AndroidBridge);
-                console.log('[KOT] Sending to app:', kotData);
-                console.log('[KOT][DEBUG] About to call window.AndroidBridge.sendOrderDetails with:', JSON.stringify(kotData));
-                if (!window.AndroidBridge) {
-                  alert('AndroidBridge is not available! Order cannot be sent to the app.');
-                  console.error('AndroidBridge is not available!');
-                } else {
-                  window.AndroidBridge.sendOrderDetails(JSON.stringify(kotData));
-                }
-              } catch (err) {
-                console.error('Failed to send KOT to app:', err);
-              }
-            } else {
-              console.warn('KOT data missing required fields, not sending to app:', kotData);
+          if (printKOT && data.order) {
+            const kotData = buildKotDataFromOrder(data.order);
+            if (kotData && !sendKotToPrinter(kotData)) {
+              showError("Order saved but printer is unavailable.");
             }
           }
           clearCart();
@@ -309,8 +342,11 @@ export default function Cart() {
                 name: item.name,
                 type: item.type,
                 quantity: item.quantity,
+                price: item.price,
+                totalPrice: item.totalPrice,
                 kotNumber: isFirstKOT ? 1 : item.kotNumber
-              }))
+              })),
+              totalAmount: data.order.totalAmount
             };
             // If this is a pending order with KOT, add KOT: 1
             if (!isPaid && printKOT) {
@@ -403,7 +439,15 @@ export default function Cart() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <BackButton />
+      <BackButton
+        onBack={() => {
+          if (savedKotData) {
+            finalizeAfterPrintSession();
+          } else {
+            navigate(-1);
+          }
+        }}
+      />
       
       {/* Header */}
       <div className="bg-gradient-to-r from-orange-400 to-yellow-300 text-white shadow-md">
@@ -614,9 +658,13 @@ export default function Cart() {
       {/* QR Code Payment Dialog */}
       <ConfirmationDialog
         isOpen={showQrCode}
-        onClose={() => setShowQrCode(false)}
+        onClose={closePaymentFlowDialog}
         title="Scan QR Code to Pay"
-        message={`Total Amount: ₹${totalAmount.toFixed(2)}`}
+        message={
+          savedKotData
+            ? `Order confirmed. Tap Print Again for another copy, or tap outside / Cancel to finish.`
+            : `Total Amount: ₹${totalAmount.toFixed(2)}`
+        }
         customContent={
           <div className="flex flex-col items-center gap-4 w-full max-w-[95vw] sm:max-w-[400px] mx-auto">
             <div className="bg-white p-5 sm:p-4 rounded-lg border-2 border-orange-200 shadow-md mb-2 flex items-center justify-center w-full">
@@ -644,37 +692,32 @@ export default function Cart() {
             </div>
             <div className="flex flex-col gap-3 w-full mt-2">
               <button
+                onClick={handleConfirmAndPrint}
+                className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
+                  ${(!savedKotData && isProcessing) || !isPrinterConnected
+                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'}
+                `}
+                disabled={(!savedKotData && isProcessing) || !isPrinterConnected}
+              >
+                {savedKotData ? 'Print Again' : 'Confirm and Print'}
+              </button>
+              <button
                 onClick={async () => {
-                  if (!isPrinterConnected) {
-                    showError("Printer is not connected.");
+                  if (savedKotData) {
+                    finalizeAfterPrintSession();
                     return;
                   }
                   setShowQrCode(false);
                   setShowPaymentOptions(false);
                   setShowPaymentConfirm(false);
                   setShowCustomPaymentDialog(false);
-                  await processPayment(true, true); // printKOT = true
-                }}
-                className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
-                  ${isProcessing || !isPrinterConnected
-                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
-                    : 'bg-orange-600 hover:bg-orange-700 text-white'}
-                `}
-              >
-                Confirm and Print
-              </button>
-              <button
-                onClick={async () => {
-                  setShowQrCode(false);
-                  setShowPaymentOptions(false);
-                  setShowPaymentConfirm(false);
-                  setShowCustomPaymentDialog(false);
-                  await processPayment(true, false); // printKOT = false
+                  await processPayment(true, false);
                 }}
                 className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-                disabled={isProcessing}
+                disabled={!savedKotData && isProcessing}
               >
-                Confirm
+                {savedKotData ? 'Done' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -731,7 +774,7 @@ export default function Cart() {
       {/* Custom Payment Dialog */}
       <ConfirmationDialog
         isOpen={showCustomPaymentDialog}
-        onClose={() => setShowCustomPaymentDialog(false)}
+        onClose={closePaymentFlowDialog}
         title="Enter Custom Payment Amounts"
         message={`Order Total: ₹${totalAmount.toFixed(2)}`}
         customContent={
@@ -801,20 +844,16 @@ export default function Cart() {
                     showError(`Does not match order total (₹${totalAmount.toFixed(2)})`);
                     return;
                   }
-                  setShowCustomPaymentDialog(false);
-                  setShowPaymentOptions(false);
-                  setShowPaymentConfirm(false);
-                  setShowQrCode(false);
-                  setShowSplashScreen(true);
-                  await processPayment(true, true); // printKOT = true
+                  await handleConfirmAndPrint();
                 }}
                 className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
-                  ${isProcessing || !isPrinterConnected
+                  ${(!savedKotData && isProcessing) || !isPrinterConnected
                     ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
                     : 'bg-orange-600 hover:bg-orange-700 text-white'}
                 `}
+                disabled={(!savedKotData && isProcessing) || !isPrinterConnected}
               >
-                Confirm and Print
+                {savedKotData ? 'Print Again' : 'Confirm and Print'}
               </button>
               <button
                 onClick={async () => {
@@ -830,16 +869,20 @@ export default function Cart() {
                     showError(`Does not match order total (₹${totalAmount.toFixed(2)})`);
                     return;
                   }
+                  if (savedKotData) {
+                    finalizeAfterPrintSession();
+                    return;
+                  }
                   setShowCustomPaymentDialog(false);
                   setShowPaymentOptions(false);
                   setShowPaymentConfirm(false);
                   setShowQrCode(false);
-                  await processPayment(true, false); // printKOT = false
+                  await processPayment(true, false);
                 }}
                 className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-                disabled={isProcessing}
+                disabled={!savedKotData && isProcessing}
               >
-                Confirm
+                {savedKotData ? 'Done' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -853,37 +896,40 @@ export default function Cart() {
       {/* Payment Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showPaymentConfirm}
-        onClose={() => setShowPaymentConfirm(false)}
+        onClose={closePaymentFlowDialog}
         title="Confirm Payment"
-        message={`Confirm ${paymentMethod} payment of ₹${totalAmount.toFixed(2)}?`}
+        message={
+          savedKotData
+            ? `Order confirmed. Tap Print Again for another copy, or tap outside / Cancel to finish.`
+            : `Confirm ${paymentMethod} payment of ₹${totalAmount.toFixed(2)}?`
+        }
         customContent={
           <div className="flex flex-col gap-3">
             <button
-              onClick={async () => {
-                if (!isPrinterConnected) {
-                  showError("Printer is not connected.");
-                  return;
-                }
-                await handleConfirmWithKOT();
-              }}
+              onClick={handleConfirmAndPrint}
               className={`w-full py-3 rounded-lg font-medium shadow-md transition-colors text-lg flex items-center justify-center gap-2
-                ${isProcessing || !isPrinterConnected
+                ${(!savedKotData && isProcessing) || !isPrinterConnected
                   ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
                   : 'bg-orange-600 hover:bg-orange-700 text-white'}
               `}
+              disabled={(!savedKotData && isProcessing) || !isPrinterConnected}
             >
-              Confirm and Print
+              {savedKotData ? 'Print Again' : 'Confirm and Print'}
             </button>
             <button
-              onClick={() => {
+              onClick={async () => {
+                if (savedKotData) {
+                  finalizeAfterPrintSession();
+                  return;
+                }
                 setShowPaymentConfirm(false);
                 setShowPaymentOptions(false);
-                processPayment(true, false);
+                await processPayment(true, false);
               }}
               className="w-full py-3 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors text-lg flex items-center justify-center gap-2"
-              disabled={isProcessing}
+              disabled={!savedKotData && isProcessing}
             >
-              Confirm
+              {savedKotData ? 'Done' : 'Confirm'}
             </button>
           </div>
         }

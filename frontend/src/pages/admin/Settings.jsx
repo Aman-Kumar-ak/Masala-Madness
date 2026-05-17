@@ -8,6 +8,7 @@ import api from '../../utils/api';
 import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment';
 import io from 'socket.io-client';
 import OptimizedImage from '../../components/OptimizedImage';
+import ApkDownloadCard from '../../components/ApkDownloadCard';
 // Add this helper at the top of the file (after imports)
 function normalizeName(name) {
   return name.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -300,7 +301,10 @@ const Settings = () => {
       // Fetch version information
       initialPromises.push(
         fetch(`/version.json?_=${Date.now()}`)
-          .then(response => response.json())
+          .then(async (response) => {
+            if (!response.ok) throw new Error(`version.json ${response.status}`);
+            return response.json();
+          })
           .then(data => setVersionInfo({ ...data, environment: process.env.NODE_ENV || 'development' }))
           .catch(error => {
             console.error('Error fetching version info:', error);
@@ -1461,6 +1465,8 @@ const Settings = () => {
                     Personal Settings
                   </h1>
                 </div>
+
+                <ApkDownloadCard />
                 
                 {user && (
                   <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
@@ -1470,7 +1476,7 @@ const Settings = () => {
                     </p>
                   </div>
                 )}
-                
+
                 {/* Password Change Section */}
                 <div className="border border-gray-200 rounded-lg p-5 mb-6">
                   <h2 className="text-xl font-semibold mb-4 text-gray-700 flex items-center gap-2">

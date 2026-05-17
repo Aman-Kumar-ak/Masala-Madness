@@ -9,15 +9,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Create an SVG logo
+// Create an SVG logo that references the canonical PNG asset
 const createLogoSVG = () => {
-  // A simple "M" logo in SVG format
-  const svg = `<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-    <rect width="200" height="200" fill="#fff7ed" />
-    <path d="M40,40 L60,40 L100,120 L140,40 L160,40 L160,160 L140,160 L140,80 L100,160 L60,80 L60,160 L40,160 Z" fill="#ea580c" />
-  </svg>`;
-  
-  return svg;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <image href="m_logo.png" width="512" height="512" preserveAspectRatio="xMidYMid meet"/>
+</svg>`;
 };
 
 // Generate optimized logo

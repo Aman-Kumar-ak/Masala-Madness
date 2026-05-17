@@ -11,8 +11,7 @@ import Login from './pages/Login';
 import Settings from './pages/admin/Settings';
 import Calendar from './pages/admin/Calendar';
 import ProtectedRoute from './components/ProtectedRoute';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { NotificationProvider } from './components/NotificationContext';
+import { useAuth } from './contexts/AuthContext';
 import OfflineDetector from './components/OfflineDetector';
 import WorkerHome from './pages/worker/WorkerHome';
 import WorkerCart from './pages/worker/WorkerCart';
@@ -53,8 +52,7 @@ const RedirectBasedOnAuth = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <NotificationProvider>
+    <>
         <div className="min-h-screen flex flex-col select-none">
           <div className="flex-grow">
             <Routes>  {/* Routes for handling different paths */}
@@ -146,8 +144,7 @@ const App = () => {
         </div>
         <Analytics />
         <SpeedInsights />
-      </NotificationProvider>
-    </AuthProvider>
+    </>
   );
 };
 

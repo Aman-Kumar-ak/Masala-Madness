@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import BackButton from '../../components/BackButton';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
+import ApkDownloadCard from '../../components/ApkDownloadCard';
 // import api from '../../utils/api'; // Not needed if password change is removed
 // import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment'; // Only if needed by logout
 
@@ -54,6 +55,8 @@ export default function WorkerSettings() {
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-6">Settings</h1>
               <div className="space-y-4">
+
+            <ApkDownloadCard />
 
             {/* Logout Section */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">

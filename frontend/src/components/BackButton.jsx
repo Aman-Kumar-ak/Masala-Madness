@@ -1,12 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const BackButton = () => {
+const BackButton = ({ onBack }) => {
   const navigate = useNavigate();
 
   return (
     <button
-      onClick={() => navigate(-1)}
+      onClick={() => (onBack ? onBack() : navigate(-1))}
       className="fixed top-4 left-4 z-50 bg-white p-2 rounded-full shadow-md hover:shadow-lg transition-shadow duration-200"
       aria-label="Go back"
     >

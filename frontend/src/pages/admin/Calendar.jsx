@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import BackButton from '../../components/BackButton';
+import { useNotification } from '../../components/NotificationContext';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
@@ -14,7 +15,16 @@ function formatMonth(monthKey) {
   return d.toLocaleString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 }
 
+function getTodayStr() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function Calendar() {
+  const { showSuccess, showError } = useNotification();
   const [availableDates, setAvailableDates] = useState([]); // Dates for selector
   const [months, setMonths] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -27,35 +37,31 @@ function Calendar() {
   const [dayError, setDayError] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Fetch available dates and monthly summary on mount
-  useEffect(() => {
-    async function fetchInitial() {
-      setLoading(true);
-      setError(null);
-      try {
-        // Check cache first
-        if (monthsCache && availableDates.length > 0) {
-          setMonths(monthsCache);
-          setSelectedDate(availableDates[0]);
-          setLoading(false);
-          return;
-        }
-        // Fetch available sales dates
-        const data = await api.get('/orders/sales-summary/dates');
-        setAvailableDates(data || []);
-        if (data && data.length > 0) {
-          setSelectedDate(data[0]); // Default to most recent date
-        }
-        // Fetch monthly summary
-        const monthly = await api.get('/orders/monthly-summary');
-        setMonths(monthly || []);
-        setMonthsCache(monthly || []);
-      } catch (err) {
-        setError('Failed to fetch sales data.');
-      } finally {
+  const fetchInitial = useCallback(async (skipCache = false) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!skipCache && monthsCache && availableDates.length > 0) {
+        setMonths(monthsCache);
+        setSelectedDate(availableDates[0]);
         setLoading(false);
+        return;
       }
+      const data = await api.get('/orders/sales-summary/dates');
+      const dates = data || [];
+      setAvailableDates(dates);
+      setSelectedDate(dates.length > 0 ? dates[0] : getTodayStr());
+      const monthly = await api.get('/orders/monthly-summary');
+      setMonths(monthly || []);
+      setMonthsCache(monthly || []);
+    } catch (err) {
+      setError('Failed to fetch sales data.');
+    } finally {
+      setLoading(false);
     }
+  }, [monthsCache, availableDates]);
+
+  useEffect(() => {
     fetchInitial();
   }, []);
 
@@ -91,48 +97,32 @@ function Calendar() {
     fetchDay();
   }, [selectedDate]);
 
-  // Handler for deleting all sales and orders
-  const [notification, setNotification] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   async function handleDeleteAll() {
     setShowDeleteDialog(false);
     setDeleteLoading(true);
     try {
       await api.delete('/orders/all');
-      // Clear caches and refetch everything after delete
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
-      setSelectedDate(todayStr);
-      setSelectedDay(null);
-      setMonths([]);
-      setAvailableDates([]);
       setDayCache({});
       setMonthsCache(null);
-      setLoading(true);
-      setNotification({ message: 'All sales and orders deleted successfully.', type: 'success' });
-      setTimeout(() => {
-        setDeleteLoading(false);
-        window.location.reload();
-      }, 1200);
+      setSelectedDay(null);
+      const dates = await api.get('/orders/sales-summary/dates');
+      const dateList = dates || [];
+      setAvailableDates(dateList);
+      setSelectedDate(dateList.length > 0 ? dateList[0] : getTodayStr());
+      const monthly = await api.get('/orders/monthly-summary');
+      setMonths(monthly || []);
+      setMonthsCache(monthly || []);
+      showSuccess('All sales and orders deleted successfully.');
     } catch (err) {
+      showError('Failed to delete all sales and orders.');
+    } finally {
       setDeleteLoading(false);
-      setNotification({ message: 'Failed to delete all sales and orders.', type: 'error' });
     }
   }
 
   return (
     <>
-      {notification && (
-        <Notification
-          message={notification.message}
-          type={notification.type}
-          duration={2000}
-          onClose={() => setNotification(null)}
-        />
-      )}
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-orange-50 flex flex-col items-center px-2 pt-8 sm:px-0">
         <BackButton />
         <div className="w-full max-w-lg mx-auto mt-2">
@@ -213,7 +203,7 @@ function Calendar() {
                     type="button"
                     className="bg-blue-100 hover:bg-blue-300 text-blue-700 font-semibold px-4 py-2 rounded-lg shadow transition"
                     onClick={() => {
-                      if (availableDates.length > 0) setSelectedDate(availableDates[0]);
+                      setSelectedDate(availableDates.length > 0 ? availableDates[0] : getTodayStr());
                     }}
                   >
                     Today

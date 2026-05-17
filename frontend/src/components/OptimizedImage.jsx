@@ -14,7 +14,7 @@ const getFallbackImage = (originalSrc) => {
     return `/images/fallbacks/icon-placeholder-${size}.svg`;
   }
   
-  // For m_logo - use SVG version
+  // For Masala Madness logo
   if (path.includes('m_logo')) {
     return '/images/fallbacks/logo-placeholder.svg';
   }
