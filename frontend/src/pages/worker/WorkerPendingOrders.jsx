@@ -228,7 +228,7 @@ export default function WorkerPendingOrders() {
 
     const fetchActiveDiscount = async () => {
       try {
-        const data = await api.get('/discounts/active');
+        const data = await api.get(appendQueryParams('/discounts/active', { locationId: currentLocationId }));
         setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
@@ -354,9 +354,7 @@ export default function WorkerPendingOrders() {
     if (activeDiscount && validatedOrder.subtotal >= activeDiscount.minOrderAmount) {
       percentageDiscount = Math.round((validatedOrder.subtotal * activeDiscount.percentage) / 100);
     }
-    const maxManual = Math.max(0, validatedOrder.subtotal - percentageDiscount);
-    const manual = Math.min(getManualDiscount(validatedOrder.orderId), maxManual);
-    return { percentageDiscount, manualDiscount: manual, totalDiscount: percentageDiscount + manual };
+    return { percentageDiscount, manualDiscount: 0, totalDiscount: percentageDiscount };
   };
 
   // Update handleConfirmPayment to include manual discount
@@ -889,8 +887,7 @@ export default function WorkerPendingOrders() {
               <div className="space-y-6">
                 {pendingOrders.map(order => {
                   const validatedOrder = validateAndFixSubtotal(order);
-                  const { percentageDiscount, manualDiscount, totalDiscount } = calculateOrderDiscount(validatedOrder);
-                  const maxManual = Math.max(0, validatedOrder.subtotal - percentageDiscount);
+                  const { percentageDiscount, totalDiscount } = calculateOrderDiscount(validatedOrder);
                   const totalAmount = validatedOrder.subtotal - totalDiscount;
                   return (
                     <div key={order.orderId} className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative ${
@@ -957,36 +954,6 @@ export default function WorkerPendingOrders() {
                               <span className="font-medium">-₹{percentageDiscount.toFixed(2)}</span>
                             </div>
                           )}
-                          {/* Manual Discount Input */}
-                          <div className="flex justify-between items-center text-gray-600 mb-2">
-                            <span className="font-medium">Discount:</span>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                value={getManualDiscount(validatedOrder.orderId) || ''}
-                                onChange={e => {
-                                  const val = Math.max(0, parseFloat(e.target.value) || 0);
-                                  handleManualDiscountChange(validatedOrder, val);
-                                }}
-                                className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
-                                placeholder="0.00"
-                                min="0"
-                                max={maxManual}
-                                step="any"
-                              />
-                                                              {getManualDiscount(validatedOrder.orderId) > 0 && (
-                                <button
-                                                                      onClick={() => handleRemoveManualDiscount(validatedOrder.orderId)}
-                                  className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
-                                  aria-label="Remove manual discount"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
-                          </div>
                           <div className="flex justify-between font-bold text-green-700 pt-2 border-t border-gray-200">
                             <span>Total Discount:</span>
                             <span className="text-green-600">-₹{totalDiscount.toFixed(2)}</span>

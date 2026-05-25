@@ -227,7 +227,7 @@ export default function PendingOrders() {
 
     const fetchActiveDiscount = async () => {
       try {
-        const data = await api.get('/discounts/active');
+        const data = await api.get(appendQueryParams('/discounts/active', { locationId: currentLocationId }));
         setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);

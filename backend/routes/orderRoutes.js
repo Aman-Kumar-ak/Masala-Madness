@@ -148,7 +148,7 @@ function calculateStatsFromOrders(orders = []) {
 
 async function fetchOrdersForScope(scope, queryBuilder, {
   select = '-__v',
-  sort = { updatedAt: -1 }
+  sort = { createdAt: -1 }
 } = {}) {
   const targets = getOrderTargets(scope);
   const ordersByLocation = await Promise.all(targets.map(async ({ location, Order }) => {
@@ -163,7 +163,7 @@ async function fetchOrdersForScope(scope, queryBuilder, {
   const orders = ordersByLocation.flat();
 
   if (sort) {
-    const [sortField, sortDirection] = Object.entries(sort)[0] || ['updatedAt', -1];
+    const [sortField, sortDirection] = Object.entries(sort)[0] || ['createdAt', -1];
     orders.sort((a, b) => {
       const aValue = new Date(a[sortField] || a.updatedAt || a.createdAt || 0).getTime();
       const bValue = new Date(b[sortField] || b.updatedAt || b.createdAt || 0).getTime();
@@ -498,6 +498,14 @@ router.post('/confirm', authenticateToken, async (req, res) => {
       printKOT
     } = req.body;
 
+    if (req.user?.role !== 'admin' && Number(manualDiscount || 0) > 0) {
+      return res.status(403).json({ message: 'Workers are not allowed to add manual discounts.' });
+    }
+
+    if (req.user?.role !== 'admin') {
+      manualDiscount = 0;
+    }
+
     const now = new Date();
     let order;
     let location;
@@ -806,7 +814,7 @@ router.get('/deleted/:date', authenticateToken, async (req, res) => {
           createdAt: { $gte: startOfDay, $lte: endOfDay }
         })
     )
-      .sort({ updatedAt: -1 })
+      .sort({ deletedAt: -1, createdAt: -1 })
       .lean();
 
     res.status(200).json(deletedOrders);
@@ -953,6 +961,18 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
     const Order = getScopedOrderModel(location);
     const order = await Order.findOne({ orderId });
     if (!order) {
+      const alreadyDeletedOrder = await DeletedOrder.findOne(
+        buildLocationQuery(location._id, { orderId })
+      ).lean();
+
+      if (alreadyDeletedOrder) {
+        return res.status(200).json({
+          message: 'Order was already deleted',
+          orderId,
+          alreadyDeleted: true
+        });
+      }
+
       return res.status(404).json({ message: 'Order not found' });
     }
 

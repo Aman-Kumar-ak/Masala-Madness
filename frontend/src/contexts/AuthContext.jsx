@@ -99,6 +99,7 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('lastActivityTime'); // <-- clear from sessionStorage
       sessionStorage.removeItem('jwtVerified');
+      sessionStorage.removeItem('cartItems');
       setUser(null);
       setIsAuthenticated(false);
       if (!isSilentLogout) {

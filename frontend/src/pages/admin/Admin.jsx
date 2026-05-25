@@ -9,7 +9,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
-import { getLocationId, getLocationName } from "../../utils/location";
+import { appendQueryParams, getLocationId, getLocationName } from "../../utils/location";
+
+const ALL_BRANCHES_VALUE = 'all';
 
 const Admin = () => {
   useKeyboardScrollAdjustment();
@@ -21,6 +23,7 @@ const Admin = () => {
   const [locationsLoading, setLocationsLoading] = useState(true);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [activeDiscount, setActiveDiscount] = useState(null);
+  const [discountLocationId, setDiscountLocationId] = useState(ALL_BRANCHES_VALUE);
   const [newDiscount, setNewDiscount] = useState({
     percentage: '',
     minOrderAmount: ''
@@ -34,6 +37,10 @@ const Admin = () => {
   const discountFormRef = useRef(null);
   const currentUserLocationId = getLocationId(user?.location);
   const selectedLocation = locations.find((location) => getLocationId(location) === selectedLocationId) || null;
+  const discountLocation = locations.find((location) => getLocationId(location) === discountLocationId) || null;
+  const discountLocationName = discountLocationId === ALL_BRANCHES_VALUE
+    ? 'All branches'
+    : getLocationName(discountLocation, 'Selected branch');
 
   const loadLocations = async () => {
     try {
@@ -81,9 +88,9 @@ const Admin = () => {
     }
   };
 
-  const loadActiveDiscount = async () => {
+  const loadActiveDiscount = async (locationId = discountLocationId) => {
     try {
-      const data = await api.get(`/discounts/active`);
+      const data = await api.get(appendQueryParams('/discounts/active', { locationId }));
       if (data) {
         setActiveDiscount(data);
       } else {
@@ -97,8 +104,11 @@ const Admin = () => {
 
   useEffect(() => {
     loadLocations();
-    loadActiveDiscount();
   }, []);
+
+  useEffect(() => {
+    loadActiveDiscount(discountLocationId);
+  }, [discountLocationId]);
 
   useEffect(() => {
     if (!selectedLocationId) {
@@ -149,7 +159,8 @@ const Admin = () => {
       // Add or update discount (no isActive field)
       const savedDiscount = await api.post('/discounts', {
         percentage: Number(newDiscount.percentage),
-        minOrderAmount: Number(newDiscount.minOrderAmount)
+        minOrderAmount: Number(newDiscount.minOrderAmount),
+        locationId: discountLocationId
       });
       setShowDiscountForm(false);
       setNewDiscount({ percentage: '', minOrderAmount: '' });
@@ -170,7 +181,7 @@ const Admin = () => {
       await api.delete(`/discounts/${activeDiscount._id}`);
       setActiveDiscount(null);
       setNotification({ message: 'Discount removed successfully!', type: 'success' });
-      await loadActiveDiscount();
+      await loadActiveDiscount(discountLocationId);
     } catch (error) {
       setNotification({ message: error.message || 'Failed to remove discount.', type: 'error' });
     } finally {
@@ -268,6 +279,9 @@ const Admin = () => {
                         <p className="text-gray-700">
                           <span className="font-medium text-green-600">{activeDiscount.percentage}% off</span> on orders above <span className="font-medium">₹{activeDiscount.minOrderAmount}</span>
                         </p>
+                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">
+                          {activeDiscount.locationName || (activeDiscount.appliesTo === 'location' ? discountLocationName : 'All branches')}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -305,6 +319,27 @@ const Admin = () => {
               >
                 <h3 className="text-lg font-semibold mb-4 text-gray-800">Add New Discount</h3>
                 <form onSubmit={handleDiscountSave} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Discount Applies To
+                    </label>
+                    <select
+                      value={discountLocationId}
+                      onChange={(e) => setDiscountLocationId(e.target.value)}
+                      className="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-4 bg-white focus:ring-2 focus:ring-green-300 focus:border-green-300 transition-all duration-200"
+                      disabled={discountLoading || locationsLoading}
+                    >
+                      <option value={ALL_BRANCHES_VALUE}>All branches</option>
+                      {locations.map((location) => {
+                        const locationId = getLocationId(location);
+                        return (
+                          <option key={locationId} value={locationId}>
+                            {getLocationName(location, 'Unassigned')}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Discount Percentage

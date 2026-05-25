@@ -9,7 +9,7 @@ import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment
 import { api } from '../../utils/api';
 import AuthContext from '../../contexts/AuthContext';
 import { buildKotDataFromOrder, sendKotToPrinter } from '../../utils/kotPrint';
-import { getLocationId } from '../../utils/location';
+import { appendQueryParams, getLocationId } from '../../utils/location';
 
 function getISTISOString(date) {
   const d = date ? new Date(date) : new Date();
@@ -36,6 +36,7 @@ export default function Cart() {
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
   const { user } = useContext(AuthContext);
+  const currentLocationId = getLocationId(user?.location);
   const [isPrinterConnected, setIsPrinterConnected] = useState(true);
   const [savedKotData, setSavedKotData] = useState(null);
 
@@ -74,7 +75,7 @@ export default function Cart() {
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
-        const data = await api.get('/discounts/active');
+        const data = await api.get(appendQueryParams('/discounts/active', { locationId: currentLocationId }));
         setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
@@ -97,7 +98,7 @@ export default function Cart() {
 
     fetchActiveDiscount();
     fetchDefaultUpiAddress();
-  }, []);
+  }, [currentLocationId]);
 
   useEffect(() => {
     if (!window.AndroidBridge) {

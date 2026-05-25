@@ -12,6 +12,22 @@ const DiscountSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  appliesTo: {
+    type: String,
+    enum: ['all', 'location'],
+    default: 'all'
+  },
+  location: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Location',
+    default: null,
+    index: true
+  },
+  locationName: {
+    type: String,
+    default: 'All branches',
+    trim: true
+  },
   isActive: {
     type: Boolean,
     default: true

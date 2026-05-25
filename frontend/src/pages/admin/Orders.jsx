@@ -256,6 +256,7 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false); // Only used to disable delete button, not for global loading
+  const [deletingOrderIds, setDeletingOrderIds] = useState([]);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [notification, setNotification] = useState(null);
@@ -475,37 +476,74 @@ const Orders = () => {
   };
 
   const handleDeleteClick = (order) => {
+    if (deletingOrderIds.includes(order.orderId)) {
+      return;
+    }
     setOrderToDelete(order);
     setShowDeleteConfirmation(true);
   };
 
+  const removeOrderFromPage = (orderId) => {
+    setOrders((previousOrders) => {
+      const nextOrders = previousOrders.filter((order) => order.orderId !== orderId);
+      if (nextOrders.length === previousOrders.length) {
+        return previousOrders;
+      }
+
+      const paidOrders = nextOrders.filter((order) => order.isPaid);
+      const totalPaidOrders = paidOrders.length;
+      const totalRevenue = paidOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+      setStats({
+        totalOrders: nextOrders.length,
+        totalPaidOrders,
+        totalRevenue,
+        avgOrderValue: totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0
+      });
+
+      return nextOrders;
+    });
+  };
+
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
-      setShowDeleteConfirmation(false);
-      setOrderToDelete(null);
-      setDeleteLoading(true);
-      setLoading(true); // Show spinner for the whole list
+    const deletingOrder = orderToDelete;
+    setShowDeleteConfirmation(false);
+    setOrderToDelete(null);
+    setDeleteLoading(true);
+    setDeletingOrderIds((previousIds) => [...new Set([...previousIds, deletingOrder.orderId])]);
+    removeOrderFromPage(deletingOrder.orderId);
+
     try {
-      await api.delete(appendQueryParams(`/orders/${orderToDelete.orderId}`, {
-        locationId: getLocationId(orderToDelete.location) || activeLocationId
+      const result = await api.delete(appendQueryParams(`/orders/${deletingOrder.orderId}`, {
+        locationId: getLocationId(deletingOrder.location) || activeLocationId
       }));
       setNotification({
-        message: `Order #${orderToDelete.orderNumber} has been deleted successfully`,
+        message: result?.alreadyDeleted
+          ? `Order #${deletingOrder.orderNumber} was already deleted`
+          : `Order #${deletingOrder.orderNumber} has been deleted successfully`,
         type: 'delete',
         duration: 2000
       });
       await loadOrders();
     } catch (error) {
-      console.error('Error deleting order:', error);
-      setNotification({
-        message: `Failed to delete order: ${error.message}`,
-        type: 'error',
-        duration: 2000
-      });
+      if (error?.status === 404) {
+        setNotification({
+          message: `Order #${deletingOrder.orderNumber} was already removed. Refreshing the list.`,
+          type: 'delete',
+          duration: 2000
+        });
+      } else {
+        console.error('Error deleting order:', error);
+        setNotification({
+          message: `Failed to delete order: ${error.message}`,
+          type: 'error',
+          duration: 2000
+        });
+      }
       await loadOrders();
     } finally {
       setDeleteLoading(false);
-      setLoading(false);
+      setDeletingOrderIds((previousIds) => previousIds.filter((orderId) => orderId !== deletingOrder.orderId));
     }
   };
 
@@ -573,8 +611,17 @@ const Orders = () => {
     }
   };
 
-  // Before rendering orders, sort by orderNumber descending
-  const sortedOrders = [...orders].sort((a, b) => b.orderNumber - a.orderNumber);
+  // Before rendering orders, sort by order time descending
+  const sortedOrders = [...orders].sort((a, b) => {
+    const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
+    const bTime = new Date(b.createdAt || b.updatedAt || 0).getTime();
+
+    if (bTime !== aTime) {
+      return bTime - aTime;
+    }
+
+    return (b.orderNumber || 0) - (a.orderNumber || 0);
+  });
 
   // Filter orders based on filter bar
   const filteredOrders = sortedOrders.filter(order => {
@@ -892,7 +939,7 @@ const Orders = () => {
                     parseCustomPaymentAmounts={parseCustomPaymentAmounts}
                     formatDateIST={formatDateIST}
                     handleDeleteClick={handleDeleteClick}
-                    deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
+                    deleteLoading={deletingOrderIds.includes(order.orderId)}
                     hideDeleteButton={false}
                     isDeletedSection={false}
                     activeLocationId={activeLocationId}

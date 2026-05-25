@@ -76,7 +76,7 @@ export default function WorkerHome() {
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
-        const data = await api.get('/discounts/active');
+        const data = await api.get(appendQueryParams('/discounts/active', { locationId: currentLocationId }));
         setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
@@ -249,19 +249,16 @@ export default function WorkerHome() {
       <div className="bg-white shadow-sm rounded-xl mx-4 mt-4 overflow-hidden">
         <div className="container mx-auto">
           <div className="bg-blue-50 px-3 py-2">
-            <div className="flex items-center justify-between gap-1">
-              {/* Left group: Refresh + Date */}
-              <div className="flex items-center gap-1 min-[380px]:gap-1 min-w-0">
+            <div className="flex items-center justify-center gap-2 sm:justify-start">
                 {/* Refresh Button */}
                 <button
                   onClick={fetchStats}
                   disabled={loading}
-                  className={`w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-colors duration-200 ${loading ? 'bg-gray-300' : ''}`}
+                  className={`h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-colors duration-200 min-[380px]:h-10 min-[380px]:w-10 ${loading ? 'bg-gray-300' : ''}`}
                   title="Refresh Stats"
-                  style={{ minWidth: 40, minHeight: 40 }}
                 >
                   <svg
-                    className={`w-8 h-8 min-[380px]:w-9 min-[380px]:h-9 ${loading ? 'animate-spin' : ''}`}
+                    className={`h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 ${loading ? 'animate-spin' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -275,15 +272,47 @@ export default function WorkerHome() {
                   </svg>
                 </button>
                 {/* Date */}
-                <span className="text-base min-[380px]:text-lg font-semibold text-gray-800 whitespace-nowrap mx-1 min-[380px]:mx-2">
+                <span className="text-base font-bold text-gray-900 whitespace-nowrap min-[380px]:text-lg">
                   {getCurrentDate()}
                 </span>
                 <span className="hidden sm:inline-flex rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-600 shadow-sm whitespace-nowrap">
                   {currentLocationName}
                 </span>
+                {/* Orders Button */}
+                <Link
+                  to="/worker-orders"
+                  className="rounded-full bg-green-50 hover:bg-green-100 transition-colors duration-200 flex items-center justify-center shadow-sm px-4 py-2"
+                  title="Orders"
+                >
+                  <span className="text-sm font-bold text-green-700 min-[380px]:text-base">Orders</span>
+                </Link>
+            </div>
+
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <div className="flex min-w-0 justify-center sm:hidden">
+                <div className="flex w-full max-w-[190px] items-center justify-center gap-2 rounded-full border border-orange-100/80 bg-white/95 px-3 py-1.5 shadow-[0_4px_12px_rgba(249,115,22,0.08)] backdrop-blur-sm">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200/70">
+                    <svg
+                      className="h-3 w-3"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 21s6-4.35 6-10a6 6 0 10-12 0c0 5.65 6 10 6 10z" />
+                      <circle cx="12" cy="11" r="2.5" fill="currentColor" stroke="none" />
+                    </svg>
+                  </div>
+                  <p className="min-w-0 truncate text-sm font-extrabold tracking-tight text-gray-900">
+                    {currentLocationName}
+                  </p>
+                </div>
               </div>
-              {/* Right group: Printer, Settings, Orders */}
-              <div className="flex items-center gap-1 min-[380px]:gap-2 flex-shrink-0">
+
+              <div className="flex flex-shrink-0 items-center justify-center gap-2">
                 {/* Printer Button */}
                 <button
                   onClick={() => {
@@ -293,39 +322,28 @@ export default function WorkerHome() {
                       setShowPrinterDialog(true);
                     }
                   }}
-                  className="w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ml-2"
+                  className="h-9 w-9 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 min-[380px]:h-10 min-[380px]:w-10"
                   title="Printer Settings"
                   style={{
-                    minWidth: 40,
-                    minHeight: 40,
                     backgroundColor: isPrinterConnected ? '#e6fff2' : '#ffd6d6',
                     border: isPrinterConnected ? '1.5px solid #b2f2d7' : '1.5px solid #ff8a8a',
                   }}
                 >
-                  <img src="/images/printer.png" alt="Printer Settings" className="w-8 h-8 min-[380px]:w-9 min-[380px]:h-9 object-contain" width={36} height={36} />
+                  <img src="/images/printer.png" alt="Printer Settings" className="h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 object-contain" width={32} height={32} />
                 </button>
                 {/* Settings Icon - larger */}
                 <Link
                   to="/worker-settings"
-                  className="w-10 h-10 min-[380px]:w-11 min-[380px]:h-11 rounded-full bg-blue-900 flex items-center justify-center shadow-sm hover:bg-blue-800 transition-colors duration-200"
+                  className="h-9 w-9 rounded-full bg-blue-900 flex items-center justify-center shadow-sm hover:bg-blue-800 transition-colors duration-200 min-[380px]:h-10 min-[380px]:w-10"
                   title="Settings"
-                  style={{ minWidth: 40, minHeight: 40 }}
                 >
                   <OptimizedImage
                     src="/images/login.png"
                     alt="Settings"
-                    className="w-10 h-10 min-[380px]:w-9 min-[380px]:h-9 object-contain"
-                    width={36}
-                    height={36}
+                    className="h-8 w-8 min-[380px]:h-9 min-[380px]:w-9 object-contain"
+                    width={32}
+                    height={32}
                   />
-                </Link>
-                {/* Orders Button */}
-                <Link
-                  to="/worker-orders"
-                  className="rounded-full bg-green-50 hover:bg-green-100 transition-colors duration-200 flex items-center justify-center shadow-sm px-3 min-[380px]:px-4 py-2 min-[380px]:py-2.5"
-                  title="Orders"
-                >
-                  <span className="text-base min-[380px]:text-lg font-bold text-green-700">Orders</span>
                 </Link>
               </div>
             </div>
@@ -382,32 +400,6 @@ export default function WorkerHome() {
           </div>
         </div>
       )}
-
-      <div className="mx-4 mt-2 sm:hidden">
-        <div className="overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-r from-white via-orange-50 to-amber-50 shadow-[0_10px_24px_rgba(249,115,22,0.10)]">
-          <div className="h-1 bg-gradient-to-r from-orange-400 via-amber-400 to-orange-500"></div>
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200/60">
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 21s6-4.35 6-10a6 6 0 10-12 0c0 5.65 6 10 6 10z" />
-                <circle cx="12" cy="11" r="2.5" fill="currentColor" stroke="none" />
-              </svg>
-            </div>
-            <p className="min-w-0 flex-1 truncate text-base font-extrabold tracking-tight text-gray-900 min-[390px]:text-lg">
-              {currentLocationName}
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Menu Section */}
       <div ref={menuSectionRef} className="container mx-auto px-4 py-8 pb-28">

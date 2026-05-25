@@ -1,11 +1,14 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import BackButton from '../../components/BackButton';
 import { useNotification } from '../../components/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { appendQueryParams, getLocationId } from '../../utils/location';
+import { appendQueryParams, getLocationId, getLocationName } from '../../utils/location';
+
+const CALENDAR_LOCATION_KEY = 'admin-sales-calendar-location';
+const ALL_LOCATIONS_VALUE = 'all';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
@@ -29,45 +32,126 @@ function Calendar() {
   const { showSuccess, showError } = useNotification();
   const { user } = useAuth();
   const currentLocationId = getLocationId(user?.location);
+  const [locations, setLocations] = useState([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [selectedLocationId, setSelectedLocationId] = useState(() => localStorage.getItem(CALENDAR_LOCATION_KEY) || currentLocationId || ALL_LOCATIONS_VALUE);
   const [availableDates, setAvailableDates] = useState([]); // Dates for selector
   const [months, setMonths] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null); // Data for selected date
-  const [dayCache, setDayCache] = useState({}); // Cache for daily summaries
-  const [monthsCache, setMonthsCache] = useState(null); // Cache for monthly summary
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const calendarCacheRef = useRef({});
+  const dayCacheRef = useRef({});
+  const activeLocationId = selectedLocationId || currentLocationId || ALL_LOCATIONS_VALUE;
+  const selectedLocation = locations.find((location) => getLocationId(location) === activeLocationId) || null;
+  const selectedLocationLabel = activeLocationId === ALL_LOCATIONS_VALUE
+    ? 'All Branches'
+    : getLocationName(selectedLocation, 'Selected branch');
 
-  const fetchInitial = useCallback(async (skipCache = false) => {
+  useEffect(() => {
+    localStorage.setItem(CALENDAR_LOCATION_KEY, selectedLocationId);
+  }, [selectedLocationId]);
+
+  const loadLocations = useCallback(async () => {
+    try {
+      setLocationsLoading(true);
+      const data = await api.get('/locations?includeInactive=true');
+      const nextLocations = Array.isArray(data) ? data : [];
+      setLocations(nextLocations);
+      setSelectedLocationId((previousLocationId) => {
+        if (previousLocationId === ALL_LOCATIONS_VALUE) {
+          return ALL_LOCATIONS_VALUE;
+        }
+
+        if (previousLocationId && nextLocations.some((location) => getLocationId(location) === previousLocationId)) {
+          return previousLocationId;
+        }
+
+        if (currentLocationId && nextLocations.some((location) => getLocationId(location) === currentLocationId)) {
+          return currentLocationId;
+        }
+
+        return ALL_LOCATIONS_VALUE;
+      });
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      setLocations([]);
+    } finally {
+      setLocationsLoading(false);
+    }
+  }, [currentLocationId]);
+
+  const loadCalendarData = useCallback(async (locationId = activeLocationId) => {
+    const cacheKey = locationId || ALL_LOCATIONS_VALUE;
+    const cachedData = calendarCacheRef.current[cacheKey];
+
     setLoading(true);
     setError(null);
+    setDayLoading(true);
+    setDayError(null);
+    setSelectedDay(null);
+
+    if (cachedData) {
+      setAvailableDates(cachedData.availableDates || []);
+      setMonths(cachedData.months || []);
+      setSelectedDate((currentSelectedDate) => {
+        if (!cachedData.availableDates || cachedData.availableDates.length === 0) {
+          return getTodayStr();
+        }
+
+        if (currentSelectedDate && cachedData.availableDates.includes(currentSelectedDate)) {
+          return currentSelectedDate;
+        }
+
+        return cachedData.availableDates[0];
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
-      if (!skipCache && monthsCache && availableDates.length > 0) {
-        setMonths(monthsCache);
-        setSelectedDate(availableDates[0]);
-        setLoading(false);
-        return;
-      }
-      const data = await api.get(appendQueryParams('/orders/sales-summary/dates', { locationId: currentLocationId }));
-      const dates = data || [];
-      setAvailableDates(dates);
-      setSelectedDate(dates.length > 0 ? dates[0] : getTodayStr());
-      const monthly = await api.get(appendQueryParams('/orders/monthly-summary', { locationId: currentLocationId }));
-      setMonths(monthly || []);
-      setMonthsCache(monthly || []);
-    } catch (err) {
+      const [dates, monthly] = await Promise.all([
+        api.get(appendQueryParams('/orders/sales-summary/dates', { locationId: cacheKey })),
+        api.get(appendQueryParams('/orders/monthly-summary', { locationId: cacheKey }))
+      ]);
+      const nextAvailableDates = Array.isArray(dates) ? dates : [];
+      const nextMonths = Array.isArray(monthly) ? monthly : [];
+      calendarCacheRef.current[cacheKey] = {
+        availableDates: nextAvailableDates,
+        months: nextMonths
+      };
+      setAvailableDates(nextAvailableDates);
+      setMonths(nextMonths);
+      setSelectedDate((currentSelectedDate) => {
+        if (nextAvailableDates.length === 0) {
+          return getTodayStr();
+        }
+
+        if (currentSelectedDate && nextAvailableDates.includes(currentSelectedDate)) {
+          return currentSelectedDate;
+        }
+
+        return nextAvailableDates[0];
+      });
+    } catch (error) {
+      console.error('Error fetching sales data:', error);
       setError('Failed to fetch sales data.');
     } finally {
       setLoading(false);
     }
-  }, [monthsCache, availableDates, currentLocationId]);
+  }, [activeLocationId]);
 
   useEffect(() => {
-    fetchInitial();
-  }, [currentLocationId]);
+    loadLocations();
+  }, [loadLocations]);
+
+  useEffect(() => {
+    loadCalendarData(activeLocationId);
+  }, [activeLocationId, loadCalendarData]);
 
   // Fetch sales summary for selected date
   useEffect(() => {
@@ -76,21 +160,17 @@ function Calendar() {
       setDayLoading(true);
       setDayError(null);
       try {
-        // Always send date in YYYY-MM-DD format
-        const dateObj = new Date(selectedDate);
-        const yyyy = dateObj.getFullYear();
-        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(dateObj.getDate()).padStart(2, '0');
-        const formattedDate = `${yyyy}-${mm}-${dd}`;
-        // Check cache first
-        if (dayCache[formattedDate]) {
-          setSelectedDay(dayCache[formattedDate]);
+        const formattedDate = selectedDate;
+        const cacheKey = `${activeLocationId}:${formattedDate}`;
+        const cachedDay = dayCacheRef.current[cacheKey];
+        if (cachedDay) {
+          setSelectedDay(cachedDay);
           setDayLoading(false);
           return;
         }
-        const day = await api.get(appendQueryParams('/orders/sales-summary', { date: formattedDate, locationId: currentLocationId }));
+        const day = await api.get(appendQueryParams('/orders/sales-summary', { date: formattedDate, locationId: activeLocationId }));
         setSelectedDay(day || null);
-        setDayCache(prev => ({ ...prev, [formattedDate]: day || null }));
+        dayCacheRef.current[cacheKey] = day || null;
       } catch (err) {
         setDayError('Failed to fetch sales for selected date.');
         setSelectedDay(null);
@@ -99,24 +179,25 @@ function Calendar() {
       }
     }
     fetchDay();
-  }, [selectedDate, currentLocationId]);
+  }, [selectedDate, activeLocationId]);
 
   const [deleteLoading, setDeleteLoading] = useState(false);
   async function handleDeleteAll() {
+    if (activeLocationId === ALL_LOCATIONS_VALUE) {
+      showError('Choose a single branch before deleting sales and orders.');
+      return;
+    }
     setShowDeleteDialog(false);
     setDeleteLoading(true);
     try {
-      await api.delete('/orders/all');
-      setDayCache({});
-      setMonthsCache(null);
-      setSelectedDay(null);
-      const dates = await api.get(appendQueryParams('/orders/sales-summary/dates', { locationId: currentLocationId }));
-      const dateList = dates || [];
-      setAvailableDates(dateList);
-      setSelectedDate(dateList.length > 0 ? dateList[0] : getTodayStr());
-      const monthly = await api.get(appendQueryParams('/orders/monthly-summary', { locationId: currentLocationId }));
-      setMonths(monthly || []);
-      setMonthsCache(monthly || []);
+      await api.delete(appendQueryParams('/orders/all', { locationId: activeLocationId }));
+      delete calendarCacheRef.current[activeLocationId];
+      Object.keys(dayCacheRef.current).forEach((key) => {
+        if (key.startsWith(`${activeLocationId}:`)) {
+          delete dayCacheRef.current[key];
+        }
+      });
+      await loadCalendarData(activeLocationId);
       showSuccess('All sales and orders deleted successfully.');
     } catch (err) {
       showError('Failed to delete all sales and orders.');
@@ -161,6 +242,43 @@ function Calendar() {
               <div className="text-red-500 text-center py-8">{error}</div>
             ) : (
               <>
+                <div className="mb-4 pt-2">
+                  <div className="flex justify-center">
+                    <span className="relative z-10 -mb-3 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-700 shadow-sm">
+                      Show sales for
+                    </span>
+                  </div>
+                  <div className="rounded-2xl border border-blue-200 bg-gradient-to-b from-blue-50 to-orange-50 px-4 pb-4 pt-5 shadow-sm">
+                    <label className="sr-only" htmlFor="sales-calendar-location-select">
+                      Show sales for
+                    </label>
+                    <select
+                      id="sales-calendar-location-select"
+                      value={selectedLocationId}
+                      onChange={(e) => setSelectedLocationId(e.target.value)}
+                      disabled={locationsLoading}
+                      className="shadow-sm border border-blue-200 rounded-lg w-full max-w-sm mx-auto py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 transition-all duration-200 bg-white"
+                    >
+                      <option value={ALL_LOCATIONS_VALUE}>All branches</option>
+                      {locations.map((location) => {
+                        const locationId = getLocationId(location);
+                        return (
+                          <option key={locationId} value={locationId}>
+                            {getLocationName(location, 'Unassigned')}
+                            {location.isActive === false ? ' (Archived)' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="mt-2 text-center text-xs text-blue-700 font-medium">
+                      Viewing {selectedLocationLabel}
+                    </p>
+                    {locationsLoading && (
+                      <p className="mt-1 text-center text-xs text-gray-500">Loading branches...</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Date selector */}
                 <div className="flex items-center justify-center gap-2 mb-4">
                   {/* Previous date button */}
@@ -214,8 +332,10 @@ function Calendar() {
                   </button>
                   <button
                     type="button"
-                    className="bg-red-100 hover:bg-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg shadow transition"
+                    className="bg-red-100 hover:bg-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => setShowDeleteDialog(true)}
+                    disabled={activeLocationId === ALL_LOCATIONS_VALUE}
+                    title={activeLocationId === ALL_LOCATIONS_VALUE ? 'Choose a single branch to delete sales and orders' : 'Delete all sales and orders'}
                   >
                     Delete
                   </button>

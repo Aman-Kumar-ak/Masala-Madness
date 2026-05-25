@@ -81,7 +81,7 @@ export default function Home() {
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
-        const data = await api.get('/discounts/active');
+        const data = await api.get(appendQueryParams('/discounts/active', { locationId: currentLocationId }));
         setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
@@ -89,7 +89,7 @@ export default function Home() {
     };
 
     fetchActiveDiscount();
-  }, []);
+  }, [currentLocationId]);
 
   // Fetch pending orders count (make it reusable)
   const fetchPendingOrdersCount = useCallback(async () => {

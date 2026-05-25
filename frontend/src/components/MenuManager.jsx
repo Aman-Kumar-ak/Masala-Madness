@@ -440,7 +440,7 @@ const MenuManager = ({
                 value={selectedLocationId}
                 onChange={(event) => onLocationChange?.(event.target.value)}
                 disabled={locationLoading || locations.length === 0}
-                className="w-full rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                className="w-full rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm focus:outline-none focus:ring-0 focus:border-orange-200"
               >
                 {locations.length === 0 ? (
                   <option value="">{locationLoading ? 'Loading locations...' : 'No locations available'}</option>

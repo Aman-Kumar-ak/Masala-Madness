@@ -9,7 +9,7 @@ import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment
 import { api } from '../../utils/api';
 import AuthContext from '../../contexts/AuthContext';
 import { buildKotDataFromOrder, sendKotToPrinter } from '../../utils/kotPrint';
-import { getLocationId } from '../../utils/location';
+import { appendQueryParams, getLocationId } from '../../utils/location';
 
 function getISTISOString(date) {
   const d = date ? new Date(date) : new Date();
@@ -31,12 +31,12 @@ export default function WorkerCart() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [defaultUpiAddress, setDefaultUpiAddress] = useState(null);
   const { showSuccess, showError, showWarning, showInfo } = useNotification();
-  const [manualDiscount, setManualDiscount] = useState(0);
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [manualPayment, setManualPayment] = useState({ cash: 0, online: 0 });
   const [showCustomPaymentDialog, setShowCustomPaymentDialog] = useState(false);
   const [showCashConfirmDialog, setShowCashConfirmDialog] = useState(false);
   const { user } = useContext(AuthContext);
+  const currentLocationId = getLocationId(user?.location);
   // Printer connection state
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [savedKotData, setSavedKotData] = useState(null);
@@ -62,11 +62,7 @@ export default function WorkerCart() {
     if (activeDiscount && subtotal >= activeDiscount.minOrderAmount) {
       percentageDiscount = Math.round((subtotal * activeDiscount.percentage) / 100);
     }
-    // Ensure manual discount does not exceed the remaining amount after percentage discount
-    const maxManualDiscount = Math.max(0, subtotal - percentageDiscount);
-    const finalManualDiscount = Math.min(manualDiscount, maxManualDiscount);
-
-    return percentageDiscount + finalManualDiscount;
+    return percentageDiscount;
   };
 
   const discountAmount = calculateDiscount();
@@ -76,7 +72,7 @@ export default function WorkerCart() {
   useEffect(() => {
     const fetchActiveDiscount = async () => {
       try {
-        const data = await api.get('/discounts/active');
+        const data = await api.get(appendQueryParams('/discounts/active', { locationId: currentLocationId }));
         setActiveDiscount(data);
       } catch (error) {
         console.error('Error fetching discount:', error);
@@ -99,7 +95,7 @@ export default function WorkerCart() {
 
     fetchActiveDiscount();
     fetchDefaultUpiAddress();
-  }, []);
+  }, [currentLocationId]);
 
   useEffect(() => {
     setIsPrinterConnected(checkPrinterConnection());
@@ -232,7 +228,7 @@ export default function WorkerCart() {
       totalAmount,
       discountAmount,
       discountPercentage: activeDiscount?.percentage || 0,
-      manualDiscount,
+      manualDiscount: 0,
       paymentMethod: isPaid ? finalPaymentMethod : "Pending",
       isPaid,
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
@@ -551,33 +547,6 @@ export default function WorkerCart() {
                     <span>-₹{Math.round(subtotal * activeDiscount.percentage / 100).toFixed(2)}</span>
                   </div>
                 )}
-
-                {/* Manual Discount Input */}
-                <div className="flex justify-between items-center text-gray-600 mb-2">
-                    <span className="font-medium">Discount:</span>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="number"
-                            value={manualDiscount || ''}
-                            onChange={(e) => handleManualDiscountChange(Math.max(0, parseFloat(e.target.value) || 0))}
-                            className="w-24 text-right border rounded-md px-2 py-1 text-sm focus:ring-orange-500 focus:border-orange-500"
-                            placeholder="0.00"
-                            min="0"
-                            step="any"
-                        />
-                        {manualDiscount > 0 && (
-                            <button
-                                onClick={() => setManualDiscount(0)}
-                                className="p-1 rounded-full text-red-500 hover:bg-red-100 transition-colors"
-                                aria-label="Remove manual discount"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        )}
-                    </div>
-                </div>
 
                 <div className="flex justify-between font-bold text-xl pt-3 border-t border-gray-100 text-gray-800">
                   <span>Total Discount:</span>

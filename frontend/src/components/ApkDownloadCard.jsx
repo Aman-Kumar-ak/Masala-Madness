@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ConfirmationDialog from './ConfirmationDialog';
 
 const APK_PATH = '/downloads/masala-madness.apk';
 const APK_FILENAME = 'masala-madness.apk';
@@ -6,6 +7,7 @@ const WEBSITE_URL = 'https://masala-madness.vercel.app';
 
 export default function ApkDownloadCard() {
   const [copied, setCopied] = useState(false);
+  const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
 
   const copyWebsiteLink = async () => {
     try {
@@ -17,19 +19,29 @@ export default function ApkDownloadCard() {
     }
   };
 
+  const confirmDownload = () => {
+    const link = document.createElement('a');
+    link.href = APK_PATH;
+    link.download = APK_FILENAME;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setShowDownloadConfirm(false);
+  };
+
   return (
     <div className="mb-6 w-full space-y-3">
-      <a
+      <button
+        type="button"
         id="apk-download"
-        href={APK_PATH}
-        download={APK_FILENAME}
+        onClick={() => setShowDownloadConfirm(true)}
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-orange-700 active:bg-orange-800"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
         </svg>
         Download APK
-      </a>
+      </button>
 
       <div className="flex items-center gap-2 px-1 pt-1">
         <a
@@ -64,6 +76,17 @@ export default function ApkDownloadCard() {
           <span>{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
+
+      <ConfirmationDialog
+        isOpen={showDownloadConfirm}
+        onClose={() => setShowDownloadConfirm(false)}
+        onConfirm={confirmDownload}
+        title="Download APK"
+        message="Do you want to download the Masala Madness APK file?"
+        confirmText="Download"
+        cancelText="Cancel"
+        type="info"
+      />
     </div>
   );
 }

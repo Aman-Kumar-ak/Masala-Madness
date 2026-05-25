@@ -21,12 +21,12 @@ const ToggleSwitch = ({ isActive, onToggle, label, disabled = false }) => {
       <input
         type="checkbox"
         value=""
-        className="sr-only peer"
+        className="sr-only peer focus:outline-none"
         checked={isActive}
         onChange={onToggle}
         disabled={disabled}
       />
-      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+      <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
       <span className="ml-3 text-sm font-medium text-gray-900 dark:text-gray-900 mt-0.5">{label}</span>
     </label>
   );
@@ -119,7 +119,7 @@ const Settings = () => {
   useKeyboardScrollAdjustment();
   const { user, isAuthenticated, logout, getUserDevices, revokeDevice, setAuthOperationInProgress, clearAuthOperationInProgress, loading, setUser } = useAuth();
   const navigate = useNavigate();
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, showWarning } = useNotification();
   
   // State for active tab
   const [activeTab, setActiveTab] = useState('adminControl');
@@ -961,6 +961,15 @@ const Settings = () => {
   };
 
   const handleDeleteLocation = (location) => {
+    const assignedUsers = usersByLocation[getLocationId(location)] || 0;
+    if (assignedUsers > 0) {
+      showWarning(
+        `Transfer ${assignedUsers} user${assignedUsers === 1 ? '' : 's'} from ${location.name} to another active location before archiving.`,
+        2500
+      );
+      return;
+    }
+
     setLocationToDelete(location);
     setShowDeleteLocationConfirm(true);
   };
@@ -1628,7 +1637,7 @@ const Settings = () => {
                               </div>
 
                               {!isEditing && (
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
                                   <button
                                     type="button"
                                     className="rounded-full bg-blue-100 p-2 text-blue-600 hover:bg-blue-200"
@@ -1639,17 +1648,17 @@ const Settings = () => {
                                       <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                   </button>
-                                  <button
-                                    type="button"
-                                    className={`rounded-full p-2 ${location.isActive === false ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
-                                    onClick={() => handleDeleteLocation(location)}
-                                    title={assignedUsers > 0 ? 'Reassign users before deleting this location' : 'Archive location'}
-                                    disabled={location.isActive === false || locationActionLoading}
+                                  <div
+                                    className="rounded-full bg-white/80 px-3 py-2 shadow-sm ring-1 ring-orange-100"
+                                    title={assignedUsers > 0 ? 'Transfer users before archiving this location' : 'Archive location'}
                                   >
-                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                  </button>
+                                    <ToggleSwitch
+                                      isActive={location.isActive !== false}
+                                      onToggle={() => handleDeleteLocation(location)}
+                                      label={location.isActive === false ? 'Archived' : 'Active'}
+                                      disabled={location.isActive === false || locationActionLoading}
+                                    />
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -2160,7 +2169,7 @@ const Settings = () => {
         onClose={cancelDeleteLocation}
         onConfirm={confirmDeleteLocation}
         title="Archive Location"
-        message={`Archive '${locationToDelete?.name}'? Its menu backup will remain safe, but reassign users from this location before archiving if needed.`}
+        message={`Archive '${locationToDelete?.name}'? Its menu backup will remain safe. Users must already be transferred to another active location.`}
         confirmText={locationActionLoading ? 'Archiving...' : 'Yes, Archive'}
         cancelText="Cancel"
         type="danger"
