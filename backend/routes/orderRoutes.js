@@ -34,26 +34,33 @@ async function getLocationFromRequest(req, options = {}) {
     preferUserLocation = false
   } = options;
 
-  let locationId = null;
+  const candidateLocationIds = [];
 
   if (preferUserLocation && req.user?.location) {
-    locationId = getLocationIdValue(req.user.location);
+    candidateLocationIds.push(getLocationIdValue(req.user.location));
   }
 
-  if (!locationId && req.query?.[queryKey]) {
-    locationId = req.query[queryKey];
+  if (req.query?.[queryKey]) {
+    candidateLocationIds.push(req.query[queryKey]);
   }
 
-  if (!locationId && req.body?.[bodyKey]) {
-    locationId = req.body[bodyKey];
+  if (req.body?.[bodyKey]) {
+    candidateLocationIds.push(req.body[bodyKey]);
   }
 
-  if (!locationId && req.user?.location) {
-    locationId = getLocationIdValue(req.user.location);
+  if (!preferUserLocation && req.user?.location) {
+    candidateLocationIds.push(getLocationIdValue(req.user.location));
   }
 
-  if (locationId) {
-    return resolveLocation(locationId, { allowInactive });
+  for (const candidateId of candidateLocationIds) {
+    if (!candidateId) {
+      continue;
+    }
+
+    const resolvedLocation = await resolveLocation(candidateId, { allowInactive });
+    if (resolvedLocation) {
+      return resolvedLocation;
+    }
   }
 
   if (fallbackToDefault) {
@@ -95,36 +102,38 @@ async function updateSalesCalendarForLocation({
 
   const monthKey = orderDate.toISOString().slice(0, 7);
   const dayKey = orderDate.toISOString().slice(8, 10);
-
-  const calendar = await SalesCalendar.findOneAndUpdate(
-    { month: monthKey, location: locationId },
-    {
-      $setOnInsert: {
-        month: monthKey,
-        location: locationId,
-        locationName: locationName || null
-      },
-      $set: {
-        locationName: locationName || null
-      },
-      $inc: {
-        [`days.${dayKey}.totalAmount`]: amountDelta,
-        [`days.${dayKey}.paidOrderCount`]: orderCountDelta
-      }
+  const update = {
+    $setOnInsert: {
+      month: monthKey,
+      location: locationId,
+      locationName: locationName || null
     },
-    { upsert: true, new: true }
-  );
+    $set: {
+      locationName: locationName || null
+    },
+    $inc: {
+      [`days.${dayKey}.totalAmount`]: amountDelta,
+      [`days.${dayKey}.paidOrderCount`]: orderCountDelta
+    }
+  };
 
-  const dayData = calendar.days.get(dayKey) || { totalAmount: 0, paidOrderCount: 0 };
-  const nextTotalAmount = Math.max(0, dayData.totalAmount || 0);
-  const nextPaidOrderCount = Math.max(0, dayData.paidOrderCount || 0);
+  try {
+    await SalesCalendar.updateOne(
+      { month: monthKey, location: locationId },
+      update,
+      { upsert: true }
+    );
+  } catch (error) {
+    if (error?.code === 11000) {
+      await SalesCalendar.updateOne(
+        { month: monthKey, location: locationId },
+        update,
+        { upsert: false }
+      );
+      return;
+    }
 
-  if (nextTotalAmount !== dayData.totalAmount || nextPaidOrderCount !== dayData.paidOrderCount) {
-    calendar.days.set(dayKey, {
-      totalAmount: nextTotalAmount,
-      paidOrderCount: nextPaidOrderCount
-    });
-    await calendar.save();
+    console.error('Sales calendar update failed:', error);
   }
 }
 
