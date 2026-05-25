@@ -28,6 +28,9 @@ async function resolveLocation(locationId, { allowInactive = false, fallbackToDe
   let location = null;
 
   if (locationId) {
+    if (typeof locationId === 'string' && !mongoose.Types.ObjectId.isValid(locationId)) {
+      return null;
+    }
     location = await Location.findById(locationId);
   } else if (fallbackToDefault) {
     location = await getDefaultLocation();

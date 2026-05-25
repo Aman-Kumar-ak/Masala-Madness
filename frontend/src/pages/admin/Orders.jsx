@@ -10,12 +10,13 @@ import { useSpring, animated } from '@react-spring/web';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useAuth } from "../../contexts/AuthContext";
-import { appendQueryParams, getLocationId, isOrderEventForLocation } from "../../utils/location";
+import { appendQueryParams, getLocationId, getLocationName, isOrderEventForLocation } from "../../utils/location";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // At the top, before component definition:
 const ORDER_FILTER_KEY = 'admin-orders-filter';
+const ORDER_LOCATION_KEY = 'admin-orders-location';
 
 // OrderCard component for per-order animation
 function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST, handleDeleteClick, deleteLoading, hideDeleteButton, isDeletedSection }) {
@@ -71,7 +72,7 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
             <h3 className="text-lg font-semibold mr-2 whitespace-nowrap">Order #{order.orderNumber}</h3>
             {isDeletedSection && (
               <button
-                onClick={() => handleDeleteClick(order.orderId)}
+                onClick={() => handleDeleteClick(order)}
                 disabled={deleteLoading}
                 className="ml-2 p-1.5 rounded-full hover:bg-red-100 focus:bg-red-100 focus:outline-none transition-colors duration-200 flex items-center justify-center"
                 aria-label="Permanently delete order"
@@ -246,8 +247,50 @@ const Orders = () => {
   // const [orderFilter, setOrderFilter] = useState('all');
   // With:
   const [orderFilter, setOrderFilter] = useState('all');
+  const [locations, setLocations] = useState([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [selectedLocationId, setSelectedLocationId] = useState(() => localStorage.getItem(ORDER_LOCATION_KEY) || '');
+  const activeLocationId = selectedLocationId || currentLocationId || 'all';
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, type: '', message: '', onConfirm: null });
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        setLocationsLoading(true);
+        const data = await api.get('/locations?includeInactive=true');
+        setLocations(data || []);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        setLocations([]);
+      } finally {
+        setLocationsLoading(false);
+      }
+    };
+
+    loadLocations();
+  }, []);
+
+  useEffect(() => {
+    if (locationsLoading) {
+      return;
+    }
+
+    if (selectedLocationId === 'all' || !selectedLocationId) {
+      return;
+    }
+
+    const hasSelectedLocation = locations.some((location) => getLocationId(location) === selectedLocationId);
+    if (!hasSelectedLocation) {
+      setSelectedLocationId('');
+    }
+  }, [locations, locationsLoading, selectedLocationId]);
+
+  useEffect(() => {
+    if (selectedLocationId) {
+      localStorage.setItem(ORDER_LOCATION_KEY, selectedLocationId);
+    }
+  }, [selectedLocationId]);
 
   // Helper to parse custom payment amounts from the paymentMethod string
   const parseCustomPaymentAmounts = (paymentMethodString) => {
@@ -265,7 +308,7 @@ const Orders = () => {
     try {
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
-      const deletedOrdersData = await api.get(appendQueryParams(`/orders/deleted/${dateToQuery}`, { locationId: currentLocationId }));
+      const deletedOrdersData = await api.get(appendQueryParams(`/orders/deleted/${dateToQuery}`, { locationId: activeLocationId }));
       setDeletedOrders(deletedOrdersData || []);
     } catch (error) {
       setError('Failed to load deleted orders. Please try again.');
@@ -280,7 +323,7 @@ const Orders = () => {
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
       const [ordersData] = await Promise.all([
-        api.get(appendQueryParams(`/orders/date/${dateToQuery}`, { locationId: currentLocationId })),
+        api.get(appendQueryParams(`/orders/date/${dateToQuery}`, { locationId: activeLocationId })),
       ]);
       setOrders(ordersData.orders || []);
       setStats(ordersData.stats || {
@@ -304,13 +347,13 @@ const Orders = () => {
     return () => {
       isMounted.current = false;
     };
-  }, [selectedDate, refreshKey, currentLocationId]);
+  }, [selectedDate, refreshKey, activeLocationId]);
 
   useEffect(() => {
     if (!socket) return;
     const handleOrderUpdate = (data) => {
       if (!isMounted.current) return;
-      if (!isOrderEventForLocation(data, currentLocationId)) {
+      if (activeLocationId !== 'all' && !isOrderEventForLocation(data, activeLocationId)) {
         return;
       }
       if (data?.type === 'order-deleted' && data?.orderId) {
@@ -340,32 +383,19 @@ const Orders = () => {
     return () => {
       socket.off('order-update', handleOrderUpdate);
     };
-  }, [socket, selectedDate, refreshKey, currentLocationId]);
-
-  // Only fetch if the selected date or refreshKey has changed, not just because the list is empty
-  const ordersDate = orders[0]?.createdAt?.slice(0, 10);
-  const deletedOrdersDate = deletedOrders[0]?.createdAt?.slice(0, 10);
+  }, [socket, selectedDate, refreshKey, activeLocationId]);
 
   // In useEffect for filter switching and data loading, clear notification
   useEffect(() => {
     setNotification(null); // Clear notification when switching filters or reloading
+    setLoading(true);
     if (orderFilter === 'deleted') {
-      if (deletedOrdersDate !== selectedDate && selectedDate) {
-        setLoading(true);
-        loadDeletedOrders();
-      } else {
-        setLoading(false);
-      }
+      loadDeletedOrders();
     } else {
-      if (ordersDate !== selectedDate && selectedDate) {
-        setLoading(true);
-        loadOrders();
-      } else {
-        setLoading(false);
-      }
+      loadOrders();
     }
     // eslint-disable-next-line
-  }, [selectedDate, refreshKey, orderFilter, currentLocationId]);
+  }, [selectedDate, refreshKey, orderFilter, activeLocationId]);
 
   const handleDateChange = (e) => {
     if (!e.target.value) {
@@ -421,12 +451,14 @@ const Orders = () => {
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
-    setShowDeleteConfirmation(false);
-    setOrderToDelete(null);
-    setDeleteLoading(true);
-    setLoading(true); // Show spinner for the whole list
+      setShowDeleteConfirmation(false);
+      setOrderToDelete(null);
+      setDeleteLoading(true);
+      setLoading(true); // Show spinner for the whole list
     try {
-      await api.delete(`/orders/${orderToDelete.orderId}`);
+      await api.delete(appendQueryParams(`/orders/${orderToDelete.orderId}`, {
+        locationId: getLocationId(orderToDelete.location) || activeLocationId
+      }));
       setNotification({
         message: `Order #${orderToDelete.orderNumber} has been deleted successfully`,
         type: 'delete',
@@ -458,7 +490,7 @@ const Orders = () => {
     setDownloadLoading(true);
     try {
       // Get signed download link from backend
-      const signedUrl = await api.getSignedExcelLink(selectedDate, currentLocationId);
+      const signedUrl = await api.getSignedExcelLink(selectedDate, activeLocationId);
       // Fetch the file as a blob
       const response = await fetch(signedUrl);
       if (!response.ok) throw new Error('Failed to fetch Excel file');
@@ -523,12 +555,14 @@ const Orders = () => {
   });
 
   // Permanently delete a single deleted order with confirmation
-  const handlePermanentDeleteOne = (orderId) => {
+  const handlePermanentDeleteOne = (order) => {
     setConfirmDialog({ open: false, type: '', message: '', onConfirm: null });
     // Optimistically remove the order from the UI
-    setDeletedOrders(prev => prev.filter(order => order.orderId !== orderId));
+    setDeletedOrders(prev => prev.filter(item => item.orderId !== order.orderId));
     setLoading(true);
-    api.delete(`/orders/deleted/permanent/${orderId}`)
+    api.delete(appendQueryParams(`/orders/deleted/permanent/${order.orderId}`, {
+      locationId: getLocationId(order.location) || activeLocationId
+    }))
       .then(() => {
         setNotification({ message: 'Order permanently deleted.', type: 'delete', duration: 2000 });
         loadDeletedOrders();
@@ -538,17 +572,16 @@ const Orders = () => {
       })
       .finally(() => {
         setLoading(false);
-        setPermanentDeleteOrderId(null);
       });
   };
 
   // Add this function in the Orders component, before handlePermanentDeleteOne
-  const handlePermanentDeleteClick = (orderId) => {
+  const handlePermanentDeleteClick = (order) => {
     setConfirmDialog({
       open: true,
       type: 'single',
       message: 'Are you sure you want to permanently delete this order?',
-      onConfirm: () => handlePermanentDeleteOne(orderId)
+      onConfirm: () => handlePermanentDeleteOne(order)
     });
   };
 
@@ -562,7 +595,9 @@ const Orders = () => {
       onConfirm: async () => {
         try {
           setLoading(true);
-          await api.delete(`/orders/deleted/permanent/all/${selectedDate}`);
+          await api.delete(appendQueryParams(`/orders/deleted/permanent/all/${selectedDate}`, {
+            locationId: activeLocationId
+          }));
           setNotification({ message: 'All deleted orders permanently deleted.', type: 'delete', duration: 2000 });
           await loadDeletedOrders();
         } catch (error) {
@@ -614,6 +649,40 @@ const Orders = () => {
       <div className="p-4 pt-16">
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-6">Order Management</h1>
+
+          <div className="mb-6 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-600">Branch Scope</p>
+                <p className="mt-1 text-sm text-gray-600">Switch between a single branch or all branches at once.</p>
+              </div>
+              <div className="w-full lg:max-w-sm">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Location
+                </label>
+                <select
+                  value={selectedLocationId || currentLocationId || 'all'}
+                  onChange={(e) => setSelectedLocationId(e.target.value)}
+                  disabled={locationsLoading}
+                  className="shadow-sm border border-orange-200 rounded-lg w-full py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 transition-all duration-200 bg-white"
+                >
+                  <option value="all">All branches</option>
+                  {locations.map((location) => {
+                    const locationId = getLocationId(location);
+                    return (
+                      <option key={locationId} value={locationId}>
+                        {getLocationName(location, 'Unassigned')}
+                        {location.isActive === false ? ' (Archived)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+                {locationsLoading && (
+                  <p className="mt-2 text-xs text-gray-500">Loading locations...</p>
+                )}
+              </div>
+            </div>
+          </div>
           
           {/* Date Picker + Excel Download */}
           <div className="mb-6">

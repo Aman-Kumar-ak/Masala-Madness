@@ -3,6 +3,7 @@ const router = express.Router();
 const ExcelJS = require('exceljs');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
+const Location = require('../models/Location');
 const { getLocationOrderModel } = require('../models/Order');
 const DeletedOrder = require('../models/DeletedOrder');
 const SalesCalendar = require('../models/SalesCalendar');
@@ -56,6 +57,9 @@ async function getLocationFromRequest(req, options = {}) {
     if (!candidateId) {
       continue;
     }
+    if (candidateId === 'all') {
+      continue;
+    }
 
     const resolvedLocation = await resolveLocation(candidateId, { allowInactive });
     if (resolvedLocation) {
@@ -83,6 +87,91 @@ function getScopedOrderModel(location) {
   }
 
   return getLocationOrderModel(location._id);
+}
+
+async function getOrderScope(req, {
+  allowAll = false,
+  allowInactive = false,
+  fallbackToDefault = true,
+  preferUserLocation = false,
+  includeInactiveLocations = true
+} = {}) {
+  const requestedLocationId = req.query?.locationId ?? req.body?.locationId;
+
+  if (allowAll && requestedLocationId === 'all' && (req.user?.role === 'admin' || req.allOrdersAccessGranted)) {
+    const locations = await Location.find(includeInactiveLocations ? {} : { isActive: true })
+      .select('_id name isActive')
+      .sort({ name: 1 })
+      .lean();
+
+    return {
+      mode: 'all',
+      location: null,
+      locations,
+      locationId: 'all'
+    };
+  }
+
+  const location = await getLocationFromRequest(req, {
+    allowInactive,
+    fallbackToDefault,
+    preferUserLocation
+  });
+
+  return {
+    mode: 'single',
+    location,
+    locations: location ? [location] : [],
+    locationId: getLocationIdValue(location?._id)
+  };
+}
+
+function getOrderTargets(scope) {
+  return (scope.locations || []).map((location) => ({
+    location,
+    Order: getScopedOrderModel(location)
+  }));
+}
+
+function calculateStatsFromOrders(orders = []) {
+  const paidOrders = orders.filter((order) => order.isPaid);
+  const totalPaidOrders = paidOrders.length;
+  const totalRevenue = paidOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+  return {
+    totalOrders: orders.length,
+    totalPaidOrders,
+    totalRevenue,
+    avgOrderValue: totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0
+  };
+}
+
+async function fetchOrdersForScope(scope, queryBuilder, {
+  select = '-__v',
+  sort = { updatedAt: -1 }
+} = {}) {
+  const targets = getOrderTargets(scope);
+  const ordersByLocation = await Promise.all(targets.map(async ({ location, Order }) => {
+    const query = queryBuilder(location);
+    let finder = Order.find(query).select(select);
+    if (sort) {
+      finder = finder.sort(sort);
+    }
+    return finder.lean();
+  }));
+
+  const orders = ordersByLocation.flat();
+
+  if (sort) {
+    const [sortField, sortDirection] = Object.entries(sort)[0] || ['updatedAt', -1];
+    orders.sort((a, b) => {
+      const aValue = new Date(a[sortField] || a.updatedAt || a.createdAt || 0).getTime();
+      const bValue = new Date(b[sortField] || b.updatedAt || b.createdAt || 0).getTime();
+      return sortDirection >= 0 ? aValue - bValue : bValue - aValue;
+    });
+  }
+
+  return orders;
 }
 
 function clearLocationScopedCaches(date, locationId) {
@@ -146,33 +235,28 @@ async function updateSalesCalendarForLocation({
 }
 
 async function downloadExcelHandler(req, res) {
-  const location = await getLocationFromRequest(req, {
+  const scope = await getOrderScope(req, {
+    allowAll: true,
     allowInactive: true,
     fallbackToDefault: true
   });
 
   const { startOfDay, endOfDay } = getDateRange(req.params.date);
-  const locationId = location?._id || null;
-  const Order = getScopedOrderModel(location);
-
-  const [ordersStats, orders] = await Promise.all([
-    Order.calculateStats(startOfDay, endOfDay, locationId),
-    Order.find(
-      buildLocationQuery(locationId, {
+  const orders = await fetchOrdersForScope(
+    scope,
+    (location) => (scope.mode === 'all'
+      ? {
         createdAt: { $gte: startOfDay, $lte: endOfDay },
         deleted: { $ne: true }
-      })
-    )
-      .sort({ createdAt: 1 })
-      .lean()
-  ]);
+      }
+      : buildLocationQuery(location._id, {
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        deleted: { $ne: true }
+      })),
+    { sort: { createdAt: 1 }, select: '-__v' }
+  );
 
-  const stats = {
-    totalOrders: ordersStats?.totalOrders || 0,
-    totalPaidOrders: ordersStats?.totalPaidOrders || 0,
-    totalRevenue: ordersStats?.totalRevenue || 0,
-    avgOrderValue: ordersStats?.avgOrderValue || 0
-  };
+  const stats = calculateStatsFromOrders(orders);
 
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Orders');
@@ -198,7 +282,7 @@ async function downloadExcelHandler(req, res) {
     const dateObj = new Date(order.createdAt);
     worksheet.addRow({
       orderNumber: order.orderNumber,
-      locationName: order.locationName || location?.name || '',
+      locationName: order.locationName || '',
       date: dateObj.toLocaleDateString('en-IN'),
       time: dateObj.toLocaleTimeString('en-IN', {
         hour12: false,
@@ -239,7 +323,7 @@ router.delete('/all', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Access denied. Only admin can delete all data.' });
     }
 
-    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    const location = await getLocationFromRequest(req, { preferUserLocation: false });
     if (!location) {
       return res.status(400).json({ message: 'Valid location is required.' });
     }
@@ -260,22 +344,25 @@ router.delete('/all', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/sales-summary/dates', async (req, res) => {
+router.get('/sales-summary/dates', authenticateToken, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req);
-    const locationId = location?._id || null;
-    const Order = getScopedOrderModel(location);
-    const cacheKey = buildCacheKey('sales-summary-dates', locationId);
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      fallbackToDefault: true
+    });
+    const cacheKey = buildCacheKey('sales-summary-dates', scope.locationId);
 
     if (ordersCache.has(cacheKey)) {
       return res.json(ordersCache.get(cacheKey));
     }
 
-    const orders = await Order.find(
-      buildLocationQuery(locationId, { deleted: { $ne: true } })
-    )
-      .select('createdAt')
-      .lean();
+    const orders = await fetchOrdersForScope(
+      scope,
+      (location) => (scope.mode === 'all'
+        ? { deleted: { $ne: true } }
+        : buildLocationQuery(location._id, { deleted: { $ne: true } })),
+      { select: 'createdAt', sort: null }
+    );
 
     const datesSet = new Set();
     orders.forEach((order) => {
@@ -291,25 +378,34 @@ router.get('/sales-summary/dates', async (req, res) => {
   }
 });
 
-router.get('/sales-summary', async (req, res) => {
+router.get('/sales-summary', authenticateToken, async (req, res) => {
   try {
     const { date } = req.query;
     if (!date) {
       return res.status(400).json({ error: 'Date query param required.' });
     }
 
-    const location = await getLocationFromRequest(req);
-    const locationId = location?._id || null;
-    const Order = getScopedOrderModel(location);
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      fallbackToDefault: true
+    });
     const { startOfDay, endOfDay } = getDateRange(date);
 
-    const orders = await Order.find(
-      buildLocationQuery(locationId, {
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
-        deleted: { $ne: true },
-        isPaid: true
-      })
-    ).lean();
+    const orders = await fetchOrdersForScope(
+      scope,
+      (location) => (scope.mode === 'all'
+        ? {
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+          deleted: { $ne: true },
+          isPaid: true
+        }
+        : buildLocationQuery(location._id, {
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+          deleted: { $ne: true },
+          isPaid: true
+        })),
+      { sort: { createdAt: 1 } }
+    );
 
     let totalAmount = 0;
     let totalOrders = 0;
@@ -337,35 +433,43 @@ router.get('/sales-summary', async (req, res) => {
   }
 });
 
-router.get('/monthly-summary', async (req, res) => {
+router.get('/monthly-summary', authenticateToken, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req);
-    const locationId = location?._id || null;
-    const Order = getScopedOrderModel(location);
-    const cacheKey = buildCacheKey('monthly-summary', locationId);
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      fallbackToDefault: true
+    });
+    const cacheKey = buildCacheKey('monthly-summary', scope.locationId);
 
     if (ordersCache.has(cacheKey)) {
       return res.json(ordersCache.get(cacheKey));
     }
 
-    const months = await SalesCalendar.find(buildLocationQuery(locationId)).lean();
-    const result = months.map((monthDoc) => {
-      let totalAmount = 0;
-      let totalOrders = 0;
+    const monthQuery = scope.mode === 'all'
+      ? {}
+      : buildLocationQuery(scope.location?._id);
+
+    const months = await SalesCalendar.find(monthQuery).lean();
+    const aggregatedMonths = new Map();
+
+    months.forEach((monthDoc) => {
+      const current = aggregatedMonths.get(monthDoc.month) || {
+        month: monthDoc.month,
+        totalAmount: 0,
+        totalOrders: 0
+      };
 
       if (monthDoc.days) {
         for (const day of Object.values(monthDoc.days)) {
-          totalAmount += day.totalAmount || 0;
-          totalOrders += day.paidOrderCount || 0;
+          current.totalAmount += day.totalAmount || 0;
+          current.totalOrders += day.paidOrderCount || 0;
         }
       }
 
-      return {
-        month: monthDoc.month,
-        totalAmount,
-        totalOrders
-      };
+      aggregatedMonths.set(monthDoc.month, current);
     });
+
+    const result = Array.from(aggregatedMonths.values());
 
     result.sort((a, b) => b.month.localeCompare(a.month));
     ordersCache.set(cacheKey, result);
@@ -401,7 +505,10 @@ router.post('/confirm', authenticateToken, async (req, res) => {
     let previousTotalAmount = 0;
 
     if (orderId) {
-      location = await getLocationFromRequest(req, { preferUserLocation: true });
+      location = await getLocationFromRequest(req, {
+        preferUserLocation: req.user?.role !== 'admin',
+        allowInactive: req.user?.role === 'admin'
+      });
       if (!location) {
         return res.status(400).json({ message: 'Valid location is required.' });
       }
@@ -413,7 +520,7 @@ router.post('/confirm', authenticateToken, async (req, res) => {
       }
 
       const requestLocationId = getLocationIdValue(req.user?.location);
-      if (requestLocationId && order.location?.toString() !== requestLocationId) {
+      if (req.user?.role !== 'admin' && requestLocationId && order.location?.toString() !== requestLocationId) {
         return res.status(403).json({ message: 'Access denied for this location.' });
       }
 
@@ -474,7 +581,10 @@ router.post('/confirm', authenticateToken, async (req, res) => {
         });
       }
     } else {
-      location = await getLocationFromRequest(req, { preferUserLocation: true });
+      location = await getLocationFromRequest(req, {
+        preferUserLocation: req.user?.role !== 'admin',
+        allowInactive: req.user?.role === 'admin'
+      });
       if (!location) {
         return res.status(400).json({ message: 'Valid location is required.' });
       }
@@ -578,15 +688,18 @@ router.post('/confirm', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req);
-    const Order = getScopedOrderModel(location);
-    const orders = await Order.find(
-      buildLocationQuery(location?._id, { deleted: { $ne: true } })
-    )
-      .sort({ updatedAt: -1 })
-      .lean();
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      fallbackToDefault: true
+    });
+    const orders = await fetchOrdersForScope(
+      scope,
+      (location) => (scope.mode === 'all'
+        ? { deleted: { $ne: true } }
+        : buildLocationQuery(location._id, { deleted: { $ne: true } }))
+    );
 
     res.status(200).json(orders);
   } catch (error) {
@@ -595,33 +708,36 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/today', async (req, res) => {
+router.get('/today', authenticateToken, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req);
-    const locationId = location?._id || null;
-    const Order = getScopedOrderModel(location);
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      fallbackToDefault: true
+    });
     const now = new Date();
     const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
-    const cacheKey = buildCacheKey(todayUTC.toISOString().split('T')[0], locationId);
+    const cacheKey = buildCacheKey(todayUTC.toISOString().split('T')[0], scope.locationId);
     if (ordersCache.has(cacheKey)) {
       return res.status(200).json(ordersCache.get(cacheKey));
     }
 
-    const [stats, orders] = await Promise.all([
-      Order.calculateStats(todayUTC, tomorrowUTC, locationId),
-      Order.find(
-        buildLocationQuery(locationId, {
+    const orders = await fetchOrdersForScope(
+      scope,
+      (location) => (scope.mode === 'all'
+        ? {
           createdAt: { $gte: todayUTC, $lt: tomorrowUTC },
           deleted: { $ne: true }
-        })
-      )
-        .select('-__v')
-        .sort({ updatedAt: -1 })
-        .lean()
-    ]);
+        }
+        : buildLocationQuery(location._id, {
+          createdAt: { $gte: todayUTC, $lt: tomorrowUTC },
+          deleted: { $ne: true }
+        }))
+    );
+
+    const stats = calculateStatsFromOrders(orders);
 
     const result = { stats, orders };
     ordersCache.set(cacheKey, result);
@@ -633,30 +749,33 @@ router.get('/today', async (req, res) => {
   }
 });
 
-router.get('/date/:date', async (req, res) => {
+router.get('/date/:date', authenticateToken, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req);
-    const locationId = location?._id || null;
-    const Order = getScopedOrderModel(location);
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      fallbackToDefault: true
+    });
     const { startOfDay, endOfDay } = getDateRange(req.params.date);
-    const cacheKey = buildCacheKey(req.params.date, locationId);
+    const cacheKey = buildCacheKey(req.params.date, scope.locationId);
 
     if (ordersCache.has(cacheKey)) {
       return res.status(200).json(ordersCache.get(cacheKey));
     }
 
-    const [stats, orders] = await Promise.all([
-      Order.calculateStats(startOfDay, endOfDay, locationId),
-      Order.find(
-        buildLocationQuery(locationId, {
+    const orders = await fetchOrdersForScope(
+      scope,
+      (location) => (scope.mode === 'all'
+        ? {
           createdAt: { $gte: startOfDay, $lte: endOfDay },
           deleted: { $ne: true }
-        })
-      )
-        .select('-__v')
-        .sort({ updatedAt: -1 })
-        .lean()
-    ]);
+        }
+        : buildLocationQuery(location._id, {
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+          deleted: { $ne: true }
+        }))
+    );
+
+    const stats = calculateStatsFromOrders(orders);
 
     const result = { stats, orders };
     ordersCache.set(cacheKey, result);
@@ -671,15 +790,21 @@ router.get('/date/:date', async (req, res) => {
   }
 });
 
-router.get('/deleted/:date', async (req, res) => {
+router.get('/deleted/:date', authenticateToken, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req, { allowInactive: true });
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      allowInactive: true,
+      fallbackToDefault: true
+    });
     const { startOfDay, endOfDay } = getDateRange(req.params.date);
 
     const deletedOrders = await DeletedOrder.find(
-      buildLocationQuery(location?._id, {
-        createdAt: { $gte: startOfDay, $lte: endOfDay }
-      })
+      scope.mode === 'all'
+        ? { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+        : buildLocationQuery(scope.location?._id, {
+          createdAt: { $gte: startOfDay, $lte: endOfDay }
+        })
     )
       .sort({ updatedAt: -1 })
       .lean();
@@ -696,7 +821,7 @@ router.get('/deleted/:date', async (req, res) => {
 
 router.delete('/cleanup', adminAuth, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    const location = await getLocationFromRequest(req, { preferUserLocation: false });
     const Order = getScopedOrderModel(location);
     const dateToDeleteBefore = new Date();
     dateToDeleteBefore.setDate(dateToDeleteBefore.getDate() - 30);
@@ -718,22 +843,36 @@ router.delete('/cleanup', adminAuth, async (req, res) => {
   }
 });
 
-router.get('/today-revenue', async (req, res) => {
+router.get('/today-revenue', authenticateToken, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req);
-    const locationId = location?._id || null;
-    const Order = getScopedOrderModel(location);
+    const scope = await getOrderScope(req, {
+      allowAll: true,
+      fallbackToDefault: true
+    });
     const now = new Date();
     const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setDate(todayUTC.getDate() + 1);
 
-    const cacheKey = buildCacheKey(`revenue_${todayUTC.toISOString().split('T')[0]}`, locationId);
+    const cacheKey = buildCacheKey(`revenue_${todayUTC.toISOString().split('T')[0]}`, scope.locationId);
     if (ordersCache.has(cacheKey)) {
       return res.json(ordersCache.get(cacheKey));
     }
 
-    const stats = await Order.calculateStats(todayUTC, tomorrowUTC, locationId);
+    const orders = await fetchOrdersForScope(
+      scope,
+      (location) => (scope.mode === 'all'
+        ? {
+          createdAt: { $gte: todayUTC, $lt: tomorrowUTC },
+          deleted: { $ne: true }
+        }
+        : buildLocationQuery(location._id, {
+          createdAt: { $gte: todayUTC, $lt: tomorrowUTC },
+          deleted: { $ne: true }
+        }))
+    );
+
+    const stats = calculateStatsFromOrders(orders);
     ordersCache.set(cacheKey, stats);
     clearCacheEntry(cacheKey);
 
@@ -745,14 +884,23 @@ router.get('/today-revenue', async (req, res) => {
 });
 
 router.get('/excel-link/:date', authenticateToken, async (req, res) => {
-  const location = await getLocationFromRequest(req, { preferUserLocation: true });
-  if (!location) {
+  const scope = await getOrderScope(req, {
+    allowAll: true,
+    preferUserLocation: false
+  });
+
+  if (scope.mode !== 'all' && !scope.location) {
     return res.status(400).json({ message: 'Valid location is required.' });
   }
 
   const userId = req.user._id.toString();
   const date = req.params.date;
-  const locationId = location._id.toString();
+  const locationId = scope.mode === 'all' ? 'all' : scope.location._id.toString();
+
+  if (locationId === 'all' && req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'Access denied. Admin privileges required for all-branch orders.' });
+  }
+
   const expires = Date.now() + 5 * 60 * 1000;
   const signature = crypto
     .createHmac('sha256', SIGNED_URL_SECRET)
@@ -781,6 +929,10 @@ router.get('/excel/:date', async (req, res, next) => {
     if (sig !== expectedSig) {
       return res.status(403).json({ message: 'Invalid signature.' });
     }
+
+    if (locationId === 'all') {
+      req.allOrdersAccessGranted = true;
+    }
   } else {
     return adminAuth(req, res, () => downloadExcelHandler(req, res).catch(next));
   }
@@ -791,7 +943,10 @@ router.get('/excel/:date', async (req, res, next) => {
 router.delete('/:orderId', authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    const location = await getLocationFromRequest(req, {
+      preferUserLocation: req.user?.role !== 'admin',
+      allowInactive: req.user?.role === 'admin'
+    });
     if (!location) {
       return res.status(400).json({ message: 'Valid location is required.' });
     }
@@ -802,7 +957,7 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
     }
 
     const requestLocationId = getLocationIdValue(req.user?.location);
-    if (requestLocationId && order.location?.toString() !== requestLocationId) {
+    if (req.user?.role !== 'admin' && requestLocationId && order.location?.toString() !== requestLocationId) {
       return res.status(403).json({ message: 'Access denied for this location.' });
     }
 
@@ -872,7 +1027,10 @@ router.post('/:orderId/mark-kot', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'itemIndexes array required' });
     }
 
-    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    const location = await getLocationFromRequest(req, {
+      preferUserLocation: req.user?.role !== 'admin',
+      allowInactive: req.user?.role === 'admin'
+    });
     if (!location) {
       return res.status(400).json({ message: 'Valid location is required.' });
     }
@@ -883,7 +1041,7 @@ router.post('/:orderId/mark-kot', authenticateToken, async (req, res) => {
     }
 
     const requestLocationId = getLocationIdValue(req.user?.location);
-    if (requestLocationId && order.location?.toString() !== requestLocationId) {
+    if (req.user?.role !== 'admin' && requestLocationId && order.location?.toString() !== requestLocationId) {
       return res.status(403).json({ message: 'Access denied for this location.' });
     }
 
@@ -910,7 +1068,10 @@ router.post('/:orderId/add-items', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'newItems array required' });
     }
 
-    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    const location = await getLocationFromRequest(req, {
+      preferUserLocation: req.user?.role !== 'admin',
+      allowInactive: req.user?.role === 'admin'
+    });
     if (!location) {
       return res.status(400).json({ message: 'Valid location is required.' });
     }
@@ -921,7 +1082,7 @@ router.post('/:orderId/add-items', authenticateToken, async (req, res) => {
     }
 
     const requestLocationId = getLocationIdValue(req.user?.location);
-    if (requestLocationId && order.location?.toString() !== requestLocationId) {
+    if (req.user?.role !== 'admin' && requestLocationId && order.location?.toString() !== requestLocationId) {
       return res.status(403).json({ message: 'Access denied for this location.' });
     }
 
@@ -982,7 +1143,7 @@ router.delete('/deleted/permanent/:orderId', adminAuth, async (req, res) => {
   try {
     const location = await getLocationFromRequest(req, {
       allowInactive: true,
-      preferUserLocation: true
+      preferUserLocation: false
     });
     const { orderId } = req.params;
 
@@ -1002,16 +1163,21 @@ router.delete('/deleted/permanent/:orderId', adminAuth, async (req, res) => {
 
 router.delete('/deleted/permanent/all/:date', adminAuth, async (req, res) => {
   try {
-    const location = await getLocationFromRequest(req, {
+    const scope = await getOrderScope(req, {
+      allowAll: true,
       allowInactive: true,
-      preferUserLocation: true
+      preferUserLocation: false
     });
     const { startOfDay, endOfDay } = getDateRange(req.params.date);
 
     const result = await DeletedOrder.deleteMany(
-      buildLocationQuery(location?._id, {
-        createdAt: { $gte: startOfDay, $lte: endOfDay }
-      })
+      scope.mode === 'all'
+        ? {
+          createdAt: { $gte: startOfDay, $lte: endOfDay }
+        }
+        : buildLocationQuery(scope.location?._id, {
+          createdAt: { $gte: startOfDay, $lte: endOfDay }
+        })
     );
 
     res.status(200).json({
