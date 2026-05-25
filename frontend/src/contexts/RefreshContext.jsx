@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { isOrderEventForLocation } from '../utils/location';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const SOCKET_URL = 'https://masala-madness.onrender.com'; // Backend WebSocket endpoint
@@ -41,7 +42,7 @@ async function refreshTokenWithDeviceToken() {
 }
 
 export const RefreshProvider = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const getToken = () =>
     sessionStorage.getItem('token') ||
     localStorage.getItem('token') ||
@@ -133,6 +134,9 @@ export const RefreshProvider = ({ children }) => {
         setConnected(false);
       });
       newSocket.on('order-update', (data) => {
+        if (!isOrderEventForLocation(data, user?.location)) {
+          return;
+        }
         triggerRefresh();
       });
       newSocket.on('reconnect', () => {
@@ -144,7 +148,7 @@ export const RefreshProvider = ({ children }) => {
     return () => {
       if (newSocket) newSocket.disconnect();
     };
-  }, [isAuthenticated, loading, getToken()]);
+  }, [isAuthenticated, loading, getToken(), user?.location]);
 
   const triggerRefresh = () => {
     setRefresh(prev => prev + 1);

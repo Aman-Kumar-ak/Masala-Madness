@@ -8,7 +8,7 @@ import { api } from '../../utils/api';
 import OptimizedImage from "../../components/OptimizedImage";
 import { useRefresh } from "../../contexts/RefreshContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName } from "../../utils/location";
+import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName, isOrderEventForLocation } from "../../utils/location";
 
 export default function Home() {
   const { user } = useAuth();
@@ -188,7 +188,10 @@ export default function Home() {
   // Live update stats and pending orders on order-update socket event
   useEffect(() => {
     if (!socket) return;
-    const handleOrderUpdate = () => {
+    const handleOrderUpdate = (data) => {
+      if (!isOrderEventForLocation(data, currentLocationId)) {
+        return;
+      }
       fetchStats();
       fetchPendingOrdersCount();
     };
@@ -196,7 +199,7 @@ export default function Home() {
     return () => {
       socket.off('order-update', handleOrderUpdate);
     };
-  }, [socket, fetchPendingOrdersCount]);
+  }, [socket, fetchPendingOrdersCount, currentLocationId]);
 
   // Animate Orders
   useEffect(() => {
@@ -414,7 +417,7 @@ export default function Home() {
                 <p className="text-lg font-semibold text-gray-800">
                   {getCurrentDate()}
                 </p>
-                <p className="mt-1 inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-orange-600 shadow-sm">
+                <p className="mt-1 hidden sm:inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-orange-600 shadow-sm">
                   {currentLocationName}
                 </p>
               </div>
@@ -482,6 +485,32 @@ export default function Home() {
                 <span className="font-medium">Admin Panel</span>
               </Link>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-4 mt-2 sm:hidden">
+        <div className="overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-r from-white via-orange-50 to-amber-50 shadow-[0_12px_30px_rgba(249,115,22,0.12)]">
+          <div className="h-1 bg-gradient-to-r from-orange-400 via-amber-400 to-orange-500"></div>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200/60">
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 21s6-4.35 6-10a6 6 0 10-12 0c0 5.65 6 10 6 10z" />
+                <circle cx="12" cy="11" r="2.5" fill="currentColor" stroke="none" />
+              </svg>
+            </div>
+            <p className="min-w-0 flex-1 truncate text-lg font-extrabold tracking-tight text-gray-900 min-[390px]:text-xl">
+              {currentLocationName}
+            </p>
           </div>
         </div>
       </div>

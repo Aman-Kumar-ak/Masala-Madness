@@ -10,6 +10,7 @@ import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import AuthContext from '../../contexts/AuthContext';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { getLocationId, isOrderEventForLocation } from "../../utils/location";
 
 export default function PendingOrders() {
   useKeyboardScrollAdjustment();
@@ -68,6 +69,7 @@ export default function PendingOrders() {
   const [updatingOrders, setUpdatingOrders] = useState(new Set()); // Track which orders are being updated
 
   const { user } = useContext(AuthContext);
+  const currentLocationId = getLocationId(user?.location);
 
   // Save the scroll position before updates
   const saveScrollPosition = () => {
@@ -167,15 +169,23 @@ export default function PendingOrders() {
     if (socket) {
       const orderUpdateHandler = (data) => {
         console.log('Socket event received:', data.type);
+        if (!isOrderEventForLocation(data, currentLocationId)) {
+          return;
+        }
         
         if (data.type === 'order-confirmed') {
           // Remove the order from pending orders if it was just confirmed
           setPendingOrders(prev => prev.filter(order => order.orderId !== data.pendingOrderId));
         } else if (data.type === 'order-updated' && data.order) {
-          // Update specific order without full refresh
-          debouncedSetPendingOrders(prev => prev.map(order => 
-            order.orderId === data.order.orderId ? data.order : order
-          ));
+          // Keep pending list clean if the order has been paid
+          if (data.order.isPaid) {
+            debouncedSetPendingOrders(prev => prev.filter(order => order.orderId !== data.order.orderId));
+          } else {
+            // Update specific order without full refresh
+            debouncedSetPendingOrders(prev => prev.map(order => 
+              order.orderId === data.order.orderId ? data.order : order
+            ));
+          }
         } else if (data.type === 'order-deleted') {
           // Remove deleted order
           debouncedSetPendingOrders(prev => prev.filter(order => order.orderId !== data.orderId));
@@ -198,7 +208,7 @@ export default function PendingOrders() {
         socket.off('order-update', orderUpdateHandler);
       };
     }
-  }, [socket, fetchPendingOrders, debouncedSetPendingOrders]);
+  }, [socket, fetchPendingOrders, debouncedSetPendingOrders, currentLocationId]);
 
   // Effect for initial data fetching
   useEffect(() => {

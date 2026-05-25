@@ -12,6 +12,31 @@ export const getLocationName = (locationLike, fallback = 'Unassigned') => {
   return locationLike.name || locationLike.locationName || fallback;
 };
 
+export const getOrderEventLocationId = (eventLike) => {
+  if (!eventLike) return '';
+
+  if (eventLike.locationId) {
+    return getLocationId(eventLike.locationId);
+  }
+
+  if (eventLike.order) {
+    return getLocationId(eventLike.order.location || eventLike.order.locationId);
+  }
+
+  return getLocationId(eventLike.location || eventLike.order?.location);
+};
+
+export const isOrderEventForLocation = (eventLike, locationLike) => {
+  const currentLocationId = getLocationId(locationLike);
+  const eventLocationId = getOrderEventLocationId(eventLike);
+
+  if (!currentLocationId || !eventLocationId) {
+    return true;
+  }
+
+  return currentLocationId === eventLocationId;
+};
+
 export const normalizeLocation = (locationLike) => {
   if (!locationLike) return null;
   return {

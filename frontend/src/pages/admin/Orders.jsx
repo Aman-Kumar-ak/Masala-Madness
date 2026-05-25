@@ -9,6 +9,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useSpring, animated } from '@react-spring/web';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { useAuth } from "../../contexts/AuthContext";
+import { getLocationId, isOrderEventForLocation } from "../../utils/location";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -119,6 +121,13 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
           <p className="text-gray-500 text-sm mt-1">
             {formatDateIST(order.createdAt)}
           </p>
+          {order.locationName && (
+            <div className="mt-2">
+              <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 border border-blue-100 whitespace-nowrap">
+                {order.locationName}
+              </span>
+            </div>
+          )}
           {order.confirmedBy && (
             <p className="text-xs text-black mt-1">Confirmed by: {order.confirmedBy}</p>
           )}
@@ -203,6 +212,8 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
 }
 
 const Orders = () => {
+  const { user } = useAuth();
+  const currentLocationId = getLocationId(user?.location);
   const [orders, setOrders] = useState([]);
   const [deletedOrders, setDeletedOrders] = useState([]); // Store deleted orders
   const [stats, setStats] = useState({
@@ -299,6 +310,9 @@ const Orders = () => {
     if (!socket) return;
     const handleOrderUpdate = (data) => {
       if (!isMounted.current) return;
+      if (!isOrderEventForLocation(data, currentLocationId)) {
+        return;
+      }
       if (data?.type === 'order-deleted' && data?.orderId) {
         // Refetch orders to update order numbers and details live for all users
         loadOrders();
@@ -326,7 +340,7 @@ const Orders = () => {
     return () => {
       socket.off('order-update', handleOrderUpdate);
     };
-  }, [socket, selectedDate, refreshKey]);
+  }, [socket, selectedDate, refreshKey, currentLocationId]);
 
   // Only fetch if the selected date or refreshKey has changed, not just because the list is empty
   const ordersDate = orders[0]?.createdAt?.slice(0, 10);

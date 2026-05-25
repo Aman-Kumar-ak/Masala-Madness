@@ -7,6 +7,8 @@ import { api } from '../../utils/api';
 import Notification from "../../components/Notification";
 // import { AnimatePresence, motion } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { useAuth } from "../../contexts/AuthContext";
+import { getLocationId, isOrderEventForLocation } from "../../utils/location";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -61,6 +63,13 @@ function WorkerOrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDa
           <p className="text-gray-500 text-sm mt-1">
             {formatDateIST(order.createdAt)}
           </p>
+          {order.locationName && (
+            <div className="mt-2">
+              <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 border border-blue-100 whitespace-nowrap">
+                {order.locationName}
+              </span>
+            </div>
+          )}
         </div>
         <div className="text-right">
           <div className="flex flex-col items-end">
@@ -114,6 +123,8 @@ function WorkerOrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDa
 }
 
 export default function WorkerOrders() {
+  const { user } = useAuth();
+  const currentLocationId = getLocationId(user?.location);
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -187,6 +198,9 @@ export default function WorkerOrders() {
   useEffect(() => {
     if (!socket) return;
     const handleOrderUpdate = (data) => {
+      if (!isOrderEventForLocation(data, currentLocationId)) {
+        return;
+      }
       if (data?.type === 'order-deleted' && data?.orderId) {
         // Refetch orders to update order numbers and details live for all users
         loadOrders();
@@ -216,7 +230,7 @@ export default function WorkerOrders() {
     return () => {
       socket.off('order-update', handleOrderUpdate);
     };
-  }, [socket, selectedDate, refreshKey]);
+  }, [socket, selectedDate, refreshKey, currentLocationId]);
 
   const getCurrentDate = () => {
     const now = new Date();
