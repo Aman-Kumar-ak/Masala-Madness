@@ -489,36 +489,11 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mx-4 mt-2 sm:hidden">
-        <div className="overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-r from-white via-orange-50 to-amber-50 shadow-[0_12px_30px_rgba(249,115,22,0.12)]">
-          <div className="h-1 bg-gradient-to-r from-orange-400 via-amber-400 to-orange-500"></div>
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200/60">
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 21s6-4.35 6-10a6 6 0 10-12 0c0 5.65 6 10 6 10z" />
-                <circle cx="12" cy="11" r="2.5" fill="currentColor" stroke="none" />
-              </svg>
-            </div>
-            <p className="min-w-0 flex-1 truncate text-lg font-extrabold tracking-tight text-gray-900 min-[390px]:text-xl">
-              {currentLocationName}
-            </p>
-          </div>
-        </div>
-      </div>
-      
       {/* Stats Banner */}
-      <div className="bg-white shadow-sm rounded-lg mx-4 mt-4 overflow-hidden">
+      <div className="bg-white shadow-sm rounded-[20px] sm:rounded-lg mx-4 mt-4 overflow-hidden">
         <div className="container mx-auto">
-          <div className="grid grid-cols-3 gap-2 p-4 bg-gradient-to-r from-blue-50 to-purple-50">
+          <div className="bg-gradient-to-r from-blue-50 via-orange-50/40 to-purple-50">
+            <div className="grid grid-cols-3 gap-2 p-4">
             {/* Orders Count - Now Clickable */}
             <Link 
               to="/orders" 
@@ -556,6 +531,30 @@ export default function Home() {
               <p className="text-xl font-bold text-purple-600">
                 ₹{Math.round(displayAvgOrder).toLocaleString('en-IN')}
               </p>
+            </div>
+          </div>
+
+            <div className="sm:hidden flex justify-center px-5 pb-5 pt-1">
+              <div className="flex w-full max-w-[260px] items-center justify-center gap-2 rounded-full border border-orange-100/80 bg-white/95 px-3.5 py-1.5 shadow-[0_4px_12px_rgba(249,115,22,0.08)] backdrop-blur-sm">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200/70">
+                  <svg
+                    className="h-3.5 w-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 21s6-4.35 6-10a6 6 0 10-12 0c0 5.65 6 10 6 10z" />
+                    <circle cx="12" cy="11" r="2.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </div>
+                <p className="min-w-0 truncate text-sm font-extrabold tracking-tight text-gray-900 min-[390px]:text-base">
+                  {currentLocationName}
+                </p>
+              </div>
             </div>
           </div>
         </div>

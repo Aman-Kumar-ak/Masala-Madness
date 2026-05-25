@@ -17,9 +17,36 @@ import { appendQueryParams, getLocationId, getLocationName, isOrderEventForLocat
 // At the top, before component definition:
 const ORDER_FILTER_KEY = 'admin-orders-filter';
 const ORDER_LOCATION_KEY = 'admin-orders-location';
+const LOCATION_BADGE_BASE = 'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] border whitespace-nowrap shadow-sm';
+const LOCATION_BADGE_VARIANTS = [
+  'bg-sky-50 text-sky-700 border-sky-200',
+  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'bg-amber-50 text-amber-700 border-amber-200',
+  'bg-violet-50 text-violet-700 border-violet-200',
+  'bg-rose-50 text-rose-700 border-rose-200',
+  'bg-cyan-50 text-cyan-700 border-cyan-200',
+  'bg-orange-50 text-orange-700 border-orange-200',
+  'bg-lime-50 text-lime-700 border-lime-200',
+];
+const DEFAULT_LOCATION_BADGE_CLASS = `${LOCATION_BADGE_BASE} bg-blue-50 text-blue-700 border-blue-100`;
+
+const getLocationBadgeClassName = (locationKey = '') => {
+  const normalized = String(locationKey || '').trim().toLowerCase();
+  if (!normalized) {
+    return DEFAULT_LOCATION_BADGE_CLASS;
+  }
+
+  let hash = 0;
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash = (hash * 31 + normalized.charCodeAt(index)) >>> 0;
+  }
+
+  const variant = LOCATION_BADGE_VARIANTS[hash % LOCATION_BADGE_VARIANTS.length] || LOCATION_BADGE_VARIANTS[0];
+  return `${LOCATION_BADGE_BASE} ${variant}`;
+};
 
 // OrderCard component for per-order animation
-function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST, handleDeleteClick, deleteLoading, hideDeleteButton, isDeletedSection }) {
+function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST, handleDeleteClick, deleteLoading, hideDeleteButton, isDeletedSection, activeLocationId }) {
   // Animate totalAmount with Framer Motion
   const amountRef = useRef(null);
   const [displayAmount, setDisplayAmount] = useState(order.totalAmount);
@@ -124,7 +151,10 @@ function OrderCard({ order, isUpdated, parseCustomPaymentAmounts, formatDateIST,
           </p>
           {order.locationName && (
             <div className="mt-2">
-              <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 border border-blue-100 whitespace-nowrap">
+              <span className={activeLocationId === 'all'
+                ? getLocationBadgeClassName(getLocationId(order.location) || order.locationName)
+                : DEFAULT_LOCATION_BADGE_CLASS
+              }>
                 {order.locationName}
               </span>
             </div>
@@ -650,40 +680,40 @@ const Orders = () => {
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-6">Order Management</h1>
 
-          <div className="mb-6 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-600">Branch Scope</p>
-                <p className="mt-1 text-sm text-gray-600">Switch between a single branch or all branches at once.</p>
-              </div>
-              <div className="w-full lg:max-w-sm">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Location
-                </label>
-                <select
-                  value={selectedLocationId || currentLocationId || 'all'}
-                  onChange={(e) => setSelectedLocationId(e.target.value)}
-                  disabled={locationsLoading}
-                  className="shadow-sm border border-orange-200 rounded-lg w-full py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 transition-all duration-200 bg-white"
-                >
-                  <option value="all">All branches</option>
-                  {locations.map((location) => {
-                    const locationId = getLocationId(location);
-                    return (
-                      <option key={locationId} value={locationId}>
-                        {getLocationName(location, 'Unassigned')}
-                        {location.isActive === false ? ' (Archived)' : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-                {locationsLoading && (
-                  <p className="mt-2 text-xs text-gray-500">Loading locations...</p>
-                )}
-              </div>
+          <div className="mb-6 pt-2">
+            <div className="flex justify-center">
+              <span className="relative z-10 -mb-3 inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-700 shadow-sm">
+                Show orders for
+              </span>
+            </div>
+            <div className="rounded-2xl border border-orange-200 bg-gradient-to-b from-orange-50 to-amber-50 px-4 pb-4 pt-5 shadow-sm">
+              <label className="sr-only" htmlFor="admin-orders-location-select">
+                Show orders for
+              </label>
+              <select
+                id="admin-orders-location-select"
+                value={selectedLocationId || currentLocationId || 'all'}
+                onChange={(e) => setSelectedLocationId(e.target.value)}
+                disabled={locationsLoading}
+                className="shadow-sm border border-orange-200 rounded-lg w-full max-w-sm mx-auto py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 transition-all duration-200 bg-white"
+              >
+                <option value="all">All branches</option>
+                {locations.map((location) => {
+                  const locationId = getLocationId(location);
+                  return (
+                    <option key={locationId} value={locationId}>
+                      {getLocationName(location, 'Unassigned')}
+                      {location.isActive === false ? ' (Archived)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+              {locationsLoading && (
+                <p className="mt-2 text-center text-xs text-gray-500">Loading branches...</p>
+              )}
             </div>
           </div>
-          
+
           {/* Date Picker + Excel Download */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2">
@@ -845,6 +875,7 @@ const Orders = () => {
                       deleteLoading={false}
                       hideDeleteButton={false}
                       isDeletedSection={true}
+                      activeLocationId={activeLocationId}
                     />
                   ))
                 )}
@@ -862,8 +893,9 @@ const Orders = () => {
                     formatDateIST={formatDateIST}
                     handleDeleteClick={handleDeleteClick}
                     deleteLoading={deleteLoading && orderToDelete?.orderId === order.orderId}
-                      hideDeleteButton={false}
-                      isDeletedSection={false}
+                    hideDeleteButton={false}
+                    isDeletedSection={false}
+                    activeLocationId={activeLocationId}
                   />
                 </div>
               ))

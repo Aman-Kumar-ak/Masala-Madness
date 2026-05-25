@@ -434,7 +434,7 @@ const MenuManager = ({
           <div className="flex flex-col items-center gap-2 sm:items-end">
             <div className="w-full sm:w-72">
               <label className="block text-xs font-semibold uppercase tracking-[0.28em] text-gray-500 mb-2 text-center sm:text-right">
-                Manage Location
+                Select branch
               </label>
               <select
                 value={selectedLocationId}
@@ -459,25 +459,6 @@ const MenuManager = ({
               </div>
             )}
           </div>
-        </motion.div>
-
-        <motion.div
-          className="mb-6 rounded-2xl border border-orange-100 bg-gradient-to-r from-orange-50 via-amber-50 to-white px-4 py-3 text-sm text-gray-700 shadow-sm"
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-        >
-          {hasSelectedLocation ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.28em] text-orange-500">Active Branch</span>
-              <span className="inline-flex items-center rounded-full bg-white px-3 py-1 font-semibold text-orange-700 shadow-sm">
-                {selectedLocationName}
-              </span>
-              <span className="text-gray-500">Categories and dishes below belong only to this location.</span>
-            </div>
-          ) : (
-            <span>Select a location to load and manage its categories and dishes.</span>
-          )}
         </motion.div>
 
         <motion.div 

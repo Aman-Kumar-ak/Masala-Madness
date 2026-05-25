@@ -333,32 +333,6 @@ export default function WorkerHome() {
         </div>
       </div>
 
-      <div className="mx-4 mt-2 sm:hidden">
-        <div className="overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-r from-white via-orange-50 to-amber-50 shadow-[0_12px_30px_rgba(249,115,22,0.12)]">
-          <div className="h-1 bg-gradient-to-r from-orange-400 via-amber-400 to-orange-500"></div>
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200/60">
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 21s6-4.35 6-10a6 6 0 10-12 0c0 5.65 6 10 6 10z" />
-                <circle cx="12" cy="11" r="2.5" fill="currentColor" stroke="none" />
-              </svg>
-            </div>
-            <p className="min-w-0 flex-1 truncate text-lg font-extrabold tracking-tight text-gray-900 min-[390px]:text-xl">
-              {currentLocationName}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Floating Cart */}
       {cartItems.length > 0 && (
         <div className="fixed bottom-4 right-4 left-4 z-50 flex justify-center">
@@ -408,6 +382,32 @@ export default function WorkerHome() {
           </div>
         </div>
       )}
+
+      <div className="mx-4 mt-2 sm:hidden">
+        <div className="overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-r from-white via-orange-50 to-amber-50 shadow-[0_10px_24px_rgba(249,115,22,0.10)]">
+          <div className="h-1 bg-gradient-to-r from-orange-400 via-amber-400 to-orange-500"></div>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200/60">
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 21s6-4.35 6-10a6 6 0 10-12 0c0 5.65 6 10 6 10z" />
+                <circle cx="12" cy="11" r="2.5" fill="currentColor" stroke="none" />
+              </svg>
+            </div>
+            <p className="min-w-0 flex-1 truncate text-base font-extrabold tracking-tight text-gray-900 min-[390px]:text-lg">
+              {currentLocationName}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Menu Section */}
       <div ref={menuSectionRef} className="container mx-auto px-4 py-8 pb-28">
