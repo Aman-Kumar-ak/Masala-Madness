@@ -10,7 +10,7 @@ import { useSpring, animated } from '@react-spring/web';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useAuth } from "../../contexts/AuthContext";
-import { getLocationId, isOrderEventForLocation } from "../../utils/location";
+import { appendQueryParams, getLocationId, isOrderEventForLocation } from "../../utils/location";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -265,7 +265,7 @@ const Orders = () => {
     try {
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
-      const deletedOrdersData = await api.get(`/orders/deleted/${dateToQuery}`);
+      const deletedOrdersData = await api.get(appendQueryParams(`/orders/deleted/${dateToQuery}`, { locationId: currentLocationId }));
       setDeletedOrders(deletedOrdersData || []);
     } catch (error) {
       setError('Failed to load deleted orders. Please try again.');
@@ -280,7 +280,7 @@ const Orders = () => {
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
       const [ordersData] = await Promise.all([
-        api.get(`/orders/date/${dateToQuery}`),
+        api.get(appendQueryParams(`/orders/date/${dateToQuery}`, { locationId: currentLocationId })),
       ]);
       setOrders(ordersData.orders || []);
       setStats(ordersData.stats || {
@@ -304,7 +304,7 @@ const Orders = () => {
     return () => {
       isMounted.current = false;
     };
-  }, [selectedDate, refreshKey]);
+  }, [selectedDate, refreshKey, currentLocationId]);
 
   useEffect(() => {
     if (!socket) return;
@@ -365,7 +365,7 @@ const Orders = () => {
       }
     }
     // eslint-disable-next-line
-  }, [selectedDate, refreshKey, orderFilter]);
+  }, [selectedDate, refreshKey, orderFilter, currentLocationId]);
 
   const handleDateChange = (e) => {
     if (!e.target.value) {
@@ -458,7 +458,7 @@ const Orders = () => {
     setDownloadLoading(true);
     try {
       // Get signed download link from backend
-      const signedUrl = await api.getSignedExcelLink(selectedDate);
+      const signedUrl = await api.getSignedExcelLink(selectedDate, currentLocationId);
       // Fetch the file as a blob
       const response = await fetch(signedUrl);
       if (!response.ok) throw new Error('Failed to fetch Excel file');

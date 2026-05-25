@@ -8,7 +8,7 @@ import { API_URL } from "../../utils/config";
 import OptimizedImage from "../../components/OptimizedImage";
 import { api } from '../../utils/api';
 import { useAuth } from "../../contexts/AuthContext";
-import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName } from "../../utils/location";
+import { DEFAULT_LOCATION_NAME, appendQueryParams, getLocationId, getLocationName } from "../../utils/location";
 
 export default function WorkerHome() {
   const { user } = useAuth();
@@ -53,7 +53,7 @@ export default function WorkerHome() {
       setIsPrinterConnected(checkPrinterConnection());
     }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentLocationId]);
 
   // Calculate cart total
   const subtotal = cartItems.reduce(
@@ -87,7 +87,7 @@ export default function WorkerHome() {
 
     const fetchPendingOrdersCount = async () => {
       try {
-        const allOrders = await api.get('/orders');
+        const allOrders = await api.get(appendQueryParams('/orders', { locationId: currentLocationId }));
         const pending = (allOrders || []).filter(order => order.isPaid === false);
         setPendingOrdersCount(pending.length || 0);
       } catch (error) {
@@ -96,7 +96,7 @@ export default function WorkerHome() {
     };
 
     fetchPendingOrdersCount();
-  }, []);
+  }, [currentLocationId]);
 
   const getCurrentDate = () => {
     const date = new Date();
@@ -115,7 +115,7 @@ export default function WorkerHome() {
     try {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const data = await api.get(`/orders/date/${today}`);
+      const data = await api.get(appendQueryParams(`/orders/date/${today}`, { locationId: currentLocationId }));
       setStats({
         totalOrders: data.stats.totalOrders || 0,
         totalPaidOrders: data.stats.totalPaidOrders || 0,

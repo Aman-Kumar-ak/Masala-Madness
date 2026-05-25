@@ -8,7 +8,7 @@ import Notification from "../../components/Notification";
 // import { AnimatePresence, motion } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useAuth } from "../../contexts/AuthContext";
-import { getLocationId, isOrderEventForLocation } from "../../utils/location";
+import { appendQueryParams, getLocationId, isOrderEventForLocation } from "../../utils/location";
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -166,7 +166,7 @@ export default function WorkerOrders() {
       setLoading(true);
       setError(null);
       const dateToQuery = selectedDate || getCurrentDate();
-      const ordersData = await api.get(`/orders/date/${dateToQuery}`);
+      const ordersData = await api.get(appendQueryParams(`/orders/date/${dateToQuery}`, { locationId: currentLocationId }));
       setOrders(ordersData.orders || []);
       setStats(ordersData.stats || {
         totalOrders: 0,
@@ -193,7 +193,7 @@ export default function WorkerOrders() {
       // If somehow selectedDate becomes invalid, reset it to current date
       setSelectedDate(getCurrentDate());
     }
-  }, [selectedDate, refreshKey]);
+  }, [selectedDate, refreshKey, currentLocationId]);
 
   useEffect(() => {
     if (!socket) return;

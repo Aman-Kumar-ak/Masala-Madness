@@ -8,7 +8,7 @@ import { api } from '../../utils/api';
 import OptimizedImage from "../../components/OptimizedImage";
 import { useRefresh } from "../../contexts/RefreshContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName, isOrderEventForLocation } from "../../utils/location";
+import { DEFAULT_LOCATION_NAME, appendQueryParams, getLocationId, getLocationName, isOrderEventForLocation } from "../../utils/location";
 
 export default function Home() {
   const { user } = useAuth();
@@ -94,13 +94,13 @@ export default function Home() {
   // Fetch pending orders count (make it reusable)
   const fetchPendingOrdersCount = useCallback(async () => {
     try {
-      const allOrders = await api.get('/orders');
+      const allOrders = await api.get(appendQueryParams('/orders', { locationId: currentLocationId }));
       const pending = (allOrders || []).filter(order => order.isPaid === false);
       setPendingOrdersCount(pending.length || 0);
     } catch (error) {
       console.error('Error fetching pending orders count:', error);
     }
-  }, []);
+  }, [currentLocationId]);
 
   // Initial fetch for pending orders count
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function Home() {
     try {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const data = await api.get(`/orders/date/${today}`);
+      const data = await api.get(appendQueryParams(`/orders/date/${today}`, { locationId: currentLocationId }));
       setStats({
         totalOrders: data.stats.totalOrders || 0,
         totalPaidOrders: data.stats.totalPaidOrders || 0,

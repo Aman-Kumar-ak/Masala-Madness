@@ -4,6 +4,8 @@ import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { api } from '../../utils/api';
 import BackButton from '../../components/BackButton';
 import { useNotification } from '../../components/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { appendQueryParams, getLocationId } from '../../utils/location';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
@@ -25,6 +27,8 @@ function getTodayStr() {
 
 function Calendar() {
   const { showSuccess, showError } = useNotification();
+  const { user } = useAuth();
+  const currentLocationId = getLocationId(user?.location);
   const [availableDates, setAvailableDates] = useState([]); // Dates for selector
   const [months, setMonths] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -47,11 +51,11 @@ function Calendar() {
         setLoading(false);
         return;
       }
-      const data = await api.get('/orders/sales-summary/dates');
+      const data = await api.get(appendQueryParams('/orders/sales-summary/dates', { locationId: currentLocationId }));
       const dates = data || [];
       setAvailableDates(dates);
       setSelectedDate(dates.length > 0 ? dates[0] : getTodayStr());
-      const monthly = await api.get('/orders/monthly-summary');
+      const monthly = await api.get(appendQueryParams('/orders/monthly-summary', { locationId: currentLocationId }));
       setMonths(monthly || []);
       setMonthsCache(monthly || []);
     } catch (err) {
@@ -59,11 +63,11 @@ function Calendar() {
     } finally {
       setLoading(false);
     }
-  }, [monthsCache, availableDates]);
+  }, [monthsCache, availableDates, currentLocationId]);
 
   useEffect(() => {
     fetchInitial();
-  }, []);
+  }, [currentLocationId]);
 
   // Fetch sales summary for selected date
   useEffect(() => {
@@ -84,7 +88,7 @@ function Calendar() {
           setDayLoading(false);
           return;
         }
-        const day = await api.get(`/orders/sales-summary?date=${formattedDate}`);
+        const day = await api.get(appendQueryParams('/orders/sales-summary', { date: formattedDate, locationId: currentLocationId }));
         setSelectedDay(day || null);
         setDayCache(prev => ({ ...prev, [formattedDate]: day || null }));
       } catch (err) {
@@ -95,7 +99,7 @@ function Calendar() {
       }
     }
     fetchDay();
-  }, [selectedDate]);
+  }, [selectedDate, currentLocationId]);
 
   const [deleteLoading, setDeleteLoading] = useState(false);
   async function handleDeleteAll() {
@@ -106,11 +110,11 @@ function Calendar() {
       setDayCache({});
       setMonthsCache(null);
       setSelectedDay(null);
-      const dates = await api.get('/orders/sales-summary/dates');
+      const dates = await api.get(appendQueryParams('/orders/sales-summary/dates', { locationId: currentLocationId }));
       const dateList = dates || [];
       setAvailableDates(dateList);
       setSelectedDate(dateList.length > 0 ? dateList[0] : getTodayStr());
-      const monthly = await api.get('/orders/monthly-summary');
+      const monthly = await api.get(appendQueryParams('/orders/monthly-summary', { locationId: currentLocationId }));
       setMonths(monthly || []);
       setMonthsCache(monthly || []);
       showSuccess('All sales and orders deleted successfully.');

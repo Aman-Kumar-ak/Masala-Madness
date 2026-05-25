@@ -1,4 +1,8 @@
 const mongoose = require("mongoose");
+const { getLocationIdValue } = require('../utils/locationUtils');
+
+const LEGACY_ORDER_COLLECTION = 'old_orders';
+const LOCATION_ORDER_COLLECTION_PREFIX = 'orders_';
 
 const OrderSchema = new mongoose.Schema({
   orderId: {
@@ -153,5 +157,75 @@ OrderSchema.statics.calculateStats = async function (startDate, endDate, locatio
   }
 };
 
-const Order = mongoose.model("Order", OrderSchema);
-module.exports = Order;
+function getLocationOrderCollectionName(locationLike) {
+  const locationId = getLocationIdValue(locationLike);
+  if (!locationId) {
+    throw new Error('Location is required to resolve the order collection.');
+  }
+
+  return `${LOCATION_ORDER_COLLECTION_PREFIX}${locationId}`;
+}
+
+function getLocationOrderModel(locationLike) {
+  const collectionName = getLocationOrderCollectionName(locationLike);
+  const modelName = `Order_${collectionName}`;
+
+  if (mongoose.models[modelName]) {
+    return mongoose.models[modelName];
+  }
+
+  return mongoose.model(modelName, OrderSchema, collectionName);
+}
+
+function getLegacyOrderModel() {
+  const modelName = 'LegacyOrder';
+
+  if (mongoose.models[modelName]) {
+    return mongoose.models[modelName];
+  }
+
+  return mongoose.model(modelName, OrderSchema, LEGACY_ORDER_COLLECTION);
+}
+
+async function ensureOrderCollectionReady(locationLike) {
+  const orderModel = getLocationOrderModel(locationLike);
+
+  try {
+    await orderModel.createCollection();
+  } catch (error) {
+    if (error?.codeName !== 'NamespaceExists' && error?.code !== 48) {
+      console.warn(`Unable to create order collection ${orderModel.collection.name}:`, error.message);
+    }
+  }
+
+  try {
+    await orderModel.syncIndexes();
+  } catch (error) {
+    console.warn(`Unable to sync order indexes for ${orderModel.collection.name}:`, error.message);
+  }
+
+  return orderModel;
+}
+
+async function ensureOrderCollectionsReady(locations = []) {
+  const uniqueLocations = new Map();
+
+  locations.forEach((location) => {
+    const locationId = getLocationIdValue(location);
+    if (locationId && !uniqueLocations.has(locationId)) {
+      uniqueLocations.set(locationId, location);
+    }
+  });
+
+  await Promise.all(Array.from(uniqueLocations.values()).map((location) => ensureOrderCollectionReady(location)));
+}
+
+module.exports = {
+  OrderSchema,
+  LEGACY_ORDER_COLLECTION,
+  getLocationOrderCollectionName,
+  getLocationOrderModel,
+  getLegacyOrderModel,
+  ensureOrderCollectionReady,
+  ensureOrderCollectionsReady
+};

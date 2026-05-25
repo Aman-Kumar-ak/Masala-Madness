@@ -1,8 +1,9 @@
 
 const express = require("express");
 const SalesCalendar = require("../models/SalesCalendar");
-const Order = require("../models/Order");
+const { getLegacyOrderModel } = require("../models/Order");
 const router = express.Router();
+const Order = getLegacyOrderModel();
 
 // @route   GET /api/orders/monthly-summary
 // Get monthly sales totals and order counts from SalesCalendar

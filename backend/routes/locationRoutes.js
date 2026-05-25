@@ -4,7 +4,7 @@ const DishCategory = require('../models/DishCategory');
 const DeletedOrder = require('../models/DeletedOrder');
 const Location = require('../models/Location');
 const LocationArchive = require('../models/LocationArchive');
-const Order = require('../models/Order');
+const { ensureOrderCollectionReady, getLocationOrderModel } = require('../models/Order');
 const SalesCalendar = require('../models/SalesCalendar');
 const User = require('../models/User');
 const { authenticateToken, adminAuth } = require('../middleware/authMiddleware');
@@ -58,6 +58,7 @@ router.post('/', adminAuth, async (req, res) => {
       location.deletedBy = null;
       location.updatedBy = req.user._id;
       await location.save();
+      await ensureOrderCollectionReady(location);
 
       return res.status(200).json({
         message: 'Location restored successfully.',
@@ -70,6 +71,7 @@ router.post('/', adminAuth, async (req, res) => {
       createdBy: req.user._id,
       updatedBy: req.user._id
     });
+    await ensureOrderCollectionReady(location);
 
     return res.status(201).json({
       message: 'Location created successfully.',
@@ -104,6 +106,7 @@ router.put('/:id', adminAuth, async (req, res) => {
     location.name = rawName;
     location.updatedBy = req.user._id;
     await location.save();
+    const Order = getLocationOrderModel(location._id);
 
     await Promise.all([
       Order.updateMany({ location: location._id }, { $set: { locationName: location.name } }),

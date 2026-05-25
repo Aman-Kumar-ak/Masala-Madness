@@ -3,7 +3,7 @@ const router = express.Router();
 const ExcelJS = require('exceljs');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
-const Order = require('../models/Order');
+const { getLocationOrderModel } = require('../models/Order');
 const DeletedOrder = require('../models/DeletedOrder');
 const SalesCalendar = require('../models/SalesCalendar');
 const { adminAuth, authenticateToken } = require('../middleware/authMiddleware');
@@ -77,6 +77,14 @@ function buildLocationQuery(locationId, extraQuery = {}) {
   };
 }
 
+function getScopedOrderModel(location) {
+  if (!location || !location._id) {
+    throw new Error('Valid location is required to access orders.');
+  }
+
+  return getLocationOrderModel(location._id);
+}
+
 function clearLocationScopedCaches(date, locationId) {
   const dateKey = typeof date === 'string' ? date : new Date(date).toISOString().split('T')[0];
   const scopedLocationId = getLocationIdValue(locationId);
@@ -145,6 +153,7 @@ async function downloadExcelHandler(req, res) {
 
   const { startOfDay, endOfDay } = getDateRange(req.params.date);
   const locationId = location?._id || null;
+  const Order = getScopedOrderModel(location);
 
   const [ordersStats, orders] = await Promise.all([
     Order.calculateStats(startOfDay, endOfDay, locationId),
@@ -234,6 +243,7 @@ router.delete('/all', authenticateToken, async (req, res) => {
     if (!location) {
       return res.status(400).json({ message: 'Valid location is required.' });
     }
+    const Order = getScopedOrderModel(location);
 
     await Promise.all([
       Order.deleteMany({ location: location._id }),
@@ -254,6 +264,7 @@ router.get('/sales-summary/dates', async (req, res) => {
   try {
     const location = await getLocationFromRequest(req);
     const locationId = location?._id || null;
+    const Order = getScopedOrderModel(location);
     const cacheKey = buildCacheKey('sales-summary-dates', locationId);
 
     if (ordersCache.has(cacheKey)) {
@@ -289,6 +300,7 @@ router.get('/sales-summary', async (req, res) => {
 
     const location = await getLocationFromRequest(req);
     const locationId = location?._id || null;
+    const Order = getScopedOrderModel(location);
     const { startOfDay, endOfDay } = getDateRange(date);
 
     const orders = await Order.find(
@@ -329,6 +341,7 @@ router.get('/monthly-summary', async (req, res) => {
   try {
     const location = await getLocationFromRequest(req);
     const locationId = location?._id || null;
+    const Order = getScopedOrderModel(location);
     const cacheKey = buildCacheKey('monthly-summary', locationId);
 
     if (ordersCache.has(cacheKey)) {
@@ -388,6 +401,12 @@ router.post('/confirm', authenticateToken, async (req, res) => {
     let previousTotalAmount = 0;
 
     if (orderId) {
+      location = await getLocationFromRequest(req, { preferUserLocation: true });
+      if (!location) {
+        return res.status(400).json({ message: 'Valid location is required.' });
+      }
+
+      const Order = getScopedOrderModel(location);
       order = await Order.findOne({ orderId });
       if (!order) {
         return res.status(404).json({ message: 'Order not found' });
@@ -459,6 +478,7 @@ router.post('/confirm', authenticateToken, async (req, res) => {
       if (!location) {
         return res.status(400).json({ message: 'Valid location is required.' });
       }
+      const Order = getScopedOrderModel(location);
 
       const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       const tomorrowUTC = new Date(todayUTC);
@@ -533,7 +553,19 @@ router.post('/confirm', authenticateToken, async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('order-update', { type: 'order-updated', order });
+      if (!previousPaidState && order.isPaid) {
+        io.emit('order-update', {
+          type: 'order-confirmed',
+          pendingOrderId: order.orderId,
+          order,
+          locationId: getLocationIdValue(order.location)
+        });
+      }
+      io.emit('order-update', {
+        type: 'order-updated',
+        order,
+        locationId: getLocationIdValue(order.location)
+      });
     }
 
     return res.status(201).json({
@@ -549,6 +581,7 @@ router.post('/confirm', authenticateToken, async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const location = await getLocationFromRequest(req);
+    const Order = getScopedOrderModel(location);
     const orders = await Order.find(
       buildLocationQuery(location?._id, { deleted: { $ne: true } })
     )
@@ -566,6 +599,7 @@ router.get('/today', async (req, res) => {
   try {
     const location = await getLocationFromRequest(req);
     const locationId = location?._id || null;
+    const Order = getScopedOrderModel(location);
     const now = new Date();
     const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const tomorrowUTC = new Date(todayUTC);
@@ -603,6 +637,7 @@ router.get('/date/:date', async (req, res) => {
   try {
     const location = await getLocationFromRequest(req);
     const locationId = location?._id || null;
+    const Order = getScopedOrderModel(location);
     const { startOfDay, endOfDay } = getDateRange(req.params.date);
     const cacheKey = buildCacheKey(req.params.date, locationId);
 
@@ -662,6 +697,7 @@ router.get('/deleted/:date', async (req, res) => {
 router.delete('/cleanup', adminAuth, async (req, res) => {
   try {
     const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    const Order = getScopedOrderModel(location);
     const dateToDeleteBefore = new Date();
     dateToDeleteBefore.setDate(dateToDeleteBefore.getDate() - 30);
 
@@ -686,6 +722,7 @@ router.get('/today-revenue', async (req, res) => {
   try {
     const location = await getLocationFromRequest(req);
     const locationId = location?._id || null;
+    const Order = getScopedOrderModel(location);
     const now = new Date();
     const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const tomorrowUTC = new Date(todayUTC);
@@ -754,6 +791,11 @@ router.get('/excel/:date', async (req, res, next) => {
 router.delete('/:orderId', authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
+    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    if (!location) {
+      return res.status(400).json({ message: 'Valid location is required.' });
+    }
+    const Order = getScopedOrderModel(location);
     const order = await Order.findOne({ orderId });
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -808,7 +850,8 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
     if (io) {
       io.emit('order-update', {
         type: 'order-deleted',
-        orderId
+        orderId,
+        locationId: getLocationIdValue(order.location)
       });
     }
 
@@ -829,6 +872,11 @@ router.post('/:orderId/mark-kot', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'itemIndexes array required' });
     }
 
+    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    if (!location) {
+      return res.status(400).json({ message: 'Valid location is required.' });
+    }
+    const Order = getScopedOrderModel(location);
     const order = await Order.findOne({ orderId: req.params.orderId });
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -862,6 +910,11 @@ router.post('/:orderId/add-items', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'newItems array required' });
     }
 
+    const location = await getLocationFromRequest(req, { preferUserLocation: true });
+    if (!location) {
+      return res.status(400).json({ message: 'Valid location is required.' });
+    }
+    const Order = getScopedOrderModel(location);
     const order = await Order.findOne({ orderId: req.params.orderId });
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -906,7 +959,11 @@ router.post('/:orderId/add-items', authenticateToken, async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('order-update', { type: 'order-updated', order });
+      io.emit('order-update', {
+        type: 'order-updated',
+        order,
+        locationId: getLocationIdValue(order.location)
+      });
     }
 
     res.status(200).json({

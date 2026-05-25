@@ -10,7 +10,7 @@ import { api } from '../../utils/api';
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import AuthContext from '../../contexts/AuthContext';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
-import { getLocationId, isOrderEventForLocation } from "../../utils/location";
+import { appendQueryParams, getLocationId, isOrderEventForLocation } from "../../utils/location";
 
 export default function PendingOrders() {
   useKeyboardScrollAdjustment();
@@ -89,7 +89,7 @@ export default function PendingOrders() {
   const fetchPendingOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const allOrders = await api.get('/orders');
+      const allOrders = await api.get(appendQueryParams('/orders', { locationId: currentLocationId }));
       const pending = (allOrders || []).filter(order => order.isPaid === false);
       setPendingOrders(pending);
       
@@ -137,7 +137,8 @@ export default function PendingOrders() {
               discountAmount: fixedOrder.discountAmount,
               discountPercentage: fixedOrder.discountPercentage,
               totalAmount: fixedOrder.totalAmount,
-              confirmedBy: user?.name || user?.username || user?.mobileNumber
+              confirmedBy: user?.name || user?.username || user?.mobileNumber,
+              locationId: currentLocationId
             });
           } catch (error) {
             console.error(`Failed to persist fixed subtotal for order ${fixedOrder.orderId}:`, error);
@@ -154,7 +155,7 @@ export default function PendingOrders() {
       setLoading(false);
       setTimeout(restoreScrollPosition, 0);
     }
-  }, [restoreScrollPosition]);
+  }, [restoreScrollPosition, currentLocationId, user]);
 
   // Debounced update function to prevent rapid state updates
   const debouncedSetPendingOrders = useCallback(
