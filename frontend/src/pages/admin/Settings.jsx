@@ -9,6 +9,7 @@ import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment
 import io from 'socket.io-client';
 import OptimizedImage from '../../components/OptimizedImage';
 import ApkDownloadCard from '../../components/ApkDownloadCard';
+import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName } from '../../utils/location';
 // Add this helper at the top of the file (after imports)
 function normalizeName(name) {
   return name.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -116,7 +117,7 @@ const IndicatorTooltip = ({ text, children }) => {
 
 const Settings = () => {
   useKeyboardScrollAdjustment();
-  const { user, isAuthenticated, logout, getUserDevices, revokeDevice, setAuthOperationInProgress, clearAuthOperationInProgress, loading } = useAuth();
+  const { user, isAuthenticated, logout, getUserDevices, revokeDevice, setAuthOperationInProgress, clearAuthOperationInProgress, loading, setUser } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
   
@@ -207,10 +208,19 @@ const Settings = () => {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [addUserForm, setAddUserForm] = useState({ name: '', mobileNumber: '', password: '', role: 'worker' });
-  const [editUserForm, setEditUserForm] = useState({ name: '', mobileNumber: '', password: '', role: 'worker', isActive: true });
+  const [addUserForm, setAddUserForm] = useState({ name: '', mobileNumber: '', password: '', role: 'worker', locationId: '' });
+  const [editUserForm, setEditUserForm] = useState({ name: '', mobileNumber: '', password: '', role: 'worker', locationId: '', isActive: true });
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [editUserLoading, setEditUserLoading] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [newLocationName, setNewLocationName] = useState('');
+  const [editingLocationId, setEditingLocationId] = useState('');
+  const [editingLocationName, setEditingLocationName] = useState('');
+  const [locationActionLoading, setLocationActionLoading] = useState(false);
+  const [showDeleteLocationConfirm, setShowDeleteLocationConfirm] = useState(false);
+  const [locationToDelete, setLocationToDelete] = useState(null);
   
   // State to manage expanded user cards
   const [expandedUsers, setExpandedUsers] = useState(new Set());
@@ -258,13 +268,19 @@ const Settings = () => {
   const [showToggleUserConfirm, setShowToggleUserConfirm] = useState(false);
   const [userToToggle, setUserToToggle] = useState(null);
   const [isTogglingUser, setIsTogglingUser] = useState(false);
+  const activeLocations = useMemo(
+    () => locations.filter((location) => location.isActive !== false),
+    [locations]
+  );
+  const currentUserLocationId = getLocationId(user?.location);
+  const currentUserLocationName = getLocationName(user?.location, DEFAULT_LOCATION_NAME);
   
   // New state for localized loading in Admin Control section
   const [isAdminControlLoading, setIsAdminControlLoading] = useState(false);
   
   // Effect to disable body scroll when any dialog is open
   useEffect(() => {
-    const isAnyDialogShowing = showLogoutConfirm || showDeleteAccountConfirm || showRevokeConfirm || showToggleUserConfirm || showDeleteUserConfirm || showAddUserModal || showEditUserModal;
+    const isAnyDialogShowing = showLogoutConfirm || showDeleteAccountConfirm || showRevokeConfirm || showToggleUserConfirm || showDeleteUserConfirm || showDeleteLocationConfirm || showAddUserModal || showEditUserModal;
     if (isAnyDialogShowing) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -274,7 +290,7 @@ const Settings = () => {
     return () => {
       document.body.style.overflow = 'unset'; // Ensure cleanup on unmount
     };
-  }, [showLogoutConfirm, showDeleteAccountConfirm, showRevokeConfirm, showToggleUserConfirm, showDeleteUserConfirm, showAddUserModal, showEditUserModal]);
+  }, [showLogoutConfirm, showDeleteAccountConfirm, showRevokeConfirm, showToggleUserConfirm, showDeleteUserConfirm, showDeleteLocationConfirm, showAddUserModal, showEditUserModal]);
   
   // Redirect if not authenticated, but only after loading is false
   useEffect(() => {
@@ -604,24 +620,58 @@ const Settings = () => {
     }
   }, []);
 
+  const fetchLocations = useCallback(async () => {
+    setLoadingLocations(true);
+    setLocationError('');
+    try {
+      const res = await api.get('/locations?includeInactive=true');
+      setLocations(Array.isArray(res) ? res : []);
+    } catch (err) {
+      setLocationError('Failed to load locations.');
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, []);
+
+  const getPreferredLocationId = useCallback(() => {
+    const activeLocationOptions = locations.filter((location) => location.isActive !== false);
+    if (currentUserLocationId && activeLocationOptions.some((location) => getLocationId(location) === currentUserLocationId)) {
+      return currentUserLocationId;
+    }
+    return getLocationId(activeLocationOptions[0]) || '';
+  }, [locations, currentUserLocationId]);
+
   // Refactor existing useEffects to only trigger on tab change, and not if `isPageLoading` is true
   useEffect(() => {
     if (activeTab === 'adminControl' && user?.role === 'admin' && isSecretCodeAuthenticated) {
       fetchUsers();
       fetchAllDevices();
+      fetchLocations();
     }
-  }, [activeTab, user, isSecretCodeAuthenticated, fetchUsers, fetchAllDevices]); // Add fetchUsers, fetchAllDevices as dependencies
+  }, [activeTab, user, isSecretCodeAuthenticated, fetchUsers, fetchAllDevices, fetchLocations]); // Add fetchUsers, fetchAllDevices as dependencies
 
   // Add this effect to refresh users when tab becomes visible
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && activeTab === 'adminControl' && user?.role === 'admin' && isSecretCodeAuthenticated) {
         fetchUsers();
+        fetchLocations();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [activeTab, user, isSecretCodeAuthenticated, fetchUsers]);
+  }, [activeTab, user, isSecretCodeAuthenticated, fetchUsers, fetchLocations]);
+
+  useEffect(() => {
+    const preferredLocationId = getPreferredLocationId();
+    if (!preferredLocationId) {
+      return;
+    }
+
+    setAddUserForm((previous) => (
+      previous.locationId ? previous : { ...previous, locationId: preferredLocationId }
+    ));
+  }, [getPreferredLocationId]);
 
   // Add user handler
   const handleAddUser = async (e) => {
@@ -641,15 +691,25 @@ const Settings = () => {
       setAddUserLoading(false);
       return;
     }
+    if (!addUserForm.locationId) {
+      setUserError('Please assign a location to this user.');
+      setAddUserLoading(false);
+      return;
+    }
 
     try {
       await api.post('/auth/register', addUserForm);
       showSuccess('User added successfully!');
       setShowAddUserModal(false);
-      setAddUserForm({ name: '', mobileNumber: '', password: '', role: 'worker' });
+      setAddUserForm({
+        name: '',
+        mobileNumber: '',
+        password: '',
+        role: 'worker',
+        locationId: getPreferredLocationId()
+      });
       setConfirmAddUserPassword(''); // Clear confirm password after successful add
       await fetchUsers();
-      window.location.reload(); // Force reload to ensure new user can log in
     } catch (err) {
       showError(err.message || 'Failed to add user.');
     } finally {
@@ -665,6 +725,10 @@ const Settings = () => {
     // Prevent changing the last admin's role to worker
     if (selectedUser && selectedUser.role === 'admin' && editUserForm.role !== 'admin' && getAdminCount() === 1) {
       setUserError('At least one admin must remain. You cannot change the last admin to a worker.');
+      return;
+    }
+    if (!editUserForm.locationId) {
+      setUserError('Please assign a location to this user.');
       return;
     }
 
@@ -704,9 +768,16 @@ const Settings = () => {
         setEditUserLoading(false);
         return;
       }
-      await api.put(`/auth/users/${selectedUser._id}`, updateData);
+      const response = await api.put(`/auth/users/${selectedUser._id}`, updateData);
       showSuccess('User updated successfully!');
       setShowEditUserModal(false);
+      if (selectedUser?._id === user?._id && response?.user) {
+        setUser(response.user);
+        sessionStorage.setItem('user', JSON.stringify(response.user));
+        if (localStorage.getItem('user')) {
+          localStorage.setItem('user', JSON.stringify(response.user));
+        }
+      }
       setSelectedUser(null);
       setConfirmEditPassword(''); // Clear confirm password after successful edit
       await fetchUsers();
@@ -767,6 +838,7 @@ const Settings = () => {
       mobileNumber: userObj.mobileNumber,
       password: '',
       role: userObj.role,
+      locationId: getLocationId(userObj.location),
       isActive: userObj.isActive
     });
     setConfirmEditPassword(''); // Reset confirm password
@@ -817,6 +889,111 @@ const Settings = () => {
     setShowDeleteUserConfirm(false);
     setUserToDelete(null);
   };
+
+  const usersByLocation = useMemo(() => {
+    return users.reduce((accumulator, currentUser) => {
+      const locationId = getLocationId(currentUser.location) || 'unassigned';
+      accumulator[locationId] = (accumulator[locationId] || 0) + 1;
+      return accumulator;
+    }, {});
+  }, [users]);
+
+  const handleCreateLocation = async (e) => {
+    e.preventDefault();
+    const trimmedName = newLocationName.trim();
+    if (!trimmedName) {
+      setLocationError('Location name is required.');
+      return;
+    }
+
+    setLocationActionLoading(true);
+    setLocationError('');
+    try {
+      const response = await api.post('/locations', { name: trimmedName });
+      showSuccess(`Location ${response?.location?.name || trimmedName} saved successfully!`);
+      setNewLocationName('');
+      await Promise.all([fetchLocations(), fetchUsers()]);
+      setAddUserForm((previous) => (
+        previous.locationId
+          ? previous
+          : { ...previous, locationId: getLocationId(response?.location) || getPreferredLocationId() }
+      ));
+    } catch (err) {
+      setLocationError(err.message || 'Failed to save location.');
+      showError(err.message || 'Failed to save location.');
+    } finally {
+      setLocationActionLoading(false);
+    }
+  };
+
+  const startEditingLocation = (location) => {
+    setEditingLocationId(getLocationId(location));
+    setEditingLocationName(location.name || '');
+    setLocationError('');
+  };
+
+  const cancelEditingLocation = () => {
+    setEditingLocationId('');
+    setEditingLocationName('');
+    setLocationError('');
+  };
+
+  const handleSaveLocation = async (locationId) => {
+    const trimmedName = editingLocationName.trim();
+    if (!trimmedName) {
+      setLocationError('Location name is required.');
+      return;
+    }
+
+    setLocationActionLoading(true);
+    setLocationError('');
+    try {
+      await api.put(`/locations/${locationId}`, { name: trimmedName });
+      showSuccess('Location updated successfully!');
+      cancelEditingLocation();
+      await Promise.all([fetchLocations(), fetchUsers()]);
+    } catch (err) {
+      setLocationError(err.message || 'Failed to update location.');
+      showError(err.message || 'Failed to update location.');
+    } finally {
+      setLocationActionLoading(false);
+    }
+  };
+
+  const handleDeleteLocation = (location) => {
+    setLocationToDelete(location);
+    setShowDeleteLocationConfirm(true);
+  };
+
+  const confirmDeleteLocation = async () => {
+    if (!locationToDelete) return;
+
+    setLocationActionLoading(true);
+    setLocationError('');
+    try {
+      await api.delete(`/locations/${getLocationId(locationToDelete)}`);
+      showSuccess(`${locationToDelete.name} archived successfully. Menu backup remains safe.`);
+      if (editingLocationId === getLocationId(locationToDelete)) {
+        cancelEditingLocation();
+      }
+      await Promise.all([fetchLocations(), fetchUsers()]);
+      if (addUserForm.locationId === getLocationId(locationToDelete)) {
+        setAddUserForm((previous) => ({ ...previous, locationId: '' }));
+      }
+    } catch (err) {
+      setLocationError(err.message || 'Failed to archive location.');
+      showError(err.message || 'Failed to archive location.');
+    } finally {
+      setLocationActionLoading(false);
+      setShowDeleteLocationConfirm(false);
+      setLocationToDelete(null);
+    }
+  };
+
+  const cancelDeleteLocation = () => {
+    setShowDeleteLocationConfirm(false);
+    setLocationToDelete(null);
+  };
   
   // Handle successful secret code verification for Admin Control access
   const handleSecretCodeSuccess = async () => {
@@ -833,6 +1010,7 @@ const Settings = () => {
       await fetchUsers();
       // Fetch all devices
       await fetchAllDevices();
+      await fetchLocations();
       // Fetch user's own devices for device management (if not already loaded by initial load)
       await getUserDevices().then(setDevices);
     } catch (err) {
@@ -1088,7 +1266,8 @@ const Settings = () => {
       !users.some(u => u.mobileNumber === addUserForm.mobileNumber) &&
       addUserForm.password.length >= 8 &&
       addUserForm.password === confirmAddUserPassword &&
-      addUserForm.role
+      addUserForm.role &&
+      addUserForm.locationId
     );
   };
 
@@ -1101,7 +1280,8 @@ const Settings = () => {
       !users.some(u => u.mobileNumber === editUserForm.mobileNumber && u._id !== selectedUser?._id) &&
       (!editUserForm.password || editUserForm.password.length >= 8) &&
       (editUserForm.password === confirmEditPassword) &&
-      editUserForm.role
+      editUserForm.role &&
+      editUserForm.locationId
     );
   };
 
@@ -1311,6 +1491,7 @@ const Settings = () => {
                               </div>
                               <p className="text-base text-gray-600 font-medium capitalize">Role: {u.role}</p>
                               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${shouldDisplayDetails ? 'opacity-100' : 'opacity-0'}`} style={{ maxHeight: shouldDisplayDetails ? '500px' : '0' }}>
+                                <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Location:</span> {getLocationName(u.location, DEFAULT_LOCATION_NAME)}</p>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Mobile:</span> {u.mobileNumber}</p>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Last Login:</span> {u.lastLogin ? new Date(u.lastLogin).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'}</p>
                                 <p className="text-sm text-gray-800 mt-2"><span className="font-semibold">Created:</span> {new Date(u.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
@@ -1350,6 +1531,136 @@ const Settings = () => {
                     )}
                   </div>
                   
+                  <div className="bg-white shadow-md rounded-xl p-4 sm:p-6 border border-orange-200 mb-6">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold text-orange-700">Location Management</h2>
+                        <p className="text-sm text-gray-500 mt-1">Categories and dishes stay backed up even after a location is archived.</p>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-orange-600 border border-orange-200">
+                        Current: {currentUserLocationName}
+                      </span>
+                    </div>
+
+                    <form onSubmit={handleCreateLocation} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 mb-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Add New Location</label>
+                        <input
+                          type="text"
+                          className="w-full border rounded-lg px-3 py-2"
+                          placeholder="Enter location name"
+                          value={newLocationName}
+                          onChange={(e) => setNewLocationName(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <button
+                          type="submit"
+                          className={`w-full rounded-lg px-5 py-2.5 font-semibold shadow transition ${
+                            newLocationName.trim() && !locationActionLoading
+                              ? 'bg-orange-500 text-white hover:bg-orange-600'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
+                          disabled={!newLocationName.trim() || locationActionLoading}
+                        >
+                          {locationActionLoading ? 'Saving...' : 'Add Location'}
+                        </button>
+                      </div>
+                    </form>
+
+                    {(locationError || loadingLocations) && (
+                      <div className={`mb-4 rounded-lg px-4 py-3 text-sm ${loadingLocations ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                        {loadingLocations ? 'Loading locations...' : locationError}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {locations.length > 0 ? locations.map((location) => {
+                        const locationId = getLocationId(location);
+                        const assignedUsers = usersByLocation[locationId] || 0;
+                        const isEditing = editingLocationId === locationId;
+                        return (
+                          <div key={locationId} className={`rounded-xl border p-4 shadow-sm ${location.isActive === false ? 'bg-gray-50 border-gray-200' : 'bg-orange-50/60 border-orange-200'}`}>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="flex-1">
+                                {isEditing ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      className="w-full rounded-lg border px-3 py-2"
+                                      value={editingLocationName}
+                                      onChange={(e) => setEditingLocationName(e.target.value)}
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                                        onClick={() => handleSaveLocation(locationId)}
+                                        disabled={locationActionLoading || !editingLocationName.trim()}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-300"
+                                        onClick={cancelEditingLocation}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <h3 className="text-lg font-bold text-gray-900">{location.name}</h3>
+                                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${
+                                        location.isActive === false
+                                          ? 'bg-gray-200 text-gray-600'
+                                          : 'bg-green-100 text-green-700'
+                                      }`}>
+                                        {location.isActive === false ? 'Archived' : 'Active'}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-gray-600">Assigned users: <span className="font-semibold text-gray-800">{assignedUsers}</span></p>
+                                    <p className="mt-1 text-xs text-gray-500">If you archive this location, its dishes and categories remain protected in the database backup.</p>
+                                  </>
+                                )}
+                              </div>
+
+                              {!isEditing && (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="rounded-full bg-blue-100 p-2 text-blue-600 hover:bg-blue-200"
+                                    onClick={() => startEditingLocation(location)}
+                                    title="Edit location"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`rounded-full p-2 ${location.isActive === false ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                                    onClick={() => handleDeleteLocation(location)}
+                                    title={assignedUsers > 0 ? 'Reassign users before deleting this location' : 'Archive location'}
+                                    disabled={location.isActive === false || locationActionLoading}
+                                  >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }) : (
+                        <p className="text-sm text-gray-500">No locations found yet.</p>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Add User Section */}
                   <div className="bg-blue-50 shadow-md rounded-xl p-4 sm:p-6 border border-blue-200 mb-6">
                     <div className="flex items-center gap-3 mb-6">
@@ -1361,7 +1672,7 @@ const Settings = () => {
                       <h2 className="text-2xl font-bold text-blue-700">Add New User</h2>
                     </div>
                     {/* Add User Form */}
-                    <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                       <div>
                         <label className="block text-sm font-medium mb-1">Name</label>
                         <input type="text" className="w-full border rounded px-3 py-2" required value={addUserForm.name} onChange={e => setAddUserForm(f => ({ ...f, name: e.target.value }))} />
@@ -1446,7 +1757,26 @@ const Settings = () => {
                           <option value="worker">Worker</option>
                         </select>
                       </div>
-                      <div className="md:col-span-4 flex justify-end mt-2">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Location</label>
+                        <select
+                          className="w-full border rounded px-3 py-2"
+                          value={addUserForm.locationId}
+                          onChange={e => setAddUserForm(f => ({ ...f, locationId: e.target.value }))}
+                          required
+                        >
+                          <option value="">Select location</option>
+                          {activeLocations.map((location) => (
+                            <option key={getLocationId(location)} value={getLocationId(location)}>
+                              {location.name}
+                            </option>
+                          ))}
+                        </select>
+                        {!addUserForm.locationId && (
+                          <p className="text-red-500 text-sm mt-1">Location is required.</p>
+                        )}
+                      </div>
+                      <div className="md:col-span-5 flex justify-end mt-2">
                         <button type="submit" className={`px-6 py-2 rounded font-semibold shadow transition w-full md:w-auto ${isAddUserFormValid() && !addUserLoading ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-400 text-white cursor-not-allowed'}`} disabled={!isAddUserFormValid() || addUserLoading}>{addUserLoading ? 'Adding...' : 'Add User'}</button>
                       </div>
                     </form>
@@ -1473,6 +1803,9 @@ const Settings = () => {
                     <h2 className="text-lg font-semibold text-blue-800 mb-2">Current User</h2>
                     <p className="text-gray-700">
                       Logged in as: <span className="font-medium">{user.username}</span>
+                    </p>
+                    <p className="text-gray-700 mt-2">
+                      Location: <span className="font-medium text-orange-700">{currentUserLocationName}</span>
                     </p>
                   </div>
                 )}
@@ -1821,6 +2154,18 @@ const Settings = () => {
         type="danger"
         isLoading={false}
       />
+
+      <ConfirmationDialog
+        isOpen={showDeleteLocationConfirm}
+        onClose={cancelDeleteLocation}
+        onConfirm={confirmDeleteLocation}
+        title="Archive Location"
+        message={`Archive '${locationToDelete?.name}'? Its menu backup will remain safe, but reassign users from this location before archiving if needed.`}
+        confirmText={locationActionLoading ? 'Archiving...' : 'Yes, Archive'}
+        cancelText="Cancel"
+        type="danger"
+        isLoading={locationActionLoading}
+      />
       
       {/* Edit User Modal (reuse ConfirmationDialog) */}
       <ConfirmationDialog
@@ -1922,6 +2267,24 @@ const Settings = () => {
                 <option value="worker">Worker</option>
               </select>
             </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-1">Location</label>
+              <select
+                className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={editUserForm.locationId}
+                onChange={e => setEditUserForm(f => ({ ...f, locationId: e.target.value }))}
+              >
+                <option value="">Select location</option>
+                {activeLocations.map((location) => (
+                  <option key={getLocationId(location)} value={getLocationId(location)}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+              {!editUserForm.locationId && (
+                <p className="text-red-500 text-sm mt-1">Location is required.</p>
+              )}
+            </div>
             <div className="md:col-span-2 flex items-center gap-2">
               <input type="checkbox" id="isActive" checked={editUserForm.isActive} onChange={e => setEditUserForm(f => ({ ...f, isActive: e.target.checked }))} />
               <label htmlFor="isActive" className="text-sm">Active</label>
@@ -1931,7 +2294,7 @@ const Settings = () => {
               <button type="submit" className={`px-4 py-2 rounded font-semibold shadow transition w-full md:w-auto ${isEditUserFormValid() && !editUserLoading ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-400 text-white cursor-not-allowed'}`} disabled={!isEditUserFormValid() || editUserLoading}>{editUserLoading ? 'Saving...' : 'Save Changes'}</button>
             </div>
           </form>
-        ), [editUserForm, confirmEditPassword, showEditUserPassword, editUserLoading, handleEditUser, setShowEditUserModal])}
+        ), [editUserForm, confirmEditPassword, showEditUserPassword, editUserLoading, handleEditUser, setShowEditUserModal, activeLocations])}
       />
 
       {/* Toggle User Confirmation Dialog */}

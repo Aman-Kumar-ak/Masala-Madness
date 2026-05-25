@@ -10,6 +10,17 @@ const OrderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  location: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Location',
+    required: true,
+    index: true
+  },
+  locationName: {
+    type: String,
+    default: null,
+    trim: true
+  },
   items: [
     {
       name: { type: String, required: true },
@@ -53,20 +64,26 @@ const OrderSchema = new mongoose.Schema({
 OrderSchema.index({ createdAt: 1, isPaid: 1 });
 OrderSchema.index({ orderNumber: 1, createdAt: 1 });
 OrderSchema.index({ isPaid: 1, totalAmount: 1 });
+OrderSchema.index({ location: 1, createdAt: 1 });
 
 // Helper function to delay execution
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Optimized static methods for revenue calculations with retries
-OrderSchema.statics.calculateStats = async function (startDate, endDate, retryCount = 3) {
+OrderSchema.statics.calculateStats = async function (startDate, endDate, locationId = null, retryCount = 3) {
   const cacheKey = `stats_${startDate.toISOString()}_${endDate.toISOString()}`;
+  const locationObjectId = locationId
+    ? new mongoose.Types.ObjectId(locationId)
+    : null;
 
   for (let attempt = 1; attempt <= retryCount; attempt++) {
     try {
       const stats = await this.aggregate([
         {
           $match: {
-            createdAt: { $gte: startDate, $lt: endDate }
+            createdAt: { $gte: startDate, $lt: endDate },
+            deleted: { $ne: true },
+            ...(locationObjectId ? { location: locationObjectId } : {})
           }
         },
         {

@@ -34,7 +34,7 @@ const authenticateToken = async (req, res, next) => {
         // Verify JWT token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         // Use User model instead of Admin
-        const user = await User.findById(decoded.userId || decoded.id);
+        const user = await User.findById(decoded.userId || decoded.id).populate('location', 'name isActive');
         
         if (!user || !user.isActive) {
           return res.status(403).json({ 
@@ -58,7 +58,7 @@ const authenticateToken = async (req, res, next) => {
       'devices.deviceId': token,
       'devices.isActive': true,
       'devices.expiresAt': { $gt: new Date() }
-    });
+    }).populate('location', 'name isActive');
     if (!user) {
       // Try to find user with this device token (even if inactive/expired)
       const userWithDevice = await User.findOne({ 'devices.deviceId': token });

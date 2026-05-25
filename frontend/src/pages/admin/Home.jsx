@@ -7,8 +7,11 @@ import { useNotification } from "../../components/NotificationContext";
 import { api } from '../../utils/api';
 import OptimizedImage from "../../components/OptimizedImage";
 import { useRefresh } from "../../contexts/RefreshContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName } from "../../utils/location";
 
 export default function Home() {
+  const { user } = useAuth();
   const { cartItems, clearCart } = useCart();
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -31,6 +34,8 @@ export default function Home() {
   const [displayAvgOrder, setDisplayAvgOrder] = useState(0);
   const { socket } = useRefresh();
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+  const currentLocationId = getLocationId(user?.location);
+  const currentLocationName = getLocationName(user?.location, DEFAULT_LOCATION_NAME);
 
   // Function to check printer connection
   function checkPrinterConnection() {
@@ -409,6 +414,9 @@ export default function Home() {
                 <p className="text-lg font-semibold text-gray-800">
                   {getCurrentDate()}
                 </p>
+                <p className="mt-1 inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-orange-600 shadow-sm">
+                  {currentLocationName}
+                </p>
               </div>
               {/* Printer Button - now in date banner */}
               <button
@@ -580,6 +588,8 @@ export default function Home() {
           cartItems={cartItems}
           handleConfirmClearCart={handleConfirmClearCart}
           setShowClearCartConfirm={setShowClearCartConfirm}
+          locationId={currentLocationId}
+          locationName={currentLocationName}
         />
       </div>
 
@@ -608,4 +618,3 @@ export default function Home() {
     </div>
   );
 }
-

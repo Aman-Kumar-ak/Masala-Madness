@@ -7,8 +7,11 @@ import { useNotification } from "../../components/NotificationContext";
 import { API_URL } from "../../utils/config";
 import OptimizedImage from "../../components/OptimizedImage";
 import { api } from '../../utils/api';
+import { useAuth } from "../../contexts/AuthContext";
+import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName } from "../../utils/location";
 
 export default function WorkerHome() {
+  const { user } = useAuth();
   const { cartItems, clearCart } = useCart();
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -26,6 +29,8 @@ export default function WorkerHome() {
   const menuSectionRef = useRef(null);
   const [showPrinterDialog, setShowPrinterDialog] = useState(false);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+  const currentLocationId = getLocationId(user?.location);
+  const currentLocationName = getLocationName(user?.location, DEFAULT_LOCATION_NAME);
 
   // Function to check printer connection
   function checkPrinterConnection() {
@@ -272,6 +277,9 @@ export default function WorkerHome() {
               <span className="text-base min-[380px]:text-lg font-semibold text-gray-800 whitespace-nowrap mx-1 min-[380px]:mx-2">
                 {getCurrentDate()}
               </span>
+              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-600 shadow-sm">
+                {currentLocationName}
+              </span>
             </div>
             {/* Right group: Printer, Settings, Orders */}
             <div className="flex items-center gap-1 min-[380px]:gap-2">
@@ -379,6 +387,8 @@ export default function WorkerHome() {
           cartItems={cartItems}
           handleConfirmClearCart={handleConfirmClearCart}
           setShowClearCartConfirm={setShowClearCartConfirm}
+          locationId={currentLocationId}
+          locationName={currentLocationName}
         />
       </div>
 
@@ -408,4 +418,3 @@ export default function WorkerHome() {
     </div>
   );
 }
-

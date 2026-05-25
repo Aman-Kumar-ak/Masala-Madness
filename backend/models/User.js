@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'worker'],
     required: true
   },
+  location: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Location',
+    default: null,
+    index: true
+  },
   isActive: {
     type: Boolean,
     default: true

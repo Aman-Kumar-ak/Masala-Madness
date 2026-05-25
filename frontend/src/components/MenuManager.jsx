@@ -1,13 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import api, { API_BASE_URL } from '../utils/api';
+import api from '../utils/api';
 import Notification from './Notification';
 import ConfirmationDialog from './ConfirmationDialog';
 import DishModal from './DishModal';
 import { fadeIn, fadeInUp, staggerChildren, listItem } from '../utils/animations';
 import { getCategoryEmoji } from '../utils/helpers';
+import { getLocationId } from '../utils/location';
 
-const MenuManager = ({ categories, onUpdate }) => {
+const MenuManager = ({
+  categories,
+  locations = [],
+  selectedLocationId = '',
+  selectedLocationName = '',
+  locationLoading = false,
+  onLocationChange,
+  onUpdate,
+  onModalToggle
+}) => {
   const [newCategory, setNewCategory] = useState('');
   const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [newDish, setNewDish] = useState({
@@ -29,6 +39,8 @@ const MenuManager = ({ categories, onUpdate }) => {
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const hasSelectedLocation = Boolean(selectedLocationId);
+  const hasCategories = categories.length > 0;
 
   const markUpdatedNow = () => {
     setLastUpdatedAt(new Date());
@@ -76,8 +88,22 @@ const MenuManager = ({ categories, onUpdate }) => {
     };
   }, [showAddDishModal, showEditDishModal]);
 
+  useEffect(() => {
+    if (typeof onModalToggle === 'function') {
+      onModalToggle(showAddDishModal || showEditDishModal);
+    }
+  }, [showAddDishModal, showEditDishModal, onModalToggle]);
+
   const handleAddCategory = async (e) => {
     e.preventDefault();
+    if (!selectedLocationId) {
+      setNotification({
+        message: 'Select a location before adding categories.',
+        type: 'warning'
+      });
+      return;
+    }
+
     const categoryName = newCategory.trim();
     if (!categoryName) {
       setNotification({
@@ -100,7 +126,7 @@ const MenuManager = ({ categories, onUpdate }) => {
 
     setIsAddingCategory(true);
     try {
-      await api.post('/dishes', { categoryName });
+      await api.post('/dishes', { categoryName, locationId: selectedLocationId });
       setNewCategory('');
       setShowCategoryInput(false);
       await onUpdate();
@@ -365,6 +391,22 @@ const MenuManager = ({ categories, onUpdate }) => {
   };
 
   const openAddDishModal = (categoryId) => {
+    if (!selectedLocationId) {
+      setNotification({
+        message: 'Select a location before adding dishes.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (!categoryId) {
+      setNotification({
+        message: 'Add a category for this location before creating dishes.',
+        type: 'warning'
+      });
+      return;
+    }
+
     setNewDish({ 
       categoryId, 
       name: '', 
@@ -389,10 +431,52 @@ const MenuManager = ({ categories, onUpdate }) => {
           transition={{ duration: 0.3 }}
         >
           <h2 className="text-2xl font-bold text-orange-700 text-center sm:text-left">Menu Management</h2>
-          {lastUpdatedAt && (
-            <div className="text-xs text-gray-500 whitespace-nowrap mt-2 sm:mt-0 text-center sm:text-right">
-              Updated at - {formatUpdatedAt(lastUpdatedAt)}
+          <div className="flex flex-col items-center gap-2 sm:items-end">
+            <div className="w-full sm:w-72">
+              <label className="block text-xs font-semibold uppercase tracking-[0.28em] text-gray-500 mb-2 text-center sm:text-right">
+                Manage Location
+              </label>
+              <select
+                value={selectedLocationId}
+                onChange={(event) => onLocationChange?.(event.target.value)}
+                disabled={locationLoading || locations.length === 0}
+                className="w-full rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              >
+                {locations.length === 0 ? (
+                  <option value="">{locationLoading ? 'Loading locations...' : 'No locations available'}</option>
+                ) : (
+                  locations.map((location) => (
+                    <option key={getLocationId(location)} value={getLocationId(location)}>
+                      {location.name}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
+            {lastUpdatedAt && (
+              <div className="text-xs text-gray-500 whitespace-nowrap text-center sm:text-right">
+                Updated at - {formatUpdatedAt(lastUpdatedAt)}
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="mb-6 rounded-2xl border border-orange-100 bg-gradient-to-r from-orange-50 via-amber-50 to-white px-4 py-3 text-sm text-gray-700 shadow-sm"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+        >
+          {hasSelectedLocation ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.28em] text-orange-500">Active Branch</span>
+              <span className="inline-flex items-center rounded-full bg-white px-3 py-1 font-semibold text-orange-700 shadow-sm">
+                {selectedLocationName}
+              </span>
+              <span className="text-gray-500">Categories and dishes below belong only to this location.</span>
+            </div>
+          ) : (
+            <span>Select a location to load and manage its categories and dishes.</span>
           )}
         </motion.div>
 
@@ -465,11 +549,16 @@ const MenuManager = ({ categories, onUpdate }) => {
               <motion.button
                 key="add-category-button"
                 onClick={() => setShowCategoryInput(true)}
-                className="w-full sm:w-auto bg-green-500 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                className={`w-full sm:w-auto px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                  hasSelectedLocation
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
                 whileTap={{ scale: 0.95 }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                disabled={!hasSelectedLocation}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -481,11 +570,16 @@ const MenuManager = ({ categories, onUpdate }) => {
 
           <motion.button
             onClick={() => openAddDishModal(categories.length > 0 ? categories[0]._id : '')}
-            className="w-full sm:w-auto bg-blue-500 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+            className={`w-full sm:w-auto px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+              hasSelectedLocation && hasCategories
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
             whileTap={{ scale: 0.95 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
+            disabled={!hasSelectedLocation || !hasCategories}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -500,6 +594,16 @@ const MenuManager = ({ categories, onUpdate }) => {
           initial="initial"
           animate="animate"
         >
+          {categories.length === 0 && hasSelectedLocation ? (
+            <motion.div
+              className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 px-6 py-10 text-center text-gray-600"
+              variants={listItem}
+            >
+              <p className="text-lg font-semibold text-gray-800">No menu created for {selectedLocationName} yet.</p>
+              <p className="mt-2 text-sm text-gray-500">Start by adding a category, then add dishes under it.</p>
+            </motion.div>
+          ) : null}
+
           {categories.map((category) => (
             <motion.div key={category._id} variants={listItem} className="mb-6 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-gray-200">

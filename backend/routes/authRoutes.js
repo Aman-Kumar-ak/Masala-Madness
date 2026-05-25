@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { authenticateToken } = require('../middleware/authMiddleware');
-const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
 const { auth, adminAuth } = require('../middleware/authMiddleware');
 const SecretCode = require('../models/SecretCode');
 const bcrypt = require('bcryptjs');
+const { resolveLocation } = require('../utils/locationUtils');
 
 // Admin login
 router.post('/login', async (req, res) => {
@@ -19,7 +19,7 @@ router.post('/login', async (req, res) => {
         { username: username },
         { mobileNumber: username }
       ]
-    });
+    }).populate('location', 'name isActive');
     
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -80,6 +80,8 @@ router.post('/login', async (req, res) => {
       await user.save();
     }
 
+    await user.populate('location', 'name isActive');
+
     res.json({
       token,
       deviceToken: newDeviceToken,
@@ -95,7 +97,9 @@ router.post('/login', async (req, res) => {
 router.get('/verify', authenticateToken, async (req, res) => {
   try {
     // Fetch the full user object (excluding password)
-    const user = await User.findById(req.user._id || req.user.id).select('-password');
+    const user = await User.findById(req.user._id || req.user.id)
+      .select('-password')
+      .populate('location', 'name isActive');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -299,7 +303,7 @@ router.post('/verify-password', authenticateToken, async (req, res) => {
 // Register new user (admin only)
 router.post('/register', adminAuth, async (req, res) => {
   try {
-    const { name, mobileNumber, password, role } = req.body;
+    const { name, mobileNumber, password, role, locationId } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({
@@ -313,6 +317,11 @@ router.post('/register', adminAuth, async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    const location = await resolveLocation(locationId, { fallbackToDefault: true });
+    if (!location) {
+      return res.status(400).json({ message: 'Valid location is required.' });
+    }
+
     // Create new user
     const user = new User({
       username: mobileNumber, // Use mobile number as username
@@ -320,10 +329,12 @@ router.post('/register', adminAuth, async (req, res) => {
       name,
       mobileNumber,
       role,
+      location: location._id,
       assignedBy: req.user._id
     });
 
     await user.save();
+    await user.populate('location', 'name isActive');
 
     res.status(201).json({
       message: 'User created successfully',
@@ -341,6 +352,7 @@ router.get('/users', adminAuth, async (req, res) => {
     const users = await User.find({})
       .select('-password')
       .populate('assignedBy', 'name username')
+      .populate('location', 'name isActive')
       .sort({ createdAt: -1 });
 
     res.json(users);
@@ -353,10 +365,19 @@ router.get('/users', adminAuth, async (req, res) => {
 // Update user (admin only)
 router.put('/users/:id', adminAuth, async (req, res) => {
   try {
-    const { name, mobileNumber, password, role, isActive } = req.body;
+    const { name, mobileNumber, password, role, isActive, locationId } = req.body;
     const io = req.app.get('io');
     const userSockets = req.app.get('userSockets');
     let user;
+    let resolvedLocation = undefined;
+
+    if (locationId) {
+      resolvedLocation = await resolveLocation(locationId);
+      if (!resolvedLocation) {
+        return res.status(400).json({ message: 'Valid active location is required.' });
+      }
+    }
+
     if (password) {
       user = await User.findById(req.params.id);
       if (!user) {
@@ -369,8 +390,10 @@ router.put('/users/:id', adminAuth, async (req, res) => {
         user.username = mobileNumber;
       }
       if (role) user.role = role;
+      if (resolvedLocation) user.location = resolvedLocation._id;
       if (typeof isActive === 'boolean') user.isActive = isActive;
       await user.save();
+      await user.populate('location', 'name isActive');
     } else {
       const updates = {};
       if (name) updates.name = name;
@@ -379,12 +402,15 @@ router.put('/users/:id', adminAuth, async (req, res) => {
         updates.username = mobileNumber;
       }
       if (role) updates.role = role;
+      if (resolvedLocation) updates.location = resolvedLocation._id;
       if (typeof isActive === 'boolean') updates.isActive = isActive;
       user = await User.findByIdAndUpdate(
         req.params.id,
         { $set: updates },
         { new: true, runValidators: true }
-      ).select('-password');
+      )
+        .select('-password')
+        .populate('location', 'name isActive');
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -421,7 +447,7 @@ router.get('/profile', auth, async (req, res) => {
 // Get all devices with user info (admin only)
 router.get('/devices/all', adminAuth, async (req, res) => {
   try {
-    const users = await User.find({}).select('name role devices');
+    const users = await User.find({}).select('name role devices location').populate('location', 'name isActive');
     const allDevices = [];
     users.forEach(user => {
       user.devices.forEach(device => {
@@ -429,6 +455,7 @@ router.get('/devices/all', adminAuth, async (req, res) => {
           ...device.toObject(),
           userName: user.name,
           userRole: user.role,
+          locationName: user.location?.name || 'Unassigned',
           userId: user._id
         });
       });
@@ -677,7 +704,7 @@ router.post('/refresh-token', async (req, res) => {
       return res.status(400).json({ message: 'Device token is required.' });
     }
     // Find user with this deviceToken
-    const user = await User.findOne({ 'devices.deviceId': deviceToken });
+    const user = await User.findOne({ 'devices.deviceId': deviceToken }).populate('location', 'name isActive');
     if (!user) {
       return res.status(401).json({ message: 'Invalid device token.' });
     }
@@ -707,6 +734,8 @@ router.post('/refresh-token', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+    await user.populate('location', 'name isActive');
+
     res.json({
       token,
       user: user.getPublicProfile(),

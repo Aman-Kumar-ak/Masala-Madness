@@ -6,8 +6,9 @@ import { getCategoryEmoji } from '../utils/helpers';
 import { useCart } from '../components/CartContext';
 import ConfirmationDialog from './ConfirmationDialog';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { DEFAULT_LOCATION_NAME } from '../utils/location';
 
-const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) => {
+const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm, locationId = '', locationName = DEFAULT_LOCATION_NAME }) => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +30,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
       setConnectionError(false);
       setEmptyMenu(false);
       
-      const data = await fetchCategories();
+      const data = await fetchCategories(locationId);
       if (!Array.isArray(data)) {
         throw new Error('Invalid data format received');
       }
@@ -61,7 +62,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
 
   useEffect(() => {
     loadAllData();
-  }, []);
+  }, [locationId]);
 
   useEffect(() => {
     // Disconnect existing observer if it exists
@@ -200,7 +201,7 @@ const Menu = ({ cartItems, handleConfirmClearCart, setShowClearCartConfirm }) =>
       <div className="text-center py-12 bg-yellow-50 rounded-lg p-6 border border-yellow-200">
         <div className="mb-4 text-yellow-500 text-5xl">🍽️</div>
         <h3 className="text-xl font-bold text-yellow-600 mb-2">Menu is Empty</h3>
-        <p className="text-gray-600 mb-6">There are no menu items available at the moment.</p>
+        <p className="text-gray-600 mb-6">There are no menu items available right now for {locationName || DEFAULT_LOCATION_NAME}.</p>
         <Link 
           to="/admin"
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all duration-200 shadow-md"

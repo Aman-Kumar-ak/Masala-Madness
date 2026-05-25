@@ -5,6 +5,7 @@ import BackButton from '../../components/BackButton';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { useNotification } from '../../components/NotificationContext';
 import ApkDownloadCard from '../../components/ApkDownloadCard';
+import { DEFAULT_LOCATION_NAME, getLocationName } from '../../utils/location';
 // import api from '../../utils/api'; // Not needed if password change is removed
 // import useKeyboardScrollAdjustment from '../../hooks/useKeyboardScrollAdjustment'; // Only if needed by logout
 
@@ -57,6 +58,18 @@ export default function WorkerSettings() {
               <div className="space-y-4">
 
             <ApkDownloadCard />
+
+            {user && (
+              <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 shadow-sm">
+                <h2 className="text-lg font-semibold text-blue-800 mb-2">Current Account</h2>
+                <p className="text-gray-700">
+                  Logged in as: <span className="font-medium">{user.username}</span>
+                </p>
+                <p className="text-gray-700 mt-2">
+                  Location: <span className="font-medium text-orange-700">{getLocationName(user.location, DEFAULT_LOCATION_NAME)}</span>
+                </p>
+              </div>
+            )}
 
             {/* Logout Section */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">

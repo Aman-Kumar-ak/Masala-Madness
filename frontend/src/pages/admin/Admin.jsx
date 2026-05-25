@@ -5,19 +5,20 @@ import { fetchCategories } from "../../utils/fetchCategories";
 import BackButton from "../../components/BackButton";
 import Notification from "../../components/Notification";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { useNotification } from "../../components/NotificationContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
-import { useRefresh } from "../../contexts/RefreshContext";
-import { API_URL } from "../../utils/config";
 import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment";
 import { api } from '../../utils/api';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { getLocationId, getLocationName } from "../../utils/location";
 
 const Admin = () => {
   useKeyboardScrollAdjustment();
+  const { user } = useAuth();
   const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [locationsLoading, setLocationsLoading] = useState(true);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [activeDiscount, setActiveDiscount] = useState(null);
   const [newDiscount, setNewDiscount] = useState({
@@ -31,11 +32,44 @@ const Admin = () => {
   const [isDishModalOpen, setIsDishModalOpen] = useState(false);
   
   const discountFormRef = useRef(null);
+  const currentUserLocationId = getLocationId(user?.location);
+  const selectedLocation = locations.find((location) => getLocationId(location) === selectedLocationId) || null;
 
-  const loadCategories = async () => {
+  const loadLocations = async () => {
+    try {
+      setLocationsLoading(true);
+      const data = await api.get('/locations');
+      const nextLocations = Array.isArray(data) ? data : [];
+      setLocations(nextLocations);
+      setSelectedLocationId((previousLocationId) => {
+        if (previousLocationId && nextLocations.some((location) => getLocationId(location) === previousLocationId)) {
+          return previousLocationId;
+        }
+
+        if (currentUserLocationId && nextLocations.some((location) => getLocationId(location) === currentUserLocationId)) {
+          return currentUserLocationId;
+        }
+
+        return getLocationId(nextLocations[0]);
+      });
+    } catch (error) {
+      console.error('Error loading locations:', error);
+      setNotification({ message: 'Failed to load locations', type: 'error' });
+    } finally {
+      setLocationsLoading(false);
+    }
+  };
+
+  const loadCategories = async (locationId = selectedLocationId) => {
+    if (!locationId) {
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await fetchCategories();
+      const data = await fetchCategories(locationId);
       // Sort categories alphabetically by categoryName
       const sortedCategories = data.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
       setCategories(sortedCategories);
@@ -62,9 +96,20 @@ const Admin = () => {
   };
 
   useEffect(() => {
-    loadCategories();
+    loadLocations();
     loadActiveDiscount();
   }, []);
+
+  useEffect(() => {
+    if (!selectedLocationId) {
+      if (!locationsLoading) {
+        setLoading(false);
+      }
+      return;
+    }
+
+    loadCategories(selectedLocationId);
+  }, [selectedLocationId, locationsLoading]);
 
   useEffect(() => {
     // Handle clicks outside the discount form
@@ -136,8 +181,11 @@ const Admin = () => {
 
   // Handler to notify after MenuManager updates (categories or dishes)
   const handleMenuUpdate = async () => {
-    await loadCategories();
-    setNotification({ message: "Categories/Dishes updated successfully", type: "success" });
+    await Promise.all([loadCategories(selectedLocationId), loadLocations()]);
+    setNotification({
+      message: `Menu updated for ${getLocationName(selectedLocation, 'the selected location')}`,
+      type: "success"
+    });
   };
 
   // Handler to update dish modal open state and manage body scroll
@@ -324,7 +372,16 @@ const Admin = () => {
               </div>
             ) : (
               <div className="bg-gradient-to-r from-orange-50 to-blue-50 p-2 rounded-lg border border-blue-200 shadow-sm">
-                <MenuManager categories={categories} onUpdate={handleMenuUpdate} onModalToggle={handleDishModalToggle} />
+                <MenuManager
+                  categories={categories}
+                  locations={locations}
+                  selectedLocationId={selectedLocationId}
+                  selectedLocationName={getLocationName(selectedLocation, '')}
+                  locationLoading={locationsLoading}
+                  onLocationChange={setSelectedLocationId}
+                  onUpdate={handleMenuUpdate}
+                  onModalToggle={handleDishModalToggle}
+                />
               </div>
             )}
           </div>

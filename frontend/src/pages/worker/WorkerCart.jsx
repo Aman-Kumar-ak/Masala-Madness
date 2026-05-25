@@ -9,6 +9,7 @@ import useKeyboardScrollAdjustment from "../../hooks/useKeyboardScrollAdjustment
 import { api } from '../../utils/api';
 import AuthContext from '../../contexts/AuthContext';
 import { buildKotDataFromOrder, sendKotToPrinter } from '../../utils/kotPrint';
+import { getLocationId } from '../../utils/location';
 
 function getISTISOString(date) {
   const d = date ? new Date(date) : new Date();
@@ -237,6 +238,7 @@ export default function WorkerCart() {
       customCashAmount: isPaid && paymentMethod === "Custom" ? customCashAmount : undefined,
       customOnlineAmount: isPaid && paymentMethod === "Custom" ? customOnlineAmount : undefined,
       confirmedBy: user?.name || user?.username || user?.mobileNumber,
+      locationId: getLocationId(user?.location),
       printKOT
     };
     if (!isPaid && printKOT) payload.KOT = 1;

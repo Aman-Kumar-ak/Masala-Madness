@@ -35,7 +35,13 @@ const dishSchema = new mongoose.Schema({
 });
 
 const categorySchema = new mongoose.Schema({
-  categoryName: { type: String, required: true },
+  categoryName: { type: String, required: true, trim: true },
+  location: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Location',
+    required: true,
+    index: true
+  },
   dishes: [dishSchema]
 });
 

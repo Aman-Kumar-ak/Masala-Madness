@@ -10,6 +10,17 @@ const DeletedOrderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  location: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Location',
+    required: true,
+    index: true
+  },
+  locationName: {
+    type: String,
+    default: null,
+    trim: true
+  },
   items: [
     {
       name: { type: String, required: true },

@@ -1,4 +1,6 @@
 // src/utils/api.js
+import { appendQueryParams } from './location';
+
 const API_BASE_URL = "https://masala-madness.onrender.com/api"; // Backend base URL
 
 // Get auth token from sessionStorage or fallback to device token from localStorage
@@ -116,9 +118,10 @@ const api = {
   },
 
   // Get signed Excel download link
-  async getSignedExcelLink(date) {
+  async getSignedExcelLink(date, locationId = '') {
     try {
-      const response = await fetch(`${API_BASE_URL}/orders/excel-link/${date}`, {
+      const endpoint = appendQueryParams(`/orders/excel-link/${date}`, { locationId });
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'GET',
         headers: getHeaders(true),
       });
