@@ -1,7 +1,6 @@
 // src/utils/api.js
 import { appendQueryParams } from './location';
-
-const API_BASE_URL = "https://masala-madness.onrender.com/api"; // Backend base URL
+import { API_BASE_URL } from './config';
 
 // Get auth token from sessionStorage or fallback to device token from localStorage
 const getToken = () => sessionStorage.getItem('token') || localStorage.getItem('deviceToken');

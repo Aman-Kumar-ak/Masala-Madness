@@ -4,6 +4,7 @@ import { api } from '../utils/api';
 import OfflinePage from '../components/OfflinePage';
 import { io } from 'socket.io-client';
 import { useNotification } from '../components/NotificationContext';
+import { API_BASE_URL, SOCKET_URL } from '../utils/config';
 
 const AuthContext = createContext();
 
@@ -440,9 +441,7 @@ export const AuthProvider = ({ children }) => {
   // Setup socket.io connection after login
   useEffect(() => {
     if (user && user._id) {
-      // Use backend base URL (remove /api)
-      const backendUrl = 'https://masala-madness.onrender.com';
-      const sock = io(backendUrl, {
+      const sock = io(SOCKET_URL, {
         transports: ['websocket'],
         reconnection: true,
         reconnectionAttempts: 5,
@@ -513,8 +512,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const handleBeforeUnload = (event) => {
       if (isAuthenticated && user && user._id) {
-          // Use the full backend URL for the API endpoint
-        const url = 'https://masala-madness.onrender.com/api/auth/last-closed';
+        const url = `${API_BASE_URL}/auth/last-closed`;
         const payload = JSON.stringify({ userId: user._id });
         console.log('Sending lastClosed update', user._id);
         if (navigator.sendBeacon) {
@@ -540,8 +538,7 @@ export const AuthProvider = ({ children }) => {
   // Update lastClosed when user goes offline
   useEffect(() => {
     if (isOffline && isAuthenticated && user && user._id) {
-      // Use the full backend URL for the API endpoint
-      const url = 'https://masala-madness.onrender.com/api/auth/last-closed';
+      const url = `${API_BASE_URL}/auth/last-closed`;
       const payload = JSON.stringify({ userId: user._id });
       console.log('Sending lastClosed update due to offline', user._id);
       if (navigator.sendBeacon) {

@@ -10,6 +10,7 @@ import io from 'socket.io-client';
 import OptimizedImage from '../../components/OptimizedImage';
 import ApkDownloadCard from '../../components/ApkDownloadCard';
 import { DEFAULT_LOCATION_NAME, getLocationId, getLocationName } from '../../utils/location';
+import { SOCKET_URL } from '../../utils/config';
 // Add this helper at the top of the file (after imports)
 function normalizeName(name) {
   return name.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -1316,8 +1317,7 @@ const Settings = () => {
 
   // Setup socket.io for admin online status updates
   useEffect(() => {
-    const backendUrl = 'https://masala-madness.onrender.com';
-    const sock = io(backendUrl, {
+    const sock = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 5

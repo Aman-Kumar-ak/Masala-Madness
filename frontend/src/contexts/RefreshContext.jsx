@@ -2,9 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { isOrderEventForLocation } from '../utils/location';
-
-// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const SOCKET_URL = 'https://masala-madness.onrender.com'; // Backend WebSocket endpoint
+import { API_BASE_URL, SOCKET_URL } from '../utils/config';
 
 const RefreshContext = createContext();
 
@@ -13,7 +11,7 @@ export const useRefresh = () => useContext(RefreshContext);
 // Helper to wake up backend before connecting socket, with timeout
 async function wakeUpBackendWithTimeout(timeoutMs = 2000) {
   return Promise.race([
-    fetch('https://masala-madness.onrender.com/api/ping', { cache: 'no-store' }),
+    fetch(`${API_BASE_URL}/ping`, { cache: 'no-store' }),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Backend wakeup timeout')), timeoutMs))
   ]);
 }
@@ -23,7 +21,7 @@ async function refreshTokenWithDeviceToken() {
   const deviceToken = localStorage.getItem('deviceToken');
   if (!deviceToken) return null;
   try {
-    const res = await fetch('https://masala-madness.onrender.com/api/auth/refresh-token', {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceToken })

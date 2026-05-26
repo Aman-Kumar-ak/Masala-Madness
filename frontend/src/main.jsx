@@ -9,12 +9,13 @@ import { RefreshProvider } from './contexts/RefreshContext'; // ✅ Import the R
 import { AuthProvider } from './contexts/AuthContext'; // ✅ Import the AuthProvider
 import { initializeFastImageLoading, preloadImages, preloadPwaIcons } from './utils/imageOptimizations'; // Import image optimization
 import { NotificationProvider } from './components/NotificationContext';
+import { API_BASE_URL } from './utils/config';
 
 // Aggressively wake up backend and DB as soon as possible for fast initial load
 Promise.all([
-  fetch('https://masala-madness.onrender.com/api/ping', { cache: 'no-store' }),
-  fetch('https://masala-madness.onrender.com/api/dishes', { cache: 'no-store' }),
-  fetch('https://masala-madness.onrender.com/api/orders/today', { cache: 'no-store' })
+  fetch(`${API_BASE_URL}/ping`, { cache: 'no-store' }),
+  fetch(`${API_BASE_URL}/dishes`, { cache: 'no-store' }),
+  fetch(`${API_BASE_URL}/orders/today`, { cache: 'no-store' })
 ]).catch(() => {});
 
 // Initialize image loading with async functions
